@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "tsc",
+    "build": "tsup",
+    "type-check": "tsc --noEmit",
     "start": "node dist/server.js"
   },
   "dependencies": {
@@ -17,6 +18,8 @@
     "@gr-barber/database": "workspace:*"
   },
   "devDependencies": {
+    "@gr-barber/config": "workspace:*",
+    "tsup": "^8.5.1",
     "tsx": "^4.19.0",
     "typescript": "^5.5.0",
     "@types/node": "^22.0.0"
