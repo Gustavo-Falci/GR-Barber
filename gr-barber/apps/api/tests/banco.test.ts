@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { prisma } from "@gr-barber/database";
+import { limparBanco } from "./helpers/limpar-banco";
 
 describe("banco de teste", () => {
   it("conecta e começa vazio", async () => {
@@ -16,15 +17,17 @@ describe("banco de teste", () => {
     expect(linhas).toHaveLength(1);
   });
 
-  it("limpa o banco entre um caso e outro", async () => {
+  it("limpa o banco quando limparBanco roda", async () => {
     await prisma.barbearia.create({
       data: { nome: "Barbearia Teste", slug: "teste-limpeza" },
     });
     expect(await prisma.barbearia.count()).toBe(1);
-    // o beforeEach do setup.ts derruba isso antes do próximo caso
-  });
 
-  it("de fato começou vazio de novo", async () => {
+    // Chama o helper direto, em vez de criar uma linha num caso e
+    // conferir no seguinte que ela sumiu. Aquele formato só provaria
+    // alguma coisa se os dois casos rodassem nessa ordem — isolado, o
+    // segundo passaria de graça.
+    await limparBanco();
     expect(await prisma.barbearia.count()).toBe(0);
   });
 });
