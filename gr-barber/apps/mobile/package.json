@@ -1,0 +1,10 @@
+{
+  "name": "@gr-barber/mobile",
+  "version": "0.1.0",
+  "private": true,
+  "dependencies": {
+    "@gr-barber/types": "workspace:*",
+    "@gr-barber/design-tokens": "workspace:*",
+    "@gr-barber/scheduling": "workspace:*"
+  }
+}

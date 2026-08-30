@@ -1,0 +1,145 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// A EXCLUDE USING gist (que trava conflito de horário) e a coluna
+// `periodo` gerada não têm representação no schema declarativo do
+// Prisma — elas são adicionadas à mão na migration inicial.
+// Veja prisma/migrations/20260829120000_init/migration.sql.
+
+enum StatusAgendamento {
+  pendente
+  confirmado
+  concluido
+  cancelado
+  no_show
+
+  @@map("status_agendamento")
+}
+
+enum OrigemAgendamento {
+  cliente
+  barbeiro
+
+  @@map("origem_agendamento")
+}
+
+model Barbearia {
+  id       String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  nome     String   @db.VarChar(120)
+  slug     String   @unique @db.VarChar(80)
+  telefone String?  @db.VarChar(20)
+  endereco String?  @db.VarChar(255)
+  logoUrl  String?  @map("logo_url")
+  criadoEm DateTime @default(now()) @map("criado_em") @db.Timestamptz
+
+  barbeiros             Barbeiro[]
+  servicos              Servico[]
+  horariosFuncionamento HorarioFuncionamento[]
+  agendamentos          Agendamento[]
+
+  @@map("barbearia")
+}
+
+model HorarioFuncionamento {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  barbeariaId    String    @map("barbearia_id") @db.Uuid
+  diaSemana      Int       @map("dia_semana") @db.SmallInt
+  horaAbertura   DateTime? @map("hora_abertura") @db.Time
+  horaFechamento DateTime? @map("hora_fechamento") @db.Time
+  fechado        Boolean   @default(false)
+
+  barbearia Barbearia @relation(fields: [barbeariaId], references: [id], onDelete: Cascade)
+
+  @@unique([barbeariaId, diaSemana])
+  @@map("horario_funcionamento")
+}
+
+model Barbeiro {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  barbeariaId String   @map("barbearia_id") @db.Uuid
+  nome        String   @db.VarChar(120)
+  email       String?  @unique @db.VarChar(160)
+  senhaHash   String   @map("senha_hash")
+  telefone    String?  @db.VarChar(20)
+  ativo       Boolean  @default(true)
+  criadoEm    DateTime @default(now()) @map("criado_em") @db.Timestamptz
+
+  barbearia    Barbearia     @relation(fields: [barbeariaId], references: [id], onDelete: Cascade)
+  agendamentos Agendamento[]
+
+  @@index([barbeariaId])
+  @@map("barbeiro")
+}
+
+model Cliente {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  nome      String   @db.VarChar(120)
+  telefone  String   @unique @db.VarChar(20)
+  email     String?  @unique @db.VarChar(160)
+  senhaHash String?  @map("senha_hash")
+  criadoEm  DateTime @default(now()) @map("criado_em") @db.Timestamptz
+
+  agendamentos Agendamento[]
+
+  @@map("cliente")
+}
+
+model Servico {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  barbeariaId    String   @map("barbearia_id") @db.Uuid
+  nome           String   @db.VarChar(120)
+  duracaoMinutos Int      @map("duracao_minutos") @db.SmallInt
+  preco          Decimal  @db.Decimal(10, 2)
+  ativo          Boolean  @default(true)
+  criadoEm       DateTime @default(now()) @map("criado_em") @db.Timestamptz
+
+  barbearia           Barbearia            @relation(fields: [barbeariaId], references: [id], onDelete: Cascade)
+  agendamentoServicos AgendamentoServico[]
+
+  @@index([barbeariaId])
+  @@map("servico")
+}
+
+model Agendamento {
+  id          String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  barbeariaId String            @map("barbearia_id") @db.Uuid
+  barbeiroId  String            @map("barbeiro_id") @db.Uuid
+  clienteId   String            @map("cliente_id") @db.Uuid
+  data        DateTime          @db.Date
+  horaInicio  DateTime          @map("hora_inicio") @db.Time
+  horaFim     DateTime          @map("hora_fim") @db.Time
+  status      StatusAgendamento @default(confirmado)
+  origem      OrigemAgendamento @default(cliente)
+  observacoes String?
+  criadoEm    DateTime          @default(now()) @map("criado_em") @db.Timestamptz
+
+  barbearia Barbearia            @relation(fields: [barbeariaId], references: [id], onDelete: Cascade)
+  barbeiro  Barbeiro             @relation(fields: [barbeiroId], references: [id])
+  cliente   Cliente              @relation(fields: [clienteId], references: [id])
+  servicos  AgendamentoServico[]
+
+  @@index([barbeiroId, data])
+  @@index([clienteId])
+  @@index([barbeariaId, data])
+  @@map("agendamento")
+}
+
+model AgendamentoServico {
+  id                 String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  agendamentoId      String  @map("agendamento_id") @db.Uuid
+  servicoId          String  @map("servico_id") @db.Uuid
+  precoNoMomento     Decimal @map("preco_no_momento") @db.Decimal(10, 2)
+  duracaoNoMomento   Int     @map("duracao_no_momento") @db.SmallInt
+
+  agendamento Agendamento @relation(fields: [agendamentoId], references: [id], onDelete: Cascade)
+  servico     Servico     @relation(fields: [servicoId], references: [id])
+
+  @@index([agendamentoId])
+  @@map("agendamento_servico")
+}

@@ -1,0 +1,24 @@
+{
+  "name": "@gr-barber/api",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js"
+  },
+  "dependencies": {
+    "fastify": "^5.0.0",
+    "@fastify/cors": "^10.0.0",
+    "@fastify/jwt": "^9.0.0",
+    "@fastify/type-provider-json-schema-to-ts": "^4.0.0",
+    "@gr-barber/types": "workspace:*",
+    "@gr-barber/scheduling": "workspace:*",
+    "@gr-barber/database": "workspace:*"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0",
+    "typescript": "^5.5.0",
+    "@types/node": "^22.0.0"
+  }
+}
