@@ -4,6 +4,8 @@ import type { JsonSchemaToTsProvider } from "@fastify/type-provider-json-schema-
 import { calcularHorariosDisponiveis } from "@gr-barber/scheduling";
 import { prisma } from "@gr-barber/database";
 import { registrarTratamentoDeErros } from "./plugins/erros";
+import { registrarAuth } from "./plugins/auth";
+import { registrarRotasAuth } from "./rotas/auth";
 import type { App } from "./tipos";
 
 // Monta a instância sem escutar em porta nenhuma. É o que permite os
@@ -18,6 +20,9 @@ export function buildApp(opts: { logger?: boolean } = {}): App {
   app.register(cors, { origin: true });
 
   registrarTratamentoDeErros(app);
+
+  registrarAuth(app);
+  registrarRotasAuth(app);
 
   app.get("/health", async () => ({ status: "ok" }));
 
