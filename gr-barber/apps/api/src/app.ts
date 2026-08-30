@@ -3,6 +3,7 @@ import Fastify from "fastify";
 import type { JsonSchemaToTsProvider } from "@fastify/type-provider-json-schema-to-ts";
 import { calcularHorariosDisponiveis } from "@gr-barber/scheduling";
 import { prisma } from "@gr-barber/database";
+import { registrarTratamentoDeErros } from "./plugins/erros";
 import type { App } from "./tipos";
 
 // Monta a instância sem escutar em porta nenhuma. É o que permite os
@@ -15,6 +16,8 @@ export function buildApp(opts: { logger?: boolean } = {}): App {
   // origin: true por enquanto — trocar por uma lista explícita
   // (domínio do painel web + esquema do app mobile) antes de produção.
   app.register(cors, { origin: true });
+
+  registrarTratamentoDeErros(app);
 
   app.get("/health", async () => ({ status: "ok" }));
 
