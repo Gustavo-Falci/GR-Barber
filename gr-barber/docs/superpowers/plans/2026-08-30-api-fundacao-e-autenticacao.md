@@ -1230,7 +1230,9 @@ numa transação, e já devolve o token pra tela entrar logada.
 - Create: `apps/api/src/plugins/auth.ts`
 - Create: `apps/api/src/rotas/auth.ts`
 - Modify: `apps/api/src/app.ts`
+- Modify: `apps/api/src/plugins/erros.ts`
 - Test: `apps/api/tests/rotas/auth-signup.test.ts`
+- Test: `apps/api/tests/erros.test.ts`
 
 **Interfaces:**
 - Consumes: `gerarHashSenha` (Task 5), `App` (Task 4), `ErroDeNegocio` (Task 6).
@@ -1411,6 +1413,55 @@ export function registrarAuth(app: App): void {
 export async function autenticar(request: FastifyRequest): Promise<void> {
   await request.jwtVerify();
 }
+```
+
+- [ ] **Step 3b: Estender o tratamento de erro pro resto do `@fastify/jwt`**
+
+Esta task é a primeira que registra o `@fastify/jwt`, então é ela que
+responde pela superfície de erro dele. A Task 6 já normaliza todo 401,
+mas o plugin também lança dois erros com status **400** —
+`FST_JWT_BAD_REQUEST` (cabeçalho `Authorization` malformado) e
+`FST_JWT_BAD_COOKIE_REQUEST` — que cairiam no repasse genérico e
+colocariam o código interno do plugin dentro do campo `erro`. É o mesmo
+vazamento de contrato que o ramo de 401 fechou.
+
+Em `apps/api/src/plugins/erros.ts`, trocar a condição do ramo de 401:
+
+```ts
+    // Toda falha vinda do @fastify/jwt é falha de autenticação, inclusive
+    // as duas que o plugin classifica como 400 (cabeçalho Authorization
+    // malformado, cookie ilegível). Tratar as duas como 401 mantém o
+    // nome interno do plugin fora do contrato, e descreve melhor o que
+    // houve: quem manda um cabeçalho torto não está autenticado.
+    if (status === 401 || erro.code?.startsWith("FST_JWT")) {
+      return reply.code(401).send({ erro: "nao_autenticado" });
+    }
+```
+
+E acrescentar este caso em `apps/api/tests/erros.test.ts`:
+
+```ts
+  it("trata o 400 do @fastify/jwt como falha de autenticação", async () => {
+    const app = buildApp();
+    app.get("/teste-jwt-400", async () => {
+      // O plugin lança isto quando o cabeçalho Authorization existe mas
+      // não está no formato "Bearer <token>".
+      const erro = new Error(
+        "Format is Authorization: Bearer [token]"
+      ) as Error & { statusCode: number; code: string };
+      erro.statusCode = 400;
+      erro.code = "FST_JWT_BAD_REQUEST";
+      throw erro;
+    });
+
+    const resposta = await app.inject({ method: "GET", url: "/teste-jwt-400" });
+
+    expect(resposta.statusCode).toBe(401);
+    expect(resposta.json()).toEqual({ erro: "nao_autenticado" });
+    expect(resposta.body).not.toContain("FST_JWT");
+
+    await app.close();
+  });
 ```
 
 - [ ] **Step 4: Escrever a rota de signup**
