@@ -133,26 +133,34 @@ export function registrarRotasAuth(app: App): void {
       // propósito. O relógio entregaria o que o corpo esconde. Por
       // isso o caminho sem barbeiro confere contra um hash descartável
       // — o resultado é sempre falso, mas custa o mesmo.
+      //
+      // Barbeiro desativado é tratado como inexistente: mesma resposta,
+      // mesmo custo. `ativo` existe no schema desde a migration inicial;
+      // sem esta linha, desativar alguém no futuro não tiraria o acesso
+      // dele, e a falha seria silenciosa — ninguém testa o login de uma
+      // conta que acabou de ser desligada.
+      const autorizado = barbeiro?.ativo ? barbeiro : null;
+
       const hashParaConferir =
-        barbeiro?.senhaHash ?? (await obterHashDescartavel());
+        autorizado?.senhaHash ?? (await obterHashDescartavel());
       const senhaConfere = await conferirSenha(senha, hashParaConferir);
 
-      if (!barbeiro || !senhaConfere) {
+      if (!autorizado || !senhaConfere) {
         return reply.code(401).send({ erro: "credenciais_invalidas" });
       }
 
       const token = app.jwt.sign({
-        barbeiroId: barbeiro.id,
-        barbeariaId: barbeiro.barbeariaId,
+        barbeiroId: autorizado.id,
+        barbeariaId: autorizado.barbeariaId,
       });
 
       return reply.code(200).send({
         token,
-        barbeiro: { id: barbeiro.id, nome: barbeiro.nome, email: barbeiro.email },
+        barbeiro: { id: autorizado.id, nome: autorizado.nome, email: autorizado.email },
         barbearia: {
-          id: barbeiro.barbearia.id,
-          nome: barbeiro.barbearia.nome,
-          slug: barbeiro.barbearia.slug,
+          id: autorizado.barbearia.id,
+          nome: autorizado.barbearia.nome,
+          slug: autorizado.barbearia.slug,
         },
       });
     }

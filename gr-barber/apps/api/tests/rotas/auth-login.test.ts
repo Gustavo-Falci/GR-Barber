@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { prisma } from "@gr-barber/database";
 import { buildApp } from "../../src/app";
 import { conferirSenha } from "../../src/lib/senha";
 import { obterHashDescartavel } from "../../src/rotas/auth";
@@ -41,6 +42,9 @@ describe("POST /auth/login", () => {
     });
 
     expect(resposta.statusCode).toBe(401);
+    // Fixar o corpo, não só o status: sem isto o teste passaria mesmo
+    // se a rota devolvesse {} ou outro código.
+    expect(resposta.json()).toEqual({ erro: "credenciais_invalidas" });
 
     await app.close();
   });
@@ -80,6 +84,25 @@ describe("POST /auth/login", () => {
     });
 
     expect(resposta.body).not.toContain("scrypt$");
+
+    await app.close();
+  });
+
+  it("recusa barbeiro desativado com a mesma resposta", async () => {
+    const app = buildApp();
+    await cadastrar(app);
+    await prisma.barbeiro.updateMany({ data: { ativo: false } });
+
+    const resposta = await app.inject({
+      method: "POST",
+      url: "/auth/login",
+      payload: { email: "gu@exemplo.com", senha: "senha-forte-123" },
+    });
+
+    // Senha certa, conta desligada: mesma resposta de credencial
+    // inválida, pra não confirmar que a conta existe.
+    expect(resposta.statusCode).toBe(401);
+    expect(resposta.json()).toEqual({ erro: "credenciais_invalidas" });
 
     await app.close();
   });
