@@ -33,7 +33,13 @@ export function registrarTratamentoDeErros(app: App): void {
     // crus colocaria o nome interno de um plugin dentro do contrato da
     // API — e as 23 telas passariam a ramificar em cima dele. Pra quem
     // consome, toda falha de token é a mesma coisa.
-    if (status === 401) {
+    //
+    // Toda falha vinda do @fastify/jwt é falha de autenticação, inclusive
+    // as duas que o plugin classifica como 400 (cabeçalho Authorization
+    // malformado, cookie ilegível). Tratar as duas como 401 mantém o
+    // nome interno do plugin fora do contrato, e descreve melhor o que
+    // houve: quem manda um cabeçalho torto não está autenticado.
+    if (status === 401 || erro.code?.startsWith("FST_JWT")) {
       return reply.code(401).send({ erro: "nao_autenticado" });
     }
 

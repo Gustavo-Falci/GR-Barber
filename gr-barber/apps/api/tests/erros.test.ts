@@ -70,6 +70,28 @@ describe("tratamento de erros", () => {
     await app.close();
   });
 
+  it("trata o 400 do @fastify/jwt como falha de autenticação", async () => {
+    const app = buildApp();
+    app.get("/teste-jwt-400", async () => {
+      // O plugin lança isto quando o cabeçalho Authorization existe mas
+      // não está no formato "Bearer <token>".
+      const erro = new Error(
+        "Format is Authorization: Bearer [token]"
+      ) as Error & { statusCode: number; code: string };
+      erro.statusCode = 400;
+      erro.code = "FST_JWT_BAD_REQUEST";
+      throw erro;
+    });
+
+    const resposta = await app.inject({ method: "GET", url: "/teste-jwt-400" });
+
+    expect(resposta.statusCode).toBe(401);
+    expect(resposta.json()).toEqual({ erro: "nao_autenticado" });
+    expect(resposta.body).not.toContain("FST_JWT");
+
+    await app.close();
+  });
+
   it("esconde erro inesperado atrás de 500 genérico", async () => {
     const app = buildApp();
     app.get("/teste-explosao", async () => {
