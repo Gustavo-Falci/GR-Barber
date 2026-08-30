@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { prisma } from "@gr-barber/database";
 import { buildApp } from "../../src/app";
 import type { App } from "../../src/tipos";
 
@@ -7,13 +8,17 @@ const CADASTRO = {
   barbeiro: { nome: "Gustavo", email: "gu@exemplo.com", senha: "senha-forte-123" },
 };
 
-async function cadastrarEObterToken(app: App): Promise<string> {
+async function cadastrar(app: App) {
   const resposta = await app.inject({
     method: "POST",
     url: "/auth/signup",
     payload: CADASTRO,
   });
-  return resposta.json().token;
+  return resposta.json();
+}
+
+async function cadastrarEObterToken(app: App): Promise<string> {
+  return (await cadastrar(app)).token;
 }
 
 describe("GET /me", () => {
@@ -98,6 +103,57 @@ describe("GET /me", () => {
     });
 
     expect(resposta.statusCode).toBe(401);
+
+    await app.close();
+  });
+
+  it("recusa token válido de barbeiro desativado com 401", async () => {
+    const app = buildApp();
+    const token = await cadastrarEObterToken(app);
+
+    // Desativar depois de o token ter sido emitido. Se o hook só
+    // conferisse a assinatura, este token continuaria valendo — e
+    // desativar um barbeiro não tiraria o acesso dele.
+    await prisma.barbeiro.updateMany({ data: { ativo: false } });
+
+    const resposta = await app.inject({
+      method: "GET",
+      url: "/me",
+      headers: { authorization: `Bearer ${token}` },
+    });
+
+    expect(resposta.statusCode).toBe(401);
+    expect(resposta.json()).toEqual({ erro: "nao_autenticado" });
+
+    await app.close();
+  });
+
+  it("recusa token expirado com 401", async () => {
+    const app = buildApp();
+    const cadastro = await cadastrar(app);
+
+    // Mesmo segredo, mesmo payload, só o `exp` no passado: é o que
+    // separa "assinatura confere" de "token ainda vale".
+    //
+    // O `exp` vai no payload, e não como `expiresIn: "-1s"`: o fast-jwt
+    // recusa expiresIn negativo já na construção do assinante, mas
+    // respeita o `exp` que vier pronto no payload em vez de recalcular
+    // a partir do expiresIn do plugin.
+    const payloadExpirado = {
+      barbeiroId: cadastro.barbeiro.id,
+      barbeariaId: cadastro.barbearia.id,
+      exp: Math.floor(Date.now() / 1000) - 60,
+    };
+    const expirado = app.jwt.sign(payloadExpirado);
+
+    const resposta = await app.inject({
+      method: "GET",
+      url: "/me",
+      headers: { authorization: `Bearer ${expirado}` },
+    });
+
+    expect(resposta.statusCode).toBe(401);
+    expect(resposta.json()).toEqual({ erro: "nao_autenticado" });
 
     await app.close();
   });
