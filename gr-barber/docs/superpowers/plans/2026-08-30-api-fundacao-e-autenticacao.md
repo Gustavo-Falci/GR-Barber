@@ -56,7 +56,7 @@ psql -U postgres -d gr_barber_test -c "CREATE EXTENSION IF NOT EXISTS pgcrypto; 
 ## Task 1: Infraestrutura de teste contra Postgres real
 
 **Files:**
-- Create: `apps/api/vitest.config.ts`
+- Create: `apps/api/vitest.config.mts`
 - Create: `apps/api/tests/global-setup.ts`
 - Create: `apps/api/tests/setup.ts`
 - Create: `apps/api/tests/helpers/limpar-banco.ts`
@@ -102,9 +102,9 @@ Acrescentar ao `.gitignore` na raiz de `gr-barber/`:
 .env.test
 ```
 
-- [ ] **Step 4: Escrever o `vitest.config.ts`**
+- [ ] **Step 4: Escrever o `vitest.config.mts`**
 
-`apps/api/vitest.config.ts`:
+`apps/api/vitest.config.mts`:
 
 ```ts
 import { fileURLToPath } from "node:url";
@@ -268,7 +268,7 @@ externo, que o turbo não tem como incluir na chave de cache.
 passaria batido. Trocar por:
 
 ```json
-  "include": ["src/**/*.ts", "tests/**/*.ts", "vitest.config.ts"],
+  "include": ["src/**/*.ts", "tests/**/*.ts", "vitest.config.mts"],
 ```
 
 - [ ] **Step 10: Rodar e verificar que passa**
@@ -286,7 +286,7 @@ bundle.
 - [ ] **Step 11: Commit**
 
 ```bash
-git add apps/api/vitest.config.ts apps/api/tests apps/api/.env.test.example apps/api/package.json apps/api/tsconfig.json turbo.json .gitignore pnpm-lock.yaml
+git add apps/api/vitest.config.mts apps/api/tests apps/api/.env.test.example apps/api/package.json apps/api/tsconfig.json turbo.json .gitignore pnpm-lock.yaml
 git commit -m "test: set up vitest against a real Postgres
 
 The exclusion constraint and Prisma's @db.Date/@db.Time mapping cannot
@@ -471,7 +471,7 @@ export function somarMinutos(hora: string, minutos: number): string {
 - [ ] **Step 4: Rodar e verificar que passa**
 
 Run: `pnpm --filter @gr-barber/api test tests/lib/horas.test.ts`
-Expected: PASS, 12 testes.
+Expected: PASS, 11 testes.
 
 - [ ] **Step 5: Commit**
 
@@ -494,7 +494,7 @@ teste. A fase 4 vai depender dele para decidir se um horário pedido é
 válido.
 
 **Files:**
-- Create: `packages/scheduling/vitest.config.ts`
+- Create: `packages/scheduling/vitest.config.mts`
 - Test: `packages/scheduling/tests/calcular-horarios.test.ts`
 - Modify: `packages/scheduling/package.json`
 
@@ -508,9 +508,9 @@ válido.
 pnpm --filter @gr-barber/scheduling add -D vitest@^4.1.11
 ```
 
-- [ ] **Step 2: Criar o `vitest.config.ts`**
+- [ ] **Step 2: Criar o `vitest.config.mts`**
 
-`packages/scheduling/vitest.config.ts`:
+`packages/scheduling/vitest.config.mts`:
 
 ```ts
 import { defineConfig } from "vitest/config";
@@ -661,7 +661,7 @@ Em `packages/scheduling/package.json`, criar a seção `scripts`:
 - [ ] **Step 6: Commit**
 
 ```bash
-git add packages/scheduling/vitest.config.ts packages/scheduling/tests packages/scheduling/package.json pnpm-lock.yaml
+git add packages/scheduling/vitest.config.mts packages/scheduling/tests packages/scheduling/package.json pnpm-lock.yaml
 git commit -m "test(scheduling): cover the availability calculator
 
 It is the product's central business rule and had no tests. One case
