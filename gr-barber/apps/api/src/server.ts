@@ -37,7 +37,11 @@ async function main() {
     properties: {
       horarioFuncionamento: {
         type: "object",
-        required: ["fechado"],
+        // As três chaves são required porque JanelaFuncionamento
+        // (@gr-barber/scheduling) declara horaAbertura/horaFechamento
+        // como string | null, sem undefined. Fora do required o schema
+        // geraria `| undefined` e o tipo não encaixaria.
+        required: ["horaAbertura", "horaFechamento", "fechado"],
         properties: {
           horaAbertura: { type: ["string", "null"] },
           horaFechamento: { type: ["string", "null"] },
