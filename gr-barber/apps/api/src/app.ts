@@ -6,6 +6,7 @@ import { prisma } from "@gr-barber/database";
 import { registrarTratamentoDeErros } from "./plugins/erros";
 import { registrarAuth } from "./plugins/auth";
 import { registrarRotasAuth } from "./rotas/auth";
+import { registrarRotasMe } from "./rotas/me";
 import type { App } from "./tipos";
 
 // Monta a instância sem escutar em porta nenhuma. É o que permite os
@@ -23,6 +24,7 @@ export function buildApp(opts: { logger?: boolean } = {}): App {
 
   registrarAuth(app);
   registrarRotasAuth(app);
+  registrarRotasMe(app);
 
   app.get("/health", async () => ({ status: "ok" }));
 
