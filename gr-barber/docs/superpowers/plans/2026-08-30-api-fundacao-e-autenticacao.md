@@ -1064,6 +1064,30 @@ describe("tratamento de erros", () => {
     await app.close();
   });
 
+  it("normaliza qualquer 401 para nao_autenticado", async () => {
+    const app = buildApp();
+    app.get("/teste-401", async () => {
+      // Imita o formato do que o @fastify/jwt lança: statusCode 401 com
+      // um code interno do plugin. O contrato da API não deve expor esse
+      // nome — as telas ramificariam em cima dele.
+      const erro = new Error("token ausente") as Error & {
+        statusCode: number;
+        code: string;
+      };
+      erro.statusCode = 401;
+      erro.code = "FST_JWT_NO_AUTHORIZATION_IN_HEADER";
+      throw erro;
+    });
+
+    const resposta = await app.inject({ method: "GET", url: "/teste-401" });
+
+    expect(resposta.statusCode).toBe(401);
+    expect(resposta.json()).toEqual({ erro: "nao_autenticado" });
+    expect(resposta.body).not.toContain("FST_JWT");
+
+    await app.close();
+  });
+
   it("esconde erro inesperado atrás de 500 genérico", async () => {
     const app = buildApp();
     app.get("/teste-explosao", async () => {
@@ -1110,6 +1134,8 @@ export class ErroDeNegocio extends Error {
 `apps/api/src/plugins/erros.ts`:
 
 ```ts
+import type { FastifyError } from "fastify";
+
 import { Prisma } from "@gr-barber/database";
 import { ErroDeNegocio } from "../lib/erro-negocio";
 import type { App } from "../tipos";
@@ -1117,7 +1143,9 @@ import type { App } from "../tipos";
 // Um lugar só traduzindo erro de domínio e de banco pra HTTP. Sem isso,
 // cada rota repetiria try/catch e o formato da resposta divergiria.
 export function registrarTratamentoDeErros(app: App): void {
-  app.setErrorHandler((erro, request, reply) => {
+  // O parâmetro de tipo é necessário: sem ele o Fastify 5 tipa o erro
+  // como `unknown`, e o ramo final não consegue ler `statusCode`/`code`.
+  app.setErrorHandler<FastifyError>((erro, request, reply) => {
     if (erro instanceof ErroDeNegocio) {
       return reply
         .code(422)
@@ -1135,9 +1163,19 @@ export function registrarTratamentoDeErros(app: App): void {
       }
     }
 
-    // Validação de schema do Fastify e erros de JWT já vêm com
-    // statusCode. Repassar preservando o código.
     const status = erro.statusCode ?? 500;
+
+    // O @fastify/jwt lança com códigos próprios (FST_JWT_NO_AUTHORIZATION_IN_HEADER,
+    // FST_JWT_AUTHORIZATION_TOKEN_INVALID e outros). Repassar esses nomes
+    // crus colocaria o nome interno de um plugin dentro do contrato da
+    // API — e as 23 telas passariam a ramificar em cima dele. Pra quem
+    // consome, toda falha de token é a mesma coisa.
+    if (status === 401) {
+      return reply.code(401).send({ erro: "nao_autenticado" });
+    }
+
+    // Validação de schema do Fastify já vem com statusCode. Repassar
+    // preservando o código.
     if (status < 500) {
       return reply
         .code(status)
@@ -1720,7 +1758,7 @@ rota de signup:
 - [ ] **Step 4: Rodar e verificar que passa**
 
 Run: `pnpm --filter @gr-barber/api test tests/rotas/auth-login.test.ts`
-Expected: PASS, 4 testes.
+Expected: PASS, 5 testes.
 
 - [ ] **Step 5: Commit**
 
@@ -1814,6 +1852,8 @@ describe("GET /me", () => {
     const resposta = await app.inject({ method: "GET", url: "/me" });
 
     expect(resposta.statusCode).toBe(401);
+    // Código de domínio, não o nome interno do @fastify/jwt.
+    expect(resposta.json()).toEqual({ erro: "nao_autenticado" });
 
     await app.close();
   });
