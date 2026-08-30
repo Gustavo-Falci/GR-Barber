@@ -46,6 +46,30 @@ describe("tratamento de erros", () => {
     await app.close();
   });
 
+  it("normaliza qualquer 401 para nao_autenticado", async () => {
+    const app = buildApp();
+    app.get("/teste-401", async () => {
+      // Imita o formato do que o @fastify/jwt lança: statusCode 401 com
+      // um code interno do plugin. O contrato da API não deve expor esse
+      // nome — as telas ramificariam em cima dele.
+      const erro = new Error("token ausente") as Error & {
+        statusCode: number;
+        code: string;
+      };
+      erro.statusCode = 401;
+      erro.code = "FST_JWT_NO_AUTHORIZATION_IN_HEADER";
+      throw erro;
+    });
+
+    const resposta = await app.inject({ method: "GET", url: "/teste-401" });
+
+    expect(resposta.statusCode).toBe(401);
+    expect(resposta.json()).toEqual({ erro: "nao_autenticado" });
+    expect(resposta.body).not.toContain("FST_JWT");
+
+    await app.close();
+  });
+
   it("esconde erro inesperado atrás de 500 genérico", async () => {
     const app = buildApp();
     app.get("/teste-explosao", async () => {

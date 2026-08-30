@@ -25,8 +25,19 @@ export function registrarTratamentoDeErros(app: App): void {
     }
 
     // Validação de schema do Fastify e erros de JWT já vêm com
-    // statusCode. Repassar preservando o código.
+    // statusCode — é isso que os dois branches abaixo consultam.
     const status = erro.statusCode ?? 500;
+
+    // O @fastify/jwt lança com códigos próprios (FST_JWT_NO_AUTHORIZATION_IN_HEADER,
+    // FST_JWT_AUTHORIZATION_TOKEN_INVALID e outros). Repassar esses nomes
+    // crus colocaria o nome interno de um plugin dentro do contrato da
+    // API — e as 23 telas passariam a ramificar em cima dele. Pra quem
+    // consome, toda falha de token é a mesma coisa.
+    if (status === 401) {
+      return reply.code(401).send({ erro: "nao_autenticado" });
+    }
+
+    // A partir daqui sobra a validação de schema do Fastify (400).
     if (status < 500) {
       return reply
         .code(status)
