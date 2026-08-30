@@ -1,4 +1,4 @@
-import { execFileSync } from "node:child_process";
+import { execSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 // Aplica a migration inicial no banco de teste, uma vez, antes de
@@ -11,11 +11,13 @@ export default function setup(): void {
     new URL("../../../packages/database", import.meta.url)
   );
 
-  execFileSync("pnpm", ["exec", "prisma", "migrate", "deploy"], {
+  // execSync com uma string só, em vez de execFileSync com array de
+  // argumentos: no Windows o pnpm é um .cmd, que o execFile só executa
+  // com `shell: true` — e essa combinação (shell mais array) dispara o
+  // aviso DEP0190 do Node em toda rodada de teste.
+  execSync("pnpm exec prisma migrate deploy", {
     cwd: pastaDatabase,
     env: { ...process.env },
     stdio: "inherit",
-    // pnpm no Windows é um .cmd, que execFile não executa direto.
-    shell: process.platform === "win32",
   });
 }
