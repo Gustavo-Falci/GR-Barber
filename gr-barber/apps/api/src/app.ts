@@ -4,7 +4,7 @@ import type { JsonSchemaToTsProvider } from "@fastify/type-provider-json-schema-
 import { calcularHorariosDisponiveis } from "@gr-barber/scheduling";
 import { prisma } from "@gr-barber/database";
 import { registrarTratamentoDeErros } from "./plugins/erros";
-import { registrarAuth } from "./plugins/auth";
+import { autenticar, registrarAuth } from "./plugins/auth";
 import { registrarRotasAuth } from "./rotas/auth";
 import { registrarRotasMe } from "./rotas/me";
 import type { App } from "./tipos";
@@ -24,7 +24,14 @@ export function buildApp(opts: { logger?: boolean } = {}): App {
 
   registrarAuth(app);
   registrarRotasAuth(app);
-  registrarRotasMe(app);
+
+  // Escopo dos protegidos: o hook vale pra tudo que for registrado aqui
+  // dentro. Pendurar onRequest rota a rota dependeria de ninguém
+  // esquecer, e quem esquecesse publicaria a rota em silêncio.
+  app.register(async (protegidas: App) => {
+    protegidas.addHook("onRequest", autenticar);
+    registrarRotasMe(protegidas);
+  });
 
   app.get("/health", async () => ({ status: "ok" }));
 
