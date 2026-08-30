@@ -1168,7 +1168,7 @@ import { registrarTratamentoDeErros } from "./plugins/erros";
 - [ ] **Step 6: Rodar e verificar que passa**
 
 Run: `pnpm --filter @gr-barber/api test tests/erros.test.ts`
-Expected: PASS, 4 testes.
+Expected: PASS, 5 testes.
 
 - [ ] **Step 7: Commit**
 
@@ -1518,6 +1518,8 @@ email — and returns the JWT so the signup screen lands logged in."
 ```ts
 import { describe, expect, it } from "vitest";
 import { buildApp } from "../../src/app";
+import { conferirSenha } from "../../src/lib/senha";
+import { obterHashDescartavel } from "../../src/rotas/auth";
 import type { App } from "../../src/tipos";
 
 const CADASTRO = {
@@ -1599,6 +1601,23 @@ describe("POST /auth/login", () => {
 
     await app.close();
   });
+
+  it("o hash descartável é bem formado, senão o atalho volta", async () => {
+    // O hash descartável só fecha o vazamento de tempo se o
+    // conferirSenha realmente derivar contra ele. Malformado, ele sairia
+    // pelo atalho de validação de formato sem derivar nada — e o login
+    // de email inexistente voltaria a responder mais rápido que o de
+    // senha errada. Medir tempo daria teste instável; o que dá pra
+    // afirmar sem instabilidade é o formato, que é o que sustenta a
+    // propriedade.
+    const descartavel = await obterHashDescartavel();
+    const partes = descartavel.split("$");
+
+    expect(partes).toHaveLength(3);
+    expect(partes[0]).toBe("scrypt");
+    expect(Buffer.from(partes[2], "base64")).toHaveLength(64);
+    expect(await conferirSenha("qualquer-senha", descartavel)).toBe(false);
+  });
 });
 ```
 
@@ -1609,10 +1628,32 @@ Expected: FAIL — rota `/auth/login` responde 404.
 
 - [ ] **Step 3: Escrever a rota**
 
-Em `apps/api/src/rotas/auth.ts`, acrescentar o import de `conferirSenha`:
+Em `apps/api/src/rotas/auth.ts`, acrescentar os imports:
 
 ```ts
+import { randomUUID } from "node:crypto";
+
 import { conferirSenha, gerarHashSenha } from "../lib/senha";
+```
+
+E, no escopo do módulo (fora de `registrarRotasAuth`), o hash descartável:
+
+```ts
+// Hash de uma senha aleatória, no mesmo formato e tamanho de um real.
+// Serve só pra dar ao login sem barbeiro o mesmo custo de derivação do
+// login com barbeiro — ver o comentário na rota. Tem que ser bem
+// formado: um valor malformado sairia pelo atalho do conferirSenha sem
+// derivar nada, que é justamente o vazamento que ele existe pra fechar.
+//
+// Calculado sob demanda e guardado: derivar a cada requisição seria
+// desperdício, e no topo do módulo exigiria await de nível superior,
+// que o bundle CJS do tsup não tem.
+let hashDescartavel: Promise<string> | null = null;
+
+export function obterHashDescartavel(): Promise<string> {
+  hashDescartavel ??= gerarHashSenha(randomUUID());
+  return hashDescartavel;
+}
 ```
 
 E o schema mais o handler, dentro de `registrarRotasAuth`, depois da
@@ -1643,8 +1684,16 @@ rota de signup:
       // Email inexistente e senha errada dão exatamente a mesma
       // resposta — confirmar qual dos dois falhou entregaria quais
       // emails existem na plataforma.
-      const senhaConfere =
-        barbeiro !== null && (await conferirSenha(senha, barbeiro.senhaHash));
+      //
+      // Responder igual não basta: se o email não existe e a gente
+      // pulasse o conferirSenha, essa resposta voltaria muito mais
+      // rápido que a de senha errada, porque o scrypt é lento de
+      // propósito. O relógio entregaria o que o corpo esconde. Por
+      // isso o caminho sem barbeiro confere contra um hash descartável
+      // — o resultado é sempre falso, mas custa o mesmo.
+      const hashParaConferir =
+        barbeiro?.senhaHash ?? (await obterHashDescartavel());
+      const senhaConfere = await conferirSenha(senha, hashParaConferir);
 
       if (!barbeiro || !senhaConfere) {
         return reply.code(401).send({ erro: "credenciais_invalidas" });
