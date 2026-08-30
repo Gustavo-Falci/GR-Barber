@@ -111,10 +111,39 @@ fluxo público não tem conta.
   plataforma — é ele que forma o link público do WhatsApp. Devolve o
   mesmo JWT do login, pra tela já entrar logada.
 - `POST /auth/login` recebe `{ email, senha }` e devolve JWT com payload
-  `{ barbeiroId, barbeariaId }`. Email ou senha errados devolvem o mesmo
+  `{ barbeiroId, barbeariaId }`. **O email é normalizado com
+  `trim().toLowerCase()` na entrada e na gravação** — `VARCHAR` com
+  índice único é sensível a caixa, então sem isso `Gu@Exemplo.com` e
+  `gu@exemplo.com` viram duas contas distintas e quem cadastrou numa
+  não entra pela outra. Email ou senha errados devolvem o mesmo
   `401` com a mesma mensagem — não confirmar qual dos dois errou.
-- Plugin `auth.ts` expõe um hook `autenticar` que valida o token e
-  decora `request.barbeiro = { id, barbeariaId }`.
+- Plugin `auth.ts` expõe um hook `autenticar` que valida o token **e
+  carrega o barbeiro do banco**, devolvendo `401` se ele não existe mais
+  ou está com `ativo: false`. Só verificar a assinatura não basta:
+  desativar um barbeiro não tiraria o acesso de quem já tem token na
+  mão, e a falha seria silenciosa. O custo é uma query por requisição
+  protegida — aceitável no MVP, e é o que torna a desativação real.
+- **Tempo de vida do token: 7 dias** (`sign: { expiresIn: "7d" }`).
+  Com o hook lendo o banco, a revogação já é imediata; a expiração é
+  defesa em profundidade contra token roubado. Sem refresh token nesta
+  fase — o barbeiro refaz login. Decidir isso agora e não depois é o
+  ponto: acrescentar expiração com as 23 telas já construídas em cima
+  de token eterno obrigaria a retrofitar tratamento de 401 e novo login
+  em cada uma delas.
+- **Rota protegida entra num escopo encapsulado que carrega o hook**,
+  não recebe `onRequest` uma a uma:
+
+  ```ts
+  app.register(async (protegidas) => {
+    protegidas.addHook("onRequest", autenticar);
+    registrarRotasMe(protegidas);
+    // fase 3: servicos, clientes, horarios, barbearias/me
+  });
+  ```
+
+  Pendurar o hook rota a rota depende de ninguém esquecer. Quem
+  esquecesse publicaria a rota sem erro de compilação e sem teste
+  falhando — a fase 3 sozinha copia esse padrão umas dez vezes.
 - Hash: `scrypt` do `node:crypto`, salt aleatório de 16 bytes por
   senha, armazenado como `scrypt$<salt-b64>$<hash-b64>` em `senhaHash`.
   Comparação com `timingSafeEqual`.
@@ -277,13 +306,22 @@ contra dois clientes confirmando o mesmo horário ao mesmo tempo.
 
 | Origem | HTTP |
 |---|---|
-| Validação de schema do Fastify | `400` (já é o padrão) |
+| Validação de schema do Fastify | `400` com `erro: "requisicao_invalida"` — nunca o `FST_ERR_VALIDATION` cru |
+| Rota inexistente | `404` com `erro: "nao_encontrado"`, via `setNotFoundHandler` |
 | Token ausente/inválido | `401` |
 | Recurso de outra barbearia | `404` (não `403` — não confirma existência) |
 | Prisma `P2025` (registro não encontrado) | `404` |
 | Prisma `P2002` (unique violada) | `409` |
 | Postgres `23P01` (`sem_conflito_horario`) | `409` |
 | Regra de negócio (horário indisponível, serviço inativo) | `422` |
+
+Nenhum código interno de framework ou plugin sai no campo `erro`:
+nem `FST_ERR_VALIDATION`, nem `FST_JWT_*`, nem código do Prisma. As 23
+telas vão ramificar nesse campo, e o dia em que uma dependência renomear
+uma constante não pode ser o dia em que a interface quebra. Rota não
+encontrada passa longe do `setErrorHandler` por padrão no Fastify — sem
+o `setNotFoundHandler` a API responderia com duas formas de erro
+incompatíveis entre si.
 
 **A fixar na implementação**: o Prisma v5.22 não tem código tipado pra
 `23P01`. A violação cai como `PrismaClientUnknownRequestError` com a
