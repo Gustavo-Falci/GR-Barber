@@ -7,3 +7,9 @@ dist/
 .env
 .env.local
 .DS_Store
+expo-env.d.ts
+*.tsbuildinfo
+.metro-health-check*
+web-build/
+/apps/mobile/ios
+/apps/mobile/android

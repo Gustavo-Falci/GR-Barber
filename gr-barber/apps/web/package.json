@@ -2,9 +2,25 @@
   "name": "@gr-barber/web",
   "version": "0.1.0",
   "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "type-check": "tsc --noEmit"
+  },
   "dependencies": {
     "@gr-barber/types": "workspace:*",
     "@gr-barber/design-tokens": "workspace:*",
-    "@gr-barber/scheduling": "workspace:*"
+    "@gr-barber/scheduling": "workspace:*",
+    "next": "^16.3.3",
+    "react": "19.2.3",
+    "react-dom": "19.2.3"
+  },
+  "devDependencies": {
+    "@gr-barber/config": "workspace:*",
+    "@types/node": "^22.0.0",
+    "@types/react": "~19.2.2",
+    "@types/react-dom": "~19.2.2",
+    "typescript": "^5.5.0"
   }
 }
