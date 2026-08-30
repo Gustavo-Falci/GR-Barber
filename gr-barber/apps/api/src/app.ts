@@ -22,6 +22,13 @@ export function buildApp(opts: { logger?: boolean } = {}): App {
 
   registrarTratamentoDeErros(app);
 
+  // Rota não encontrada não passa pelo setErrorHandler no Fastify: sem
+  // isto a API responderia com duas formas de erro incompatíveis, a
+  // nossa e a do framework ({ message, error, statusCode }).
+  app.setNotFoundHandler(async (_request, reply) =>
+    reply.code(404).send({ erro: "nao_encontrado" })
+  );
+
   registrarAuth(app);
   registrarRotasAuth(app);
 

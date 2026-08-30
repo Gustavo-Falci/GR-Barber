@@ -42,6 +42,26 @@ describe("tratamento de erros", () => {
     });
 
     expect(resposta.statusCode).toBe(400);
+    // Fixar o corpo, não só o status: o FST_ERR_VALIDATION do Fastify
+    // saía no campo `erro` e nada aqui reclamava.
+    expect(resposta.json().erro).toBe("requisicao_invalida");
+    expect(resposta.body).not.toContain("FST_ERR");
+
+    await app.close();
+  });
+
+  it("devolve o mesmo formato de erro em rota inexistente", async () => {
+    const app = buildApp();
+    const resposta = await app.inject({
+      method: "GET",
+      url: "/rota-inexistente",
+    });
+
+    // Sem setNotFoundHandler o Fastify devolveria { message, error,
+    // statusCode } — uma segunda forma de erro, incompatível com a
+    // nossa, na mesma API.
+    expect(resposta.statusCode).toBe(404);
+    expect(resposta.json()).toEqual({ erro: "nao_encontrado" });
 
     await app.close();
   });

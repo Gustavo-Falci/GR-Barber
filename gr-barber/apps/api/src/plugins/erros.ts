@@ -44,10 +44,15 @@ export function registrarTratamentoDeErros(app: App): void {
     }
 
     // A partir daqui sobra a validação de schema do Fastify (400).
+    // O `erro` é sempre nosso: repassar o `erro.code` colocaria o
+    // FST_ERR_VALIDATION do Fastify no contrato, o mesmo vazamento já
+    // fechado logo acima pros FST_JWT_*. A `mensagem` do AJV continua
+    // saindo porque diz ao cliente qual campo está errado — é o código
+    // que precisa ser estável e livre de nome de framework.
     if (status < 500) {
       return reply
         .code(status)
-        .send({ erro: erro.code ?? "requisicao_invalida", mensagem: erro.message });
+        .send({ erro: "requisicao_invalida", mensagem: erro.message });
     }
 
     // Qualquer outra coisa é bug nosso: registra inteiro no log e
