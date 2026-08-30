@@ -1606,6 +1606,7 @@ email — and returns the JWT so the signup screen lands logged in."
 
 ```ts
 import { describe, expect, it } from "vitest";
+import { prisma } from "@gr-barber/database";
 import { buildApp } from "../../src/app";
 import { conferirSenha } from "../../src/lib/senha";
 import { obterHashDescartavel } from "../../src/rotas/auth";
@@ -1648,6 +1649,9 @@ describe("POST /auth/login", () => {
     });
 
     expect(resposta.statusCode).toBe(401);
+    // Fixar o corpo, não só o status: sem isto o teste passaria mesmo
+    // se a rota devolvesse {} ou outro código.
+    expect(resposta.json()).toEqual({ erro: "credenciais_invalidas" });
 
     await app.close();
   });
@@ -1687,6 +1691,25 @@ describe("POST /auth/login", () => {
     });
 
     expect(resposta.body).not.toContain("scrypt$");
+
+    await app.close();
+  });
+
+  it("recusa barbeiro desativado com a mesma resposta", async () => {
+    const app = buildApp();
+    await cadastrar(app);
+    await prisma.barbeiro.updateMany({ data: { ativo: false } });
+
+    const resposta = await app.inject({
+      method: "POST",
+      url: "/auth/login",
+      payload: { email: "gu@exemplo.com", senha: "senha-forte-123" },
+    });
+
+    // Senha certa, conta desligada: mesma resposta de credencial
+    // inválida, pra não confirmar que a conta existe.
+    expect(resposta.statusCode).toBe(401);
+    expect(resposta.json()).toEqual({ erro: "credenciais_invalidas" });
 
     await app.close();
   });
@@ -1780,26 +1803,37 @@ rota de signup:
       // propósito. O relógio entregaria o que o corpo esconde. Por
       // isso o caminho sem barbeiro confere contra um hash descartável
       // — o resultado é sempre falso, mas custa o mesmo.
+      // Barbeiro desativado é tratado como inexistente: mesma resposta,
+      // mesmo custo. `ativo` existe no schema desde a migration inicial;
+      // sem esta linha, desativar alguém no futuro não tiraria o acesso
+      // dele, e a falha seria silenciosa — ninguém testa o login de uma
+      // conta que acabou de ser desligada.
+      const autorizado = barbeiro?.ativo ? barbeiro : null;
+
       const hashParaConferir =
-        barbeiro?.senhaHash ?? (await obterHashDescartavel());
+        autorizado?.senhaHash ?? (await obterHashDescartavel());
       const senhaConfere = await conferirSenha(senha, hashParaConferir);
 
-      if (!barbeiro || !senhaConfere) {
+      if (!autorizado || !senhaConfere) {
         return reply.code(401).send({ erro: "credenciais_invalidas" });
       }
 
       const token = app.jwt.sign({
-        barbeiroId: barbeiro.id,
-        barbeariaId: barbeiro.barbeariaId,
+        barbeiroId: autorizado.id,
+        barbeariaId: autorizado.barbeariaId,
       });
 
       return reply.code(200).send({
         token,
-        barbeiro: { id: barbeiro.id, nome: barbeiro.nome, email: barbeiro.email },
+        barbeiro: {
+          id: autorizado.id,
+          nome: autorizado.nome,
+          email: autorizado.email,
+        },
         barbearia: {
-          id: barbeiro.barbearia.id,
-          nome: barbeiro.barbearia.nome,
-          slug: barbeiro.barbearia.slug,
+          id: autorizado.barbearia.id,
+          nome: autorizado.barbearia.nome,
+          slug: autorizado.barbearia.slug,
         },
       });
     }
@@ -1809,7 +1843,7 @@ rota de signup:
 - [ ] **Step 4: Rodar e verificar que passa**
 
 Run: `pnpm --filter @gr-barber/api test tests/rotas/auth-login.test.ts`
-Expected: PASS, 5 testes.
+Expected: PASS, 6 testes.
 
 - [ ] **Step 5: Commit**
 
