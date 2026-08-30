@@ -1,10 +1,28 @@
+import { randomUUID } from "node:crypto";
+
 import { prisma } from "@gr-barber/database";
-import { gerarHashSenha } from "../lib/senha";
+import { conferirSenha, gerarHashSenha } from "../lib/senha";
 import type { App } from "../tipos";
 
 // `format: "email"` dependeria do ajv-formats estar ligado no Fastify;
 // um pattern explícito não depende de configuração nenhuma.
 const PADRAO_EMAIL = "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$";
+
+// Hash de uma senha aleatória, no mesmo formato e tamanho de um real.
+// Serve só pra dar ao login sem barbeiro o mesmo custo de derivação do
+// login com barbeiro — ver o comentário na rota. Tem que ser bem
+// formado: um valor malformado sairia pelo atalho do conferirSenha sem
+// derivar nada, que é justamente o vazamento que ele existe pra fechar.
+//
+// Calculado sob demanda e guardado: derivar a cada requisição seria
+// desperdício, e no topo do módulo exigiria await de nível superior,
+// que o bundle CJS do tsup não tem.
+let hashDescartavel: Promise<string> | null = null;
+
+export function obterHashDescartavel(): Promise<string> {
+  hashDescartavel ??= gerarHashSenha(randomUUID());
+  return hashDescartavel;
+}
 
 const corpoSignup = {
   type: "object",
@@ -79,6 +97,62 @@ export function registrarRotasAuth(app: App): void {
           id: criado.barbearia.id,
           nome: criado.barbearia.nome,
           slug: criado.barbearia.slug,
+        },
+      });
+    }
+  );
+
+  const corpoLogin = {
+    type: "object",
+    required: ["email", "senha"],
+    additionalProperties: false,
+    properties: {
+      email: { type: "string", pattern: PADRAO_EMAIL, maxLength: 160 },
+      senha: { type: "string", minLength: 1, maxLength: 200 },
+    },
+  } as const;
+
+  app.post(
+    "/auth/login",
+    { schema: { body: corpoLogin } },
+    async (request, reply) => {
+      const { email, senha } = request.body;
+
+      const barbeiro = await prisma.barbeiro.findUnique({
+        where: { email },
+        include: { barbearia: true },
+      });
+
+      // Email inexistente e senha errada dão exatamente a mesma
+      // resposta — confirmar qual dos dois falhou entregaria quais
+      // emails existem na plataforma.
+      //
+      // Responder igual não basta: se o email não existe e a gente
+      // pulasse o conferirSenha, essa resposta voltaria muito mais
+      // rápido que a de senha errada, porque o scrypt é lento de
+      // propósito. O relógio entregaria o que o corpo esconde. Por
+      // isso o caminho sem barbeiro confere contra um hash descartável
+      // — o resultado é sempre falso, mas custa o mesmo.
+      const hashParaConferir =
+        barbeiro?.senhaHash ?? (await obterHashDescartavel());
+      const senhaConfere = await conferirSenha(senha, hashParaConferir);
+
+      if (!barbeiro || !senhaConfere) {
+        return reply.code(401).send({ erro: "credenciais_invalidas" });
+      }
+
+      const token = app.jwt.sign({
+        barbeiroId: barbeiro.id,
+        barbeariaId: barbeiro.barbeariaId,
+      });
+
+      return reply.code(200).send({
+        token,
+        barbeiro: { id: barbeiro.id, nome: barbeiro.nome, email: barbeiro.email },
+        barbearia: {
+          id: barbeiro.barbearia.id,
+          nome: barbeiro.barbearia.nome,
+          slug: barbeiro.barbearia.slug,
         },
       });
     }

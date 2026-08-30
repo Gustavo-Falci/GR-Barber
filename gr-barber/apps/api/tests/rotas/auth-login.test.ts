@@ -1,0 +1,103 @@
+import { describe, expect, it } from "vitest";
+import { buildApp } from "../../src/app";
+import { conferirSenha } from "../../src/lib/senha";
+import { obterHashDescartavel } from "../../src/rotas/auth";
+import type { App } from "../../src/tipos";
+
+const CADASTRO = {
+  barbearia: { nome: "Barbearia do Gu", slug: "barbearia-do-gu" },
+  barbeiro: { nome: "Gustavo", email: "gu@exemplo.com", senha: "senha-forte-123" },
+};
+
+async function cadastrar(app: App) {
+  await app.inject({ method: "POST", url: "/auth/signup", payload: CADASTRO });
+}
+
+describe("POST /auth/login", () => {
+  it("devolve token com email e senha corretos", async () => {
+    const app = buildApp();
+    await cadastrar(app);
+
+    const resposta = await app.inject({
+      method: "POST",
+      url: "/auth/login",
+      payload: { email: "gu@exemplo.com", senha: "senha-forte-123" },
+    });
+
+    expect(resposta.statusCode).toBe(200);
+    expect(typeof resposta.json().token).toBe("string");
+
+    await app.close();
+  });
+
+  it("recusa senha errada com 401", async () => {
+    const app = buildApp();
+    await cadastrar(app);
+
+    const resposta = await app.inject({
+      method: "POST",
+      url: "/auth/login",
+      payload: { email: "gu@exemplo.com", senha: "senha-errada-123" },
+    });
+
+    expect(resposta.statusCode).toBe(401);
+
+    await app.close();
+  });
+
+  it("dá a mesma resposta pra email inexistente e senha errada", async () => {
+    const app = buildApp();
+    await cadastrar(app);
+
+    const senhaErrada = await app.inject({
+      method: "POST",
+      url: "/auth/login",
+      payload: { email: "gu@exemplo.com", senha: "senha-errada-123" },
+    });
+
+    const emailInexistente = await app.inject({
+      method: "POST",
+      url: "/auth/login",
+      payload: { email: "ninguem@exemplo.com", senha: "senha-forte-123" },
+    });
+
+    // Respostas idênticas: confirmar qual dos dois errou entregaria
+    // quais emails existem na plataforma.
+    expect(emailInexistente.statusCode).toBe(senhaErrada.statusCode);
+    expect(emailInexistente.json()).toEqual(senhaErrada.json());
+
+    await app.close();
+  });
+
+  it("nunca devolve senhaHash", async () => {
+    const app = buildApp();
+    await cadastrar(app);
+
+    const resposta = await app.inject({
+      method: "POST",
+      url: "/auth/login",
+      payload: { email: "gu@exemplo.com", senha: "senha-forte-123" },
+    });
+
+    expect(resposta.body).not.toContain("scrypt$");
+
+    await app.close();
+  });
+
+  it("o hash descartável é bem formado, senão o atalho volta", async () => {
+    // O hash descartável só fecha o vazamento de tempo se o
+    // conferirSenha realmente derivar contra ele. Malformado, ele sairia
+    // pelo atalho de validação de formato sem derivar nada — e o login
+    // de email inexistente voltaria a responder mais rápido que o de
+    // senha errada. Medir tempo daria teste instável; o que dá pra
+    // afirmar sem instabilidade é o formato, que é o que sustenta a
+    // propriedade.
+    const descartavel = await obterHashDescartavel();
+    const partes = descartavel.split("$");
+
+    expect(partes).toHaveLength(3);
+    expect(partes[0]).toBe("scrypt");
+    expect(Buffer.from(partes[2], "base64")).toHaveLength(64);
+    expect(await conferirSenha("qualquer-senha", descartavel)).toBe(false);
+  });
+});
