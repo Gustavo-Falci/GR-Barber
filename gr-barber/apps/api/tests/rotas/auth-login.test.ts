@@ -107,6 +107,32 @@ describe("POST /auth/login", () => {
     await app.close();
   });
 
+  it("entra com o email em outra caixa da que cadastrou", async () => {
+    const app = buildApp();
+    await app.inject({
+      method: "POST",
+      url: "/auth/signup",
+      payload: {
+        ...CADASTRO,
+        barbeiro: { ...CADASTRO.barbeiro, email: "Gu@Exemplo.com" },
+      },
+    });
+
+    // A coluna é VARCHAR com unique simples: sem normalizar nos dois
+    // lados, este login não acharia a conta que o signup acabou de
+    // criar — e o barbeiro ficaria trancado do lado de fora.
+    const resposta = await app.inject({
+      method: "POST",
+      url: "/auth/login",
+      payload: { email: "gu@exemplo.com", senha: "senha-forte-123" },
+    });
+
+    expect(resposta.statusCode).toBe(200);
+    expect(resposta.json().barbeiro.email).toBe("gu@exemplo.com");
+
+    await app.close();
+  });
+
   it("o hash descartável é bem formado, senão o atalho volta", async () => {
     // O hash descartável só fecha o vazamento de tempo se o
     // conferirSenha realmente derivar contra ele. Malformado, ele sairia

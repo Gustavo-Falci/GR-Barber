@@ -8,6 +8,15 @@ import type { App } from "../tipos";
 // um pattern explícito não depende de configuração nenhuma.
 const PADRAO_EMAIL = "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$";
 
+// A coluna é VARCHAR com índice único simples — sem citext e sem índice
+// funcional, o Postgres compara caixa a caixa. Sem normalizar,
+// "Gu@Exemplo.com" e "gu@exemplo.com" viram duas contas distintas, e
+// quem cadastrou numa não entra pela outra. A mesma função na gravação
+// e na busca, senão a busca nunca acha o que a gravação guardou.
+function normalizarEmail(email: string): string {
+  return email.trim().toLowerCase();
+}
+
 // Hash de uma senha aleatória, no mesmo formato e tamanho de um real.
 // Serve só pra dar ao login sem barbeiro o mesmo custo de derivação do
 // login com barbeiro — ver o comentário na rota. Tem que ser bem
@@ -58,6 +67,7 @@ export function registrarRotasAuth(app: App): void {
     { schema: { body: corpoSignup } },
     async (request, reply) => {
       const { barbearia, barbeiro } = request.body;
+      const email = normalizarEmail(barbeiro.email);
       const senhaHash = await gerarHashSenha(barbeiro.senha);
 
       // Transação: uma barbearia sem barbeiro seria inacessível pra
@@ -71,7 +81,7 @@ export function registrarRotasAuth(app: App): void {
           data: {
             barbeariaId: novaBarbearia.id,
             nome: barbeiro.nome,
-            email: barbeiro.email,
+            email,
             senhaHash,
           },
         });
@@ -119,7 +129,7 @@ export function registrarRotasAuth(app: App): void {
       const { email, senha } = request.body;
 
       const barbeiro = await prisma.barbeiro.findUnique({
-        where: { email },
+        where: { email: normalizarEmail(email) },
         include: { barbearia: true },
       });
 
