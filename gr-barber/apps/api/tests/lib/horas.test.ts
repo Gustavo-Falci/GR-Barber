@@ -36,6 +36,12 @@ describe("dateParaHora", () => {
   it("preenche com zero à esquerda", () => {
     expect(dateParaHora(horaParaDate("07:05"))).toBe("07:05");
   });
+
+  it("recusa Date inválida em vez de devolver NaN:NaN", () => {
+    // Sem a guarda, o retorno seria a string "NaN:NaN", que seguiria
+    // pro contrato HTTP ou pro banco sem ninguém reclamar.
+    expect(() => dateParaHora(new Date("nada disso"))).toThrow(RangeError);
+  });
 });
 
 describe("dataParaDate", () => {
@@ -45,6 +51,10 @@ describe("dataParaDate", () => {
 
   it("faz o caminho de volta", () => {
     expect(dateParaData(dataParaDate("2026-12-31"))).toBe("2026-12-31");
+  });
+
+  it("recusa Date inválida em vez de devolver NaN-NaN-NaN", () => {
+    expect(() => dateParaData(new Date("nada disso"))).toThrow(RangeError);
   });
 
   it("rejeita data que não existe no calendário", () => {
@@ -69,5 +79,18 @@ describe("somarMinutos", () => {
     // Se hora_fim virasse o dia, o range ficaria invertido e o Postgres
     // recusaria a linha com um erro bem menos claro que este.
     expect(() => somarMinutos("23:30", 45)).toThrow(RangeError);
+  });
+
+  it("rejeita soma que cai antes da meia-noite", () => {
+    // Não há CHECK em servico.duracao_minutos: uma duração negativa
+    // lida do banco chegaria aqui e sairia como "-1:-5", corrompendo
+    // hora_fim e a coluna `periodo` junto.
+    expect(() => somarMinutos("00:00", -5)).toThrow(RangeError);
+    expect(() => somarMinutos("10:00", -601)).toThrow(RangeError);
+  });
+
+  it("aceita minutos negativos que ainda caem dentro do dia", () => {
+    expect(somarMinutos("10:00", -30)).toBe("09:30");
+    expect(somarMinutos("00:30", -30)).toBe("00:00");
   });
 });

@@ -15,6 +15,11 @@ export function horaParaDate(hora: string): Date {
 }
 
 export function dateParaHora(d: Date): string {
+  // Uma Date inválida devolveria "NaN:NaN" sem reclamar, e essa string
+  // seguiria pro contrato HTTP ou de volta pro banco. Este módulo existe
+  // justamente pra não deixar horário malformado passar em silêncio.
+  if (Number.isNaN(d.getTime())) throw new RangeError("Date inválida");
+
   const h = String(d.getUTCHours()).padStart(2, "0");
   const m = String(d.getUTCMinutes()).padStart(2, "0");
   return `${h}:${m}`;
@@ -35,6 +40,10 @@ export function dataParaDate(data: string): Date {
 }
 
 export function dateParaData(d: Date): string {
+  // Mesma armadilha do dateParaHora: sem esta linha o retorno seria
+  // "NaN-NaN-NaN".
+  if (Number.isNaN(d.getTime())) throw new RangeError("Date inválida");
+
   const ano = String(d.getUTCFullYear()).padStart(4, "0");
   const mes = String(d.getUTCMonth() + 1).padStart(2, "0");
   const dia = String(d.getUTCDate()).padStart(2, "0");
@@ -49,6 +58,14 @@ export function somarMinutos(hora: string, minutos: number): string {
   // `periodo`. Melhor recusar aqui, com mensagem clara.
   if (total >= 24 * 60) {
     throw new RangeError(`soma passa da meia-noite: ${hora} + ${minutos}min`);
+  }
+
+  // O outro lado do mesmo limite. Não há CHECK em servico.duracao_minutos
+  // na migration inicial, então uma duração negativa lida do banco
+  // chegaria aqui e sairia como "-1:-5" — hora_fim corrompida e, com
+  // ela, a coluna `periodo` de onde vem a trava de conflito.
+  if (total < 0) {
+    throw new RangeError(`soma cai antes da meia-noite: ${hora} + ${minutos}min`);
   }
 
   const h = String(Math.floor(total / 60)).padStart(2, "0");
