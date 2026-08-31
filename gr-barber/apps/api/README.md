@@ -2,16 +2,74 @@
 
 Backend — Node.js + PostgreSQL, framework HTTP **Fastify**, ORM **Prisma**.
 
-`src/server.ts` já sobe um servidor real com `/health`, uma rota
-que consulta o Postgres de verdade via Prisma (`/barbearias/:slug/servicos`)
-e um endpoint `/disponibilidade` que usa `@gr-barber/scheduling` —
-o schema da rota valida o body e tipa `request.body` ao mesmo
-tempo, sem precisar de Zod nem de `as any`.
+`src/app.ts` monta a aplicação inteira (rotas, plugins, tratamento de
+erros) e devolve a instância sem abrir porta — é o que deixa os testes
+usarem `app.inject()`. O `src/server.ts` só chama esse `buildApp()` e
+escuta na 3333.
+
+## Variáveis de ambiente
+
+Nada carrega um `.env` no processo da API ainda — o `dev` roda
+`tsx watch src/server.ts` sem loader. As variáveis precisam estar
+exportadas no shell. Veja `.env.example` para a lista e o formato:
+
+- `DATABASE_URL` — Postgres de desenvolvimento.
+- `JWT_SECRET` — segredo de assinatura do token. Sem ele a API não sobe,
+  de propósito: subir sem segredo publicaria as rotas protegidas sem
+  proteção.
+
+A suíte de testes é a exceção: ela carrega `apps/api/.env.test`
+(modelo em `.env.test.example`), que precisa apontar pro banco de
+**teste** — o setup se recusa a rodar fora de um banco `*_test`, porque
+cada caso trunca todas as tabelas.
+
+## Rodando
 
 ```bash
 pnpm --filter @gr-barber/database migrate:dev   # aplica o schema no seu Postgres
 pnpm --filter @gr-barber/api dev
+pnpm --filter @gr-barber/api test               # vitest contra Postgres de verdade
 ```
+
+## Rotas
+
+Públicas:
+
+| Método | Rota | O que faz |
+|---|---|---|
+| `GET` | `/health` | sinal de vida |
+| `POST` | `/auth/signup` | cria barbearia + barbeiro numa transação e devolve JWT |
+| `POST` | `/auth/login` | `{ email, senha }` → JWT |
+| `GET` | `/barbearias/:slug/servicos` | serviços ativos da barbearia |
+| `POST` | `/disponibilidade` | horários livres, via `@gr-barber/scheduling` |
+
+Protegidas (JWT no `Authorization: Bearer`), registradas num escopo
+encapsulado que carrega o hook `autenticar` — rota nova entra ali dentro
+e já nasce protegida:
+
+| Método | Rota | O que faz |
+|---|---|---|
+| `GET` | `/me` | barbeiro do token |
+
+O `barbeariaId` e o id do barbeiro saem sempre do token, nunca do corpo
+nem da URL. O token vale 7 dias, e o hook confere no banco se o barbeiro
+ainda existe e está ativo — desativar alguém tira o acesso na hora.
+
+## Erros
+
+Formato único: `{ erro: "<codigo>", mensagem?: "<detalhe>" }`. O `erro`
+é sempre um código nosso — nenhum `FST_*` do Fastify e nenhum código do
+Prisma sai no contrato.
+
+| Situação | HTTP | `erro` |
+|---|---|---|
+| Body fora do schema | 400 | `requisicao_invalida` |
+| Token ausente, inválido, expirado ou de barbeiro inativo | 401 | `nao_autenticado` |
+| Credenciais erradas no login | 401 | `credenciais_invalidas` |
+| Rota ou registro inexistente | 404 | `nao_encontrado` |
+| Unique violada | 409 | `conflito` |
+| Regra de negócio | 422 | código do domínio |
+| Bug nosso | 500 | `erro_interno` |
 
 ## Consumindo os pacotes internos
 
