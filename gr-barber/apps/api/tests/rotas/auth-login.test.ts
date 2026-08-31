@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { prisma } from "@gr-barber/database";
 import { buildApp } from "../../src/app";
 import { conferirSenha } from "../../src/lib/senha";
+import { decodificarPayload } from "../helpers/decodificar-token";
 import { obterHashDescartavel } from "../../src/rotas/auth";
 import type { App } from "../../src/tipos";
 
@@ -129,6 +130,28 @@ describe("POST /auth/login", () => {
 
     expect(resposta.statusCode).toBe(200);
     expect(resposta.json().barbeiro.email).toBe("gu@exemplo.com");
+
+    await app.close();
+  });
+
+  it("emite token com expiração de 7 dias", async () => {
+    const app = buildApp();
+    await cadastrar(app);
+
+    const resposta = await app.inject({
+      method: "POST",
+      url: "/auth/login",
+      payload: { email: "gu@exemplo.com", senha: "senha-forte-123" },
+    });
+
+    // O teste de token expirado prova que o verificador recusa um exp no
+    // passado. Este prova o outro lado: que os tokens que a gente emite
+    // de fato têm exp. Sem ele, tirar o expiresIn do registro do plugin
+    // devolveria tokens eternos sem nenhum teste falhar.
+    const payload = decodificarPayload(resposta.json().token);
+
+    expect(typeof payload.exp).toBe("number");
+    expect((payload.exp as number) - (payload.iat as number)).toBe(7 * 24 * 60 * 60);
 
     await app.close();
   });

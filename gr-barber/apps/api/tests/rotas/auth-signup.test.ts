@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { prisma } from "@gr-barber/database";
 import { buildApp } from "../../src/app";
+import { decodificarPayload } from "../helpers/decodificar-token";
 
 const CORPO_VALIDO = {
   barbearia: { nome: "Barbearia do Gu", slug: "barbearia-do-gu" },
@@ -25,6 +26,26 @@ describe("POST /auth/signup", () => {
 
     expect(await prisma.barbearia.count()).toBe(1);
     expect(await prisma.barbeiro.count()).toBe(1);
+
+    await app.close();
+  });
+
+  it("emite token com expiração de 7 dias", async () => {
+    const app = buildApp();
+
+    const resposta = await app.inject({
+      method: "POST",
+      url: "/auth/signup",
+      payload: CORPO_VALIDO,
+    });
+
+    // O signup assina o token por conta própria, não reaproveita o do
+    // login — então o expiresIn precisa valer aqui também, e é preciso
+    // um teste separado pra provar isso.
+    const payload = decodificarPayload(resposta.json().token);
+
+    expect(typeof payload.exp).toBe("number");
+    expect((payload.exp as number) - (payload.iat as number)).toBe(7 * 24 * 60 * 60);
 
     await app.close();
   });
