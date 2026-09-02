@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { prisma } from "@gr-barber/database";
 import { buildApp } from "../src/app";
 import { ErroDeNegocio } from "../src/lib/erro-negocio";
+import { conflito, naoEncontrado } from "../src/lib/erro-http";
 
 describe("tratamento de erros", () => {
   it("traduz ErroDeNegocio pra 422", async () => {
@@ -123,6 +125,84 @@ describe("tratamento de erros", () => {
     expect(resposta.statusCode).toBe(500);
     expect(resposta.json()).toEqual({ erro: "erro_interno" });
     expect(resposta.body).not.toContain("detalhe interno");
+
+    await app.close();
+  });
+  it("traduz ErroHttp de 404 com o código nao_encontrado", async () => {
+    const app = buildApp();
+    app.get("/teste-404", async () => {
+      throw naoEncontrado("serviço não encontrado");
+    });
+
+    const resposta = await app.inject({ method: "GET", url: "/teste-404" });
+
+    expect(resposta.statusCode).toBe(404);
+    // O bug que este caso fecha: com o status certo no cabeçalho, o
+    // corpo saía como `requisicao_invalida` — e as telas ramificam no
+    // corpo, não no status.
+    expect(resposta.json().erro).toBe("nao_encontrado");
+
+    await app.close();
+  });
+
+  it("traduz ErroHttp de 409 com o código conflito", async () => {
+    const app = buildApp();
+    app.get("/teste-409", async () => {
+      throw conflito("telefone já cadastrado nesta barbearia");
+    });
+
+    const resposta = await app.inject({ method: "GET", url: "/teste-409" });
+
+    expect(resposta.statusCode).toBe(409);
+    expect(resposta.json()).toEqual({
+      erro: "conflito",
+      mensagem: "telefone já cadastrado nesta barbearia",
+    });
+
+    await app.close();
+  });
+
+  it("dá código próprio a erro cru de 403 e de 409", async () => {
+    const app = buildApp();
+    app.get("/teste-403-cru", async () => {
+      // Erro de biblioteca: tem statusCode, não tem código nosso. Antes,
+      // qualquer coisa assim virava `requisicao_invalida`.
+      throw Object.assign(new Error("proibido"), { statusCode: 403 });
+    });
+    app.get("/teste-409-cru", async () => {
+      throw Object.assign(new Error("conflitou"), { statusCode: 409 });
+    });
+
+    const proibido = await app.inject({ method: "GET", url: "/teste-403-cru" });
+    expect(proibido.statusCode).toBe(403);
+    expect(proibido.json().erro).toBe("acesso_negado");
+
+    const conflitou = await app.inject({ method: "GET", url: "/teste-409-cru" });
+    expect(conflitou.statusCode).toBe(409);
+    expect(conflitou.json().erro).toBe("conflito");
+
+    await app.close();
+  });
+
+  it("traduz P2023 do Prisma (id fora do formato UUID) pra 400", async () => {
+    const app = buildApp();
+    app.get("/teste-uuid-torto", async () => {
+      // O Postgres recusa "nao-e-uuid" numa coluna uuid e o Prisma lança
+      // P2023. Sem tratamento isso vira 500 — bug nosso — quando quem
+      // errou foi o chamador.
+      return prisma.servico.findUniqueOrThrow({ where: { id: "nao-e-uuid" } });
+    });
+
+    const resposta = await app.inject({
+      method: "GET",
+      url: "/teste-uuid-torto",
+    });
+
+    expect(resposta.statusCode).toBe(400);
+    expect(resposta.json().erro).toBe("requisicao_invalida");
+    // A mensagem crua do Prisma traz nome de coluna e SQL; nada disso
+    // pode sair no contrato.
+    expect(resposta.body).not.toContain("Inconsistent column data");
 
     await app.close();
   });

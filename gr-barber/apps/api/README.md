@@ -67,13 +67,18 @@ Prisma sai no contrato.
 
 | Situação | HTTP | `erro` |
 |---|---|---|
-| Body fora do schema | 400 | `requisicao_invalida` |
+| Body ou parâmetro fora do schema, id fora do formato UUID | 400 | `requisicao_invalida` |
 | Token ausente, inválido, expirado ou de barbeiro inativo | 401 | `nao_autenticado` |
 | Credenciais erradas no login | 401 | `credenciais_invalidas` |
-| Rota ou registro inexistente | 404 | `nao_encontrado` |
+| Acesso negado | 403 | `acesso_negado` |
+| Rota, registro inexistente ou recurso de outra barbearia | 404 | `nao_encontrado` |
 | Unique violada | 409 | `conflito` |
 | Regra de negócio | 422 | código do domínio |
 | Bug nosso | 500 | `erro_interno` |
+
+Quem lança escolhe o par status/código com `ErroHttp`
+(`src/lib/erro-http.ts`) ou com `ErroDeNegocio` (`src/lib/erro-negocio.ts`,
+sempre 422).
 
 ## Consumindo os pacotes internos
 
