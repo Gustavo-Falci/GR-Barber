@@ -9,9 +9,13 @@ escuta na 3333.
 
 ## Variáveis de ambiente
 
-Nada carrega um `.env` no processo da API ainda — o `dev` roda
-`tsx watch src/server.ts` sem loader. As variáveis precisam estar
-exportadas no shell. Veja `.env.example` para a lista e o formato:
+O `dev` carrega `apps/api/.env` sozinho, via
+`tsx watch --env-file-if-exists=.env` — copie o `.env.example` e
+preencha. Quem prefere exportar no shell continua funcionando: variável
+já presente no ambiente ganha do arquivo, e o `-if-exists` faz o arquivo
+ausente não abortar a subida. O `start` (bundle de produção) não carrega
+`.env` nenhum — lá as variáveis vêm do systemd, do container ou do
+painel da OCI. Veja `.env.example` para a lista e o formato:
 
 - `DATABASE_URL` — Postgres de desenvolvimento.
 - `JWT_SECRET` — segredo de assinatura do token. Sem ele a API não sobe,
