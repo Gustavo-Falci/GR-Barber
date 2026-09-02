@@ -1,8 +1,9 @@
 -- ============================================================
 -- GR Barber — schema do banco de dados (PostgreSQL)
 -- ============================================================
--- Modelo multi-tenant: Barbearia é o tenant raiz. Cliente é
--- global na plataforma (pode agendar em barbearias diferentes).
+-- Modelo multi-tenant: Barbearia é o tenant raiz. Cliente pertence
+-- a uma barbearia — o mesmo telefone em duas barbearias são dois
+-- cadastros, e a busca por telefone é sempre dentro da barbearia.
 -- ============================================================
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto;   -- gen_random_uuid()
@@ -60,17 +61,20 @@ CREATE TABLE barbeiro (
 CREATE INDEX idx_barbeiro_barbearia ON barbeiro(barbearia_id);
 
 -- ------------------------------------------------------------
--- Cliente (identidade global na plataforma)
+-- Cliente (pertence a uma barbearia)
 -- senha_hash nulo = cliente identificado só pelo telefone,
 -- nunca criou conta no app opcional.
 -- ------------------------------------------------------------
 CREATE TABLE cliente (
-  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  nome        VARCHAR(120) NOT NULL,
-  telefone    VARCHAR(20)  NOT NULL UNIQUE,
-  email       VARCHAR(160) UNIQUE,
-  senha_hash  TEXT,
-  criado_em   TIMESTAMPTZ NOT NULL DEFAULT now()
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  barbearia_id  UUID NOT NULL REFERENCES barbearia(id) ON DELETE CASCADE,
+  nome          VARCHAR(120) NOT NULL,
+  telefone      VARCHAR(20)  NOT NULL,
+  email         VARCHAR(160),
+  senha_hash    TEXT,
+  criado_em     TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (barbearia_id, telefone),
+  UNIQUE (barbearia_id, email)
 );
 
 -- ------------------------------------------------------------

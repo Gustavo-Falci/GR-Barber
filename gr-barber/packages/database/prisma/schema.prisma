@@ -39,6 +39,7 @@ model Barbearia {
   criadoEm DateTime @default(now()) @map("criado_em") @db.Timestamptz
 
   barbeiros             Barbeiro[]
+  clientes              Cliente[]
   servicos              Servico[]
   horariosFuncionamento HorarioFuncionamento[]
   agendamentos          Agendamento[]
@@ -78,15 +79,23 @@ model Barbeiro {
 }
 
 model Cliente {
-  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  nome      String   @db.VarChar(120)
-  telefone  String   @unique @db.VarChar(20)
-  email     String?  @unique @db.VarChar(160)
-  senhaHash String?  @map("senha_hash")
-  criadoEm  DateTime @default(now()) @map("criado_em") @db.Timestamptz
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  barbeariaId String   @map("barbearia_id") @db.Uuid
+  nome        String   @db.VarChar(120)
+  telefone    String   @db.VarChar(20)
+  email       String?  @db.VarChar(160)
+  senhaHash   String?  @map("senha_hash")
+  criadoEm    DateTime @default(now()) @map("criado_em") @db.Timestamptz
 
+  barbearia    Barbearia     @relation(fields: [barbeariaId], references: [id], onDelete: Cascade)
   agendamentos Agendamento[]
 
+  // Telefone é único dentro da barbearia, não na plataforma: o mesmo
+  // cliente pode ser cliente de duas barbearias, com um cadastro em
+  // cada uma. É esse par que o upsert por telefone da fase 4 usa.
+  @@unique([barbeariaId, telefone])
+  @@unique([barbeariaId, email])
+  @@index([barbeariaId])
   @@map("cliente")
 }
 
