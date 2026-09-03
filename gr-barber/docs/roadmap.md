@@ -5,27 +5,21 @@ O que falta pro GR Barber sair do papel, mais ou menos em ordem:
 1. **Rodar os scaffolds do Expo e do Next.js** — dentro de
    `apps/mobile` e `apps/web`, seguindo os READMEs de cada um, sem
    sobrescrever `package.json`/`metro.config.js`.
-2. **Completar as rotas da API** — em andamento, guiado pela spec
-   `docs/superpowers/specs/2026-08-30-api-crud-agendamentos-design.md`,
-   que divide o trabalho em cinco fases. A autenticação foi fundida
-   aqui dentro (era o passo 3 separado), porque quase toda rota de
-   escrita precisa saber qual barbearia é a do chamador — sem isso as
-   rotas nasceriam abertas ou receberiam `barbeariaId` no corpo, e
+2. **Rotas da API — pronto.** A spec
+   `docs/superpowers/specs/2026-08-30-api-crud-agendamentos-design.md`
+   dividiu o trabalho em cinco fases, todas concluídas: fundação e
+   autenticação (PR #1), cadastros do barbeiro (PR #2), criação de
+   agendamento (PR #3) e disponibilidade. Cada uma tem plano próprio em
+   `docs/superpowers/plans/`. A autenticação foi
+   fundida aqui dentro (era o passo 3 separado), porque quase toda rota
+   de escrita precisa saber qual barbearia é a do chamador — sem isso
+   as rotas nasceriam abertas ou receberiam `barbeariaId` no corpo, e
    seriam reescritas quando o JWT chegasse.
-   - **Fases 1 e 2, prontas** (PR #1): infraestrutura de teste contra
-     Postgres real, camada de conversão de horários, `buildApp()`,
-     hash `scrypt`, tradutor central de erros, e autenticação JWT com
-     `POST /auth/signup`, `POST /auth/login` e `GET /me`.
-   - **Fase 3** — cadastros do barbeiro: `PATCH /me`,
-     `PATCH /barbearias/me`, `GET/PUT /barbearias/me/horarios`, CRUD de
-     `Servico` e de `Cliente`, e o perfil público
-     `GET /barbearias/:slug`.
-   - **Fase 4** — criação de agendamento: os dois `POST`, a tradução da
-     violação de `sem_conflito_horario` em `409`, e os testes de
-     conflito e de corrida contra banco real.
-   - **Fase 5** — disponibilidade: as duas rotas de leitura (dia e mês)
-     e a remoção do `POST /disponibilidade` antigo, que é calculadora
-     sem estado e nenhuma tela pode usar.
+
+   A superfície HTTP que as 23 telas consomem está completa; o que a
+   spec deixou de fora continua fora (login de cliente com senha,
+   remarcar agendamento, múltiplos barbeiros por barbearia, barbearias
+   em fusos diferentes).
 3. **Construir as telas reais** — as 23 telas já mapeadas
    (`docs/screens.md`) em React Native e Next.js de verdade, usando
    os tokens de `packages/design-tokens`.

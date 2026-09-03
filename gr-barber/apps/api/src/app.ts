@@ -1,7 +1,6 @@
 import cors from "@fastify/cors";
 import Fastify from "fastify";
 import type { JsonSchemaToTsProvider } from "@fastify/type-provider-json-schema-to-ts";
-import { calcularHorariosDisponiveis } from "@gr-barber/scheduling";
 import { prisma } from "@gr-barber/database";
 import { registrarTratamentoDeErros } from "./plugins/erros";
 import { autenticar, registrarAuth } from "./plugins/auth";
@@ -73,54 +72,6 @@ export function buildApp(opts: { logger?: boolean } = {}): App {
   });
 
   app.get("/health", async () => ({ status: "ok" }));
-
-  // Exemplo do padrão "schema da rota é a validação": o mesmo
-  // objeto que valida o body também tipa `request.body` — sem
-  // precisar de Zod nem de `as any`.
-  const disponibilidadeBodySchema = {
-    type: "object",
-    required: ["horarioFuncionamento", "agendamentosExistentes", "duracaoTotalMinutos"],
-    properties: {
-      horarioFuncionamento: {
-        type: "object",
-        // As três chaves são required porque JanelaFuncionamento
-        // (@gr-barber/scheduling) declara horaAbertura/horaFechamento
-        // como string | null, sem undefined. Fora do required o schema
-        // geraria `| undefined` e o tipo não encaixaria.
-        required: ["horaAbertura", "horaFechamento", "fechado"],
-        properties: {
-          horaAbertura: { type: ["string", "null"] },
-          horaFechamento: { type: ["string", "null"] },
-          fechado: { type: "boolean" },
-        },
-      },
-      agendamentosExistentes: {
-        type: "array",
-        items: {
-          type: "object",
-          required: ["horaInicio", "horaFim"],
-          properties: {
-            horaInicio: { type: "string" },
-            horaFim: { type: "string" },
-          },
-        },
-      },
-      duracaoTotalMinutos: { type: "number", minimum: 1 },
-      intervaloMinutos: { type: "number", minimum: 5 },
-    },
-  } as const;
-
-  app.post(
-    "/disponibilidade",
-    { schema: { body: disponibilidadeBodySchema } },
-    async (request) => {
-      // request.body já vem tipado a partir do schema acima —
-      // esse é o cálculo que vira "quais horários mostrar pro
-      // cliente" na tela de Escolha do horário.
-      const horarios = calcularHorariosDisponiveis(request.body);
-      return { horarios };
-    }
-  );
 
   return app;
 }

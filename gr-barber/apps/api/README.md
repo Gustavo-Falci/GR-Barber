@@ -49,7 +49,6 @@ Públicas:
 | `POST` | `/barbearias/:slug/agendamentos` | agendamento pelo link público, `origem: "cliente"` |
 | `GET` | `/barbearias/:slug/disponibilidade` | horários livres de um dia (`barbeiroId`, `data`, `servicoIds` repetido) |
 | `GET` | `/barbearias/:slug/disponibilidade/mes` | quais dias do mês têm vaga (`barbeiroId`, `mes`, `servicoIds`) |
-| `POST` | `/disponibilidade` | horários livres, via `@gr-barber/scheduling` |
 
 Protegidas (JWT no `Authorization: Bearer`), registradas num escopo
 encapsulado que carrega o hook `autenticar` — rota nova entra ali dentro
