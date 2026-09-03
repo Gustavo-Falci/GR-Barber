@@ -5,8 +5,8 @@ import {
   horariosLivres,
 } from "../lib/disponibilidade";
 import { ErroDeNegocio } from "../lib/erro-negocio";
-import { dataParaDate } from "../lib/horas";
-import { PADRAO_DATA, PADRAO_UUID } from "../lib/padroes";
+import { dataParaDate, dateParaData } from "../lib/horas";
+import { PADRAO_DATA, PADRAO_MES, PADRAO_UUID } from "../lib/padroes";
 import type { App } from "../tipos";
 
 const paramsSlug = {
@@ -26,6 +26,22 @@ const filtroDia = {
   properties: {
     barbeiroId: { type: "string", pattern: PADRAO_UUID },
     data: { type: "string", pattern: PADRAO_DATA },
+    servicoIds: {
+      type: "array",
+      minItems: 1,
+      maxItems: 10,
+      items: { type: "string", pattern: PADRAO_UUID },
+    },
+  },
+} as const;
+
+const filtroMes = {
+  type: "object",
+  additionalProperties: false,
+  required: ["barbeiroId", "mes", "servicoIds"],
+  properties: {
+    barbeiroId: { type: "string", pattern: PADRAO_UUID },
+    mes: { type: "string", pattern: PADRAO_MES },
     servicoIds: {
       type: "array",
       minItems: 1,
@@ -90,6 +106,85 @@ export function registrarRotasDisponibilidade(app: App): void {
       return {
         horarios: horariosLivres({ janela, ocupados, duracaoTotalMinutos }),
       };
+    }
+  );
+
+  app.get(
+    "/barbearias/:slug/disponibilidade/mes",
+    { schema: { params: paramsSlug, querystring: filtroMes } },
+    async (request) => {
+      const { barbeiroId, mes, servicoIds } = request.query;
+
+      const barbearia = await prisma.barbearia.findUniqueOrThrow({
+        where: { slug: request.params.slug },
+        select: { id: true },
+      });
+
+      await garantirBarbeiro(prisma, barbearia.id, barbeiroId);
+
+      const { duracaoTotalMinutos } = await carregarServicos(
+        prisma,
+        barbearia.id,
+        servicoIds
+      );
+
+      const [ano, numeroDoMes] = mes.split("-").map(Number);
+      const primeiroDia = new Date(Date.UTC(ano, numeroDoMes - 1, 1));
+      // Dia 0 do mês seguinte é o último dia deste — o jeito de não
+      // manter uma tabela de 28/30/31 e de acertar ano bissexto.
+      const ultimoDia = new Date(Date.UTC(ano, numeroDoMes, 0));
+
+      // Uma consulta pro mês inteiro, agrupada em memória logo abaixo.
+      // Trinta consultas (uma por dia) desenhariam o mesmo calendário
+      // com trinta idas ao banco.
+      const agendamentos = await prisma.agendamento.findMany({
+        where: {
+          barbeiroId,
+          data: { gte: primeiroDia, lte: ultimoDia },
+          status: { not: "cancelado" },
+        },
+        select: { data: true, horaInicio: true, horaFim: true },
+      });
+
+      const ocupadosPorDia = new Map<
+        string,
+        { horaInicio: Date; horaFim: Date }[]
+      >();
+      for (const agendamento of agendamentos) {
+        const chave = dateParaData(agendamento.data);
+        const doDia = ocupadosPorDia.get(chave) ?? [];
+        doDia.push({
+          horaInicio: agendamento.horaInicio,
+          horaFim: agendamento.horaFim,
+        });
+        ocupadosPorDia.set(chave, doDia);
+      }
+
+      // A segunda e última consulta: as sete linhas da semana.
+      const janelas = await prisma.horarioFuncionamento.findMany({
+        where: { barbeariaId: barbearia.id },
+      });
+      const janelaPorDiaSemana = new Map(
+        janelas.map((janela) => [janela.diaSemana, janela])
+      );
+
+      const dias: Record<string, boolean> = {};
+      for (let dia = 1; dia <= ultimoDia.getUTCDate(); dia += 1) {
+        const data = new Date(Date.UTC(ano, numeroDoMes - 1, dia));
+        const chave = dateParaData(data);
+
+        // Um dia é `true` se tem pelo menos um horário livre. A rota não
+        // sabe que dia é hoje, de propósito: ver "Desvios conscientes"
+        // no plano da fase 5 — quem desabilita o passado é a tela.
+        dias[chave] =
+          horariosLivres({
+            janela: janelaPorDiaSemana.get(data.getUTCDay()) ?? null,
+            ocupados: ocupadosPorDia.get(chave) ?? [],
+            duracaoTotalMinutos,
+          }).length > 0;
+      }
+
+      return { dias };
     }
   );
 }
