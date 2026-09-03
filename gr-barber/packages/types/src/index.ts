@@ -16,16 +16,29 @@ export interface ClientePublico {
   temConta: boolean;
 }
 
-// Body de POST /agendamentos — o que o cliente envia pra criar
-// um agendamento (o preço/duração de cada serviço são resolvidos
-// no backend, não confiados no que o client manda).
-export interface NovoAgendamentoInput {
-  barbeariaId: string;
+// Body de POST /agendamentos — o walk-in que o barbeiro registra. O
+// `barbeariaId` sai do token e a `origem` é fixa em "barbeiro": os dois
+// no corpo seriam forjáveis, e é por isso que este tipo não os tem.
+// Preço e duração de cada serviço são resolvidos no backend, nunca
+// confiados no que o client manda.
+export interface NovoAgendamentoBarbeiroInput {
   barbeiroId: string;
   clienteId: string;
   servicoIds: string[];
   data: string; // "YYYY-MM-DD"
   horaInicio: string; // "HH:mm"
-  origem: "cliente" | "barbeiro";
+  observacoes?: string;
+}
+
+// Body de POST /barbearias/:slug/agendamentos — o cliente agendando pelo
+// link público, sem conta. O `barbeariaId` sai do slug, a `origem` é fixa
+// em "cliente", e o cliente é resolvido pelo telefone dentro daquela
+// barbearia.
+export interface NovoAgendamentoPublicoInput {
+  barbeiroId: string;
+  servicoIds: string[];
+  data: string;
+  horaInicio: string;
+  cliente: { nome: string; telefone: string };
   observacoes?: string;
 }
