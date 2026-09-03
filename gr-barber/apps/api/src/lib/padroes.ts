@@ -1,7 +1,6 @@
 // Patterns de JSON Schema usados por mais de uma rota. `format: "uuid"`
-// dependeria do ajv-formats estar ligado no Fastify; pattern não depende
-// de configuração nenhuma — mesmo motivo do PADRAO_EMAIL que já existe
-// em rotas/auth.ts.
+// e `format: "email"` dependeriam do ajv-formats estar ligado no
+// Fastify; pattern não depende de configuração nenhuma.
 
 // Sem isto, um `:id` fora do formato chega no Prisma, o Postgres recusa
 // o valor na coluna uuid e vira P2023 — que o tratador traduz pra 400,
@@ -21,3 +20,7 @@ export const PADRAO_HORA = "^([01]\\d|2[0-3]):([0-5]\\d)$";
 // Preço como string decimal, no máximo duas casas — o mesmo formato que
 // sai na resposta. Number aqui perderia centavo no caminho.
 export const PADRAO_PRECO = "^\\d{1,8}(\\.\\d{1,2})?$";
+
+// `format: "email"` dependeria do ajv-formats estar ligado no Fastify;
+// um pattern explícito não depende de configuração nenhuma.
+export const PADRAO_EMAIL = "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$";

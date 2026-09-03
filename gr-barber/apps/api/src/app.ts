@@ -6,6 +6,7 @@ import { prisma } from "@gr-barber/database";
 import { registrarTratamentoDeErros } from "./plugins/erros";
 import { autenticar, registrarAuth } from "./plugins/auth";
 import { registrarRotasAuth } from "./rotas/auth";
+import { registrarRotasClientes } from "./rotas/clientes";
 import {
   registrarRotasBarbeariasProtegidas,
   registrarRotasBarbeariasPublicas,
@@ -60,6 +61,7 @@ export function buildApp(opts: { logger?: boolean } = {}): App {
     registrarRotasBarbeariasProtegidas(protegidas);
     registrarRotasHorarios(protegidas);
     registrarRotasServicos(protegidas);
+    registrarRotasClientes(protegidas);
   });
 
   app.get("/health", async () => ({ status: "ok" }));

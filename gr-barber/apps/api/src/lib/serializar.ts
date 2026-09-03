@@ -1,4 +1,5 @@
 import type { Prisma } from "@gr-barber/database";
+import type { ClientePublico } from "@gr-barber/types";
 import { dateParaData, dateParaHora } from "./horas";
 
 // O que sai pelo HTTP não é o registro do Prisma. Dois motivos, os dois
@@ -86,13 +87,9 @@ export function serializarServico(servico: {
   };
 }
 
-export interface ClienteSerializado {
-  id: string;
-  nome: string;
-  telefone: string;
-  email: string | null;
-  temConta: boolean;
-}
+// Um nome só, um formato só: a resposta da API e o tipo que web e
+// mobile importam não têm como divergir em silêncio.
+export type ClienteSerializado = ClientePublico;
 
 export function serializarCliente(cliente: {
   id: string;

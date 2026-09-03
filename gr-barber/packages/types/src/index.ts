@@ -4,11 +4,15 @@
 // do banco: formatos de entrada/saída de endpoint, versões "seguras"
 // de uma entidade sem campos sensíveis, etc.
 
-// Versão pública do Cliente — nunca inclui senha_hash.
+// Versão pública do Cliente — nunca inclui senhaHash. É o formato que
+// `serializarCliente` (apps/api/src/lib/serializar.ts) produz: o
+// serializador importa este tipo, então divergir os dois quebra o
+// type-check em vez de quebrar uma tela.
 export interface ClientePublico {
   id: string;
   nome: string;
   telefone: string;
+  email: string | null;
   temConta: boolean;
 }
 

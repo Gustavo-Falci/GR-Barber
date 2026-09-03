@@ -63,6 +63,8 @@ e já nasce protegida:
 | `POST` | `/servicos` | cria serviço; `preco` é string (`"45.00"`) |
 | `PATCH` | `/servicos/:id` | edita nome, duração, preço, e reativa |
 | `DELETE` | `/servicos/:id` | soft delete: `ativo = false`, 200 com o serviço |
+| `GET` | `/clientes` | clientes da barbearia do token; `?busca=` casa nome ou telefone |
+| `POST` | `/clientes` | cadastra cliente; telefone é único dentro da barbearia |
 
 O `barbeariaId` e o id do barbeiro saem sempre do token, nunca do corpo
 nem da URL. O token vale 7 dias, e o hook confere no banco se o barbeiro
