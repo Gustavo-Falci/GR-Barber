@@ -93,6 +93,12 @@ Prisma sai no contrato.
 | Rota, registro inexistente ou recurso de outra barbearia | 404 | `nao_encontrado` |
 | Unique violada | 409 | `conflito` |
 | Horário já ocupado (trava do banco) | 409 | `horario_ocupado` |
+
+Dois pedidos simultâneos no mesmo horário podem terminar em impasse no
+Postgres (SQLSTATE `40P01`) em vez de violação da constraint. As rotas de
+criação repetem a transação uma vez nesse caso (`src/lib/transacao.ts`):
+na segunda tentativa a concorrente já terminou, e a resposta é o `201` ou
+o `409` — nunca um `500`.
 | Regra de negócio | 422 | código do domínio |
 | Bug nosso | 500 | `erro_interno` |
 

@@ -228,10 +228,25 @@ describe("conflito de horário", () => {
 
     const recusado = resultados.find((r) => r.status === "rejected");
     const erro = (recusado as PromiseRejectedResult).reason as Error;
-    // Os dois pedaços que o tratador de erros usa pra reconhecer o
-    // conflito. Se o Prisma mudar o formato, é este teste que avisa.
-    expect(erro.message).toContain("23P01");
-    expect(erro.message).toContain("sem_conflito_horario");
+
+    // O Postgres resolve isto de duas formas, e qual delas sai depende
+    // de tempo — medido: em ~1 de cada 6 rodadas sai a segunda.
+    //
+    // 23P01: uma transação chegou primeiro, a outra bateu na
+    // `sem_conflito_horario`. É o caminho que o tratador de erros
+    // traduz em 409.
+    //
+    // 40P01: impasse. Cada transação gravou a própria tupla antes de a
+    // constraint conferir a outra, e aí cada uma ficou esperando a
+    // transação da outra; o Postgres mata uma das duas. É por causa
+    // deste caminho que as rotas de criação repetem a transação uma vez
+    // (`comRetryDeDeadlock`) — sem isso ele viraria 500.
+    const violouAExclusao =
+      erro.message.includes("23P01") &&
+      erro.message.includes("sem_conflito_horario");
+    const deuImpasse = erro.message.includes("40P01");
+
+    expect(violouAExclusao || deuImpasse).toBe(true);
 
     await app.close();
   });
