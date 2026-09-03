@@ -47,6 +47,7 @@ Públicas:
 | `GET` | `/barbearias/:slug` | perfil público + horários de funcionamento |
 | `GET` | `/barbearias/:slug/servicos` | serviços ativos da barbearia, `{ servicos: [...] }` |
 | `POST` | `/barbearias/:slug/agendamentos` | agendamento pelo link público, `origem: "cliente"` |
+| `GET` | `/barbearias/:slug/disponibilidade` | horários livres de um dia (`barbeiroId`, `data`, `servicoIds` repetido) |
 | `POST` | `/disponibilidade` | horários livres, via `@gr-barber/scheduling` |
 
 Protegidas (JWT no `Authorization: Bearer`), registradas num escopo

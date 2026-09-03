@@ -11,6 +11,7 @@ import {
   registrarRotasAgendamentosPublicas,
 } from "./rotas/agendamentos";
 import { registrarRotasClientes } from "./rotas/clientes";
+import { registrarRotasDisponibilidade } from "./rotas/disponibilidade";
 import {
   registrarRotasBarbeariasProtegidas,
   registrarRotasBarbeariasPublicas,
@@ -56,6 +57,7 @@ export function buildApp(opts: { logger?: boolean } = {}): App {
   registrarRotasBarbeariasPublicas(app);
   registrarRotasServicosPublicas(app);
   registrarRotasAgendamentosPublicas(app);
+  registrarRotasDisponibilidade(app);
 
   // Escopo dos protegidos: o hook vale pra tudo que for registrado aqui
   // dentro. Pendurar onRequest rota a rota dependeria de ninguém
