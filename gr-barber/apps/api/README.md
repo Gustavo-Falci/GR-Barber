@@ -44,6 +44,7 @@ Públicas:
 | `GET` | `/health` | sinal de vida |
 | `POST` | `/auth/signup` | cria barbearia + barbeiro numa transação e devolve JWT |
 | `POST` | `/auth/login` | `{ email, senha }` → JWT |
+| `GET` | `/barbearias/:slug` | perfil público + horários de funcionamento |
 | `GET` | `/barbearias/:slug/servicos` | serviços ativos da barbearia |
 | `POST` | `/disponibilidade` | horários livres, via `@gr-barber/scheduling` |
 
