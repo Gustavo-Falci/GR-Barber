@@ -86,6 +86,7 @@ Prisma sai no contrato.
 | Acesso negado | 403 | `acesso_negado` |
 | Rota, registro inexistente ou recurso de outra barbearia | 404 | `nao_encontrado` |
 | Unique violada | 409 | `conflito` |
+| Horário já ocupado (trava do banco) | 409 | `horario_ocupado` |
 | Regra de negócio | 422 | código do domínio |
 | Bug nosso | 500 | `erro_interno` |
 
