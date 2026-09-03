@@ -6,7 +6,17 @@ import { prisma } from "@gr-barber/database";
 import { registrarTratamentoDeErros } from "./plugins/erros";
 import { autenticar, registrarAuth } from "./plugins/auth";
 import { registrarRotasAuth } from "./rotas/auth";
+import { registrarRotasClientes } from "./rotas/clientes";
+import {
+  registrarRotasBarbeariasProtegidas,
+  registrarRotasBarbeariasPublicas,
+} from "./rotas/barbearias";
+import { registrarRotasHorarios } from "./rotas/horarios";
 import { registrarRotasMe } from "./rotas/me";
+import {
+  registrarRotasServicos,
+  registrarRotasServicosPublicas,
+} from "./rotas/servicos";
 import type { App } from "./tipos";
 
 // Monta a instância sem escutar em porta nenhuma. É o que permite os
@@ -14,6 +24,14 @@ import type { App } from "./tipos";
 export function buildApp(opts: { logger?: boolean } = {}): App {
   const app = Fastify({
     logger: opts.logger ?? false,
+    // O AJV do Fastify vem com `removeAdditional: true`: campo fora do
+    // schema é apagado do corpo em silêncio, e a rota responde 200 como
+    // se estivesse tudo certo. Com `additionalProperties: false` nos
+    // corpos, queremos o contrário — 400 dizendo qual campo sobra. É o
+    // que separa "mandei `telephone` em vez de `telefone`" de "salvou
+    // sem esse campo e não me avisou", e o que faz um `barbeariaId`
+    // no corpo de rota protegida ser recusado em vez de ignorado.
+    ajv: { customOptions: { removeAdditional: false } },
   }).withTypeProvider<JsonSchemaToTsProvider>();
 
   // origin: true por enquanto — trocar por uma lista explícita
@@ -31,6 +49,8 @@ export function buildApp(opts: { logger?: boolean } = {}): App {
 
   registrarAuth(app);
   registrarRotasAuth(app);
+  registrarRotasBarbeariasPublicas(app);
+  registrarRotasServicosPublicas(app);
 
   // Escopo dos protegidos: o hook vale pra tudo que for registrado aqui
   // dentro. Pendurar onRequest rota a rota dependeria de ninguém
@@ -38,24 +58,13 @@ export function buildApp(opts: { logger?: boolean } = {}): App {
   app.register(async (protegidas: App) => {
     protegidas.addHook("onRequest", autenticar);
     registrarRotasMe(protegidas);
+    registrarRotasBarbeariasProtegidas(protegidas);
+    registrarRotasHorarios(protegidas);
+    registrarRotasServicos(protegidas);
+    registrarRotasClientes(protegidas);
   });
 
   app.get("/health", async () => ({ status: "ok" }));
-
-  // Exemplo real usando o Prisma — lista os serviços ativos de
-  // uma barbearia, o primeiro passo do fluxo de agendamento do cliente.
-  app.get(
-    "/barbearias/:slug/servicos",
-    { schema: { params: { type: "object", properties: { slug: { type: "string" } }, required: ["slug"] } } },
-    async (request) => {
-      const { slug } = request.params;
-      const barbearia = await prisma.barbearia.findUniqueOrThrow({ where: { slug } });
-      return prisma.servico.findMany({
-        where: { barbeariaId: barbearia.id, ativo: true },
-        orderBy: { nome: "asc" },
-      });
-    }
-  );
 
   // Exemplo do padrão "schema da rota é a validação": o mesmo
   // objeto que valida o body também tipa `request.body` — sem

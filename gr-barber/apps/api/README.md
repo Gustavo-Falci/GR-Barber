@@ -44,7 +44,8 @@ Públicas:
 | `GET` | `/health` | sinal de vida |
 | `POST` | `/auth/signup` | cria barbearia + barbeiro numa transação e devolve JWT |
 | `POST` | `/auth/login` | `{ email, senha }` → JWT |
-| `GET` | `/barbearias/:slug/servicos` | serviços ativos da barbearia |
+| `GET` | `/barbearias/:slug` | perfil público + horários de funcionamento |
+| `GET` | `/barbearias/:slug/servicos` | serviços ativos da barbearia, `{ servicos: [...] }` |
 | `POST` | `/disponibilidade` | horários livres, via `@gr-barber/scheduling` |
 
 Protegidas (JWT no `Authorization: Bearer`), registradas num escopo
@@ -54,6 +55,18 @@ e já nasce protegida:
 | Método | Rota | O que faz |
 |---|---|---|
 | `GET` | `/me` | barbeiro do token |
+| `PATCH` | `/me` | edita nome e telefone do barbeiro do token |
+| `PATCH` | `/barbearias/me` | edita nome, telefone, endereço e logo da barbearia do token |
+| `GET` | `/barbearias/me/horarios` | os 7 dias da semana, mesmo os não gravados |
+| `PUT` | `/barbearias/me/horarios` | grava a semana inteira; dia ausente vira fechado |
+| `GET` | `/servicos` | serviços da barbearia do token, inclusive os inativos |
+| `POST` | `/servicos` | cria serviço; `preco` é string (`"45.00"`) |
+| `PATCH` | `/servicos/:id` | edita nome, duração, preço, e reativa |
+| `DELETE` | `/servicos/:id` | soft delete: `ativo = false`, 200 com o serviço |
+| `GET` | `/clientes` | clientes da barbearia do token; `?busca=` casa nome ou telefone |
+| `POST` | `/clientes` | cadastra cliente; telefone é único dentro da barbearia |
+| `GET` | `/clientes/:id` | cliente + histórico de agendamentos na barbearia |
+| `PATCH` | `/clientes/:id` | edita nome, telefone e email |
 
 O `barbeariaId` e o id do barbeiro saem sempre do token, nunca do corpo
 nem da URL. O token vale 7 dias, e o hook confere no banco se o barbeiro
@@ -67,13 +80,18 @@ Prisma sai no contrato.
 
 | Situação | HTTP | `erro` |
 |---|---|---|
-| Body fora do schema | 400 | `requisicao_invalida` |
+| Body ou parâmetro fora do schema, id fora do formato UUID | 400 | `requisicao_invalida` |
 | Token ausente, inválido, expirado ou de barbeiro inativo | 401 | `nao_autenticado` |
 | Credenciais erradas no login | 401 | `credenciais_invalidas` |
-| Rota ou registro inexistente | 404 | `nao_encontrado` |
+| Acesso negado | 403 | `acesso_negado` |
+| Rota, registro inexistente ou recurso de outra barbearia | 404 | `nao_encontrado` |
 | Unique violada | 409 | `conflito` |
 | Regra de negócio | 422 | código do domínio |
 | Bug nosso | 500 | `erro_interno` |
+
+Quem lança escolhe o par status/código com `ErroHttp`
+(`src/lib/erro-http.ts`) ou com `ErroDeNegocio` (`src/lib/erro-negocio.ts`,
+sempre 422).
 
 ## Consumindo os pacotes internos
 

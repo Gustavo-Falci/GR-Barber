@@ -1,58 +1,77 @@
 import type { FastifyError } from "fastify";
 import { Prisma } from "@gr-barber/database";
-import { ErroDeNegocio } from "../lib/erro-negocio";
+import { ErroHttp } from "../lib/erro-http";
 import type { App } from "../tipos";
+
+// Erro sub-500 que chega sem código nosso: em vez de rotular tudo como
+// `requisicao_invalida`, cada status ganha o código que descreve o que
+// houve. Status fora desta tabela cai no padrão — é sempre alguma forma
+// de "a requisição está errada".
+const CODIGO_POR_STATUS: Record<number, string> = {
+  400: "requisicao_invalida",
+  403: "acesso_negado",
+  404: "nao_encontrado",
+  409: "conflito",
+  413: "requisicao_invalida",
+  415: "requisicao_invalida",
+  422: "regra_de_negocio",
+};
 
 // Um lugar só traduzindo erro de domínio e de banco pra HTTP. Sem isso,
 // cada rota repetiria try/catch e o formato da resposta divergiria.
 export function registrarTratamentoDeErros(app: App): void {
   app.setErrorHandler<FastifyError>((erro, request, reply) => {
-    if (erro instanceof ErroDeNegocio) {
+    // ErroDeNegocio (422) também cai aqui: ele estende ErroHttp.
+    if (erro instanceof ErroHttp) {
       return reply
-        .code(422)
+        .code(erro.status)
         .send({ erro: erro.codigo, mensagem: erro.message });
     }
 
     if (erro instanceof Prisma.PrismaClientKnownRequestError) {
-      // P2025: findUniqueOrThrow/update não achou o registro.
+      // P2025: findUniqueOrThrow/findFirstOrThrow/update não achou o
+      // registro. Nas rotas protegidas o `where` sempre carrega o
+      // barbeariaId do token, então "não achou" inclui "é de outra
+      // barbearia" — e a resposta é a mesma, de propósito.
       if (erro.code === "P2025") {
         return reply.code(404).send({ erro: "nao_encontrado" });
       }
-      // P2002: violação de unique (slug de barbearia, email, telefone).
+      // P2002: violação de unique (slug, email, telefone do cliente).
       if (erro.code === "P2002") {
         return reply.code(409).send({ erro: "conflito" });
+      }
+      // P2023: valor inconsistente pra coluna — na prática, um id que
+      // não é UUID. Erro de quem chamou, não bug nosso: 400. A mensagem
+      // crua traz nome de coluna e SQL, então não é repassada.
+      if (erro.code === "P2023") {
+        return reply.code(400).send({ erro: "requisicao_invalida" });
       }
     }
 
     // Validação de schema do Fastify e erros de JWT já vêm com
-    // statusCode — é isso que os dois branches abaixo consultam.
+    // statusCode — é isso que os branches abaixo consultam.
     const status = erro.statusCode ?? 500;
 
     // O @fastify/jwt lança com códigos próprios (FST_JWT_NO_AUTHORIZATION_IN_HEADER,
     // FST_JWT_AUTHORIZATION_TOKEN_INVALID e outros). Repassar esses nomes
     // crus colocaria o nome interno de um plugin dentro do contrato da
     // API — e as 23 telas passariam a ramificar em cima dele. Pra quem
-    // consome, toda falha de token é a mesma coisa.
-    //
-    // Toda falha vinda do @fastify/jwt é falha de autenticação, inclusive
-    // as duas que o plugin classifica como 400 (cabeçalho Authorization
-    // malformado, cookie ilegível). Tratar as duas como 401 mantém o
-    // nome interno do plugin fora do contrato, e descreve melhor o que
-    // houve: quem manda um cabeçalho torto não está autenticado.
+    // consome, toda falha de token é a mesma coisa, inclusive as duas
+    // que o plugin classifica como 400 (cabeçalho Authorization
+    // malformado, cookie ilegível): quem manda um cabeçalho torto não
+    // está autenticado.
     if (status === 401 || erro.code?.startsWith("FST_JWT")) {
       return reply.code(401).send({ erro: "nao_autenticado" });
     }
 
-    // A partir daqui sobra a validação de schema do Fastify (400).
-    // O `erro` é sempre nosso: repassar o `erro.code` colocaria o
-    // FST_ERR_VALIDATION do Fastify no contrato, o mesmo vazamento já
-    // fechado logo acima pros FST_JWT_*. A `mensagem` do AJV continua
-    // saindo porque diz ao cliente qual campo está errado — é o código
-    // que precisa ser estável e livre de nome de framework.
     if (status < 500) {
-      return reply
-        .code(status)
-        .send({ erro: "requisicao_invalida", mensagem: erro.message });
+      // O `erro` é sempre nosso: repassar o `erro.code` colocaria o
+      // FST_ERR_VALIDATION do Fastify no contrato, o mesmo vazamento já
+      // fechado logo acima pros FST_JWT_*. A `mensagem` do AJV continua
+      // saindo porque diz ao cliente qual campo está errado — é o código
+      // que precisa ser estável e livre de nome de framework.
+      const codigo = CODIGO_POR_STATUS[status] ?? "requisicao_invalida";
+      return reply.code(status).send({ erro: codigo, mensagem: erro.message });
     }
 
     // Qualquer outra coisa é bug nosso: registra inteiro no log e

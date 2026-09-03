@@ -1,12 +1,9 @@
 import { randomUUID } from "node:crypto";
 
 import { prisma } from "@gr-barber/database";
+import { PADRAO_EMAIL } from "../lib/padroes";
 import { conferirSenha, gerarHashSenha } from "../lib/senha";
 import type { App } from "../tipos";
-
-// `format: "email"` dependeria do ajv-formats estar ligado no Fastify;
-// um pattern explícito não depende de configuração nenhuma.
-const PADRAO_EMAIL = "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$";
 
 // A coluna é VARCHAR com índice único simples — sem citext e sem índice
 // funcional, o Postgres compara caixa a caixa. Sem normalizar,
