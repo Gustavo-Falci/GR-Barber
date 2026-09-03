@@ -46,6 +46,7 @@ Públicas:
 | `POST` | `/auth/login` | `{ email, senha }` → JWT |
 | `GET` | `/barbearias/:slug` | perfil público + horários de funcionamento |
 | `GET` | `/barbearias/:slug/servicos` | serviços ativos da barbearia, `{ servicos: [...] }` |
+| `POST` | `/barbearias/:slug/agendamentos` | agendamento pelo link público, `origem: "cliente"` |
 | `POST` | `/disponibilidade` | horários livres, via `@gr-barber/scheduling` |
 
 Protegidas (JWT no `Authorization: Bearer`), registradas num escopo
@@ -67,6 +68,10 @@ e já nasce protegida:
 | `POST` | `/clientes` | cadastra cliente; telefone é único dentro da barbearia |
 | `GET` | `/clientes/:id` | cliente + histórico de agendamentos na barbearia |
 | `PATCH` | `/clientes/:id` | edita nome, telefone e email |
+| `POST` | `/agendamentos` | walk-in do barbeiro, `origem: "barbeiro"` |
+| `GET` | `/agendamentos` | `?data=` (um dia) ou `?de=&ate=` (até 92 dias) |
+| `GET` | `/agendamentos/:id` | detalhe, com cliente e serviços |
+| `PATCH` | `/agendamentos/:id` | muda `status` e `observacoes` |
 
 O `barbeariaId` e o id do barbeiro saem sempre do token, nunca do corpo
 nem da URL. O token vale 7 dias, e o hook confere no banco se o barbeiro
@@ -86,6 +91,7 @@ Prisma sai no contrato.
 | Acesso negado | 403 | `acesso_negado` |
 | Rota, registro inexistente ou recurso de outra barbearia | 404 | `nao_encontrado` |
 | Unique violada | 409 | `conflito` |
+| Horário já ocupado (trava do banco) | 409 | `horario_ocupado` |
 | Regra de negócio | 422 | código do domínio |
 | Bug nosso | 500 | `erro_interno` |
 

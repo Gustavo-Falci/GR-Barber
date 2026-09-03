@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { prisma } from "@gr-barber/database";
+import { Prisma, prisma } from "@gr-barber/database";
 import { buildApp } from "../src/app";
 import { ErroDeNegocio } from "../src/lib/erro-negocio";
 import { conflito, naoEncontrado } from "../src/lib/erro-http";
@@ -203,6 +203,79 @@ describe("tratamento de erros", () => {
     // A mensagem crua do Prisma traz nome de coluna e SQL; nada disso
     // pode sair no contrato.
     expect(resposta.body).not.toContain("Inconsistent column data");
+
+    await app.close();
+  });
+  it("traduz a violação da sem_conflito_horario em 409", async () => {
+    const app = buildApp();
+    app.get("/teste-23p01", async () => {
+      // Formato medido contra o Postgres 18 em 2026-09-02: o Prisma 5.22
+      // não tipa o 23P01. Ele chega como PrismaClientUnknownRequestError
+      // com `code` undefined, e o SQLSTATE só existe dentro da mensagem.
+      throw new Prisma.PrismaClientUnknownRequestError(
+        "Invalid `prisma.agendamento.create()` invocation in " +
+          "/caminho/absoluto/que/nao/pode/vazar.ts:45:32 " +
+          "Error occurred during query execution: " +
+          "ConnectorError(ConnectorError { kind: QueryError(PostgresError " +
+          '{ code: "23P01", message: "valor-chave conflitante viola a restrição de exclusão ' +
+          'sem_conflito_horario", severity: "ERRO" }), transient: false })',
+        { clientVersion: "5.22.0" }
+      );
+    });
+
+    const resposta = await app.inject({ method: "GET", url: "/teste-23p01" });
+
+    expect(resposta.statusCode).toBe(409);
+    expect(resposta.json().erro).toBe("horario_ocupado");
+
+    await app.close();
+  });
+
+  it("não vaza a mensagem crua do Postgres no 409 de conflito", async () => {
+    const app = buildApp();
+    app.get("/teste-23p01-vazamento", async () => {
+      throw new Prisma.PrismaClientUnknownRequestError(
+        "Invalid `prisma.agendamento.create()` invocation in " +
+          "/caminho/absoluto/que/nao/pode/vazar.ts:45:32 " +
+          'ConnectorError(ConnectorError { kind: QueryError(PostgresError { code: "23P01", ' +
+          'message: "viola a restrição de exclusão sem_conflito_horario" }) })',
+        { clientVersion: "5.22.0" }
+      );
+    });
+
+    const resposta = await app.inject({
+      method: "GET",
+      url: "/teste-23p01-vazamento",
+    });
+
+    // A mensagem crua traz o caminho do arquivo que fez a query e os
+    // valores da chave em conflito — o id do barbeiro, a data e a hora
+    // do agendamento alheio. É o oposto do que uma rota pública pode
+    // devolver.
+    expect(resposta.body).not.toContain("ConnectorError");
+    expect(resposta.body).not.toContain("/caminho/absoluto");
+    expect(resposta.body).not.toContain("23P01");
+
+    await app.close();
+  });
+
+  it("não confunde outro erro desconhecido do Prisma com conflito", async () => {
+    const app = buildApp();
+    app.get("/teste-desconhecido", async () => {
+      // Sem 23P01 na mensagem: continua sendo bug nosso, continua 500.
+      throw new Prisma.PrismaClientUnknownRequestError(
+        "Error occurred during query execution: conexão perdida",
+        { clientVersion: "5.22.0" }
+      );
+    });
+
+    const resposta = await app.inject({
+      method: "GET",
+      url: "/teste-desconhecido",
+    });
+
+    expect(resposta.statusCode).toBe(500);
+    expect(resposta.json()).toEqual({ erro: "erro_interno" });
 
     await app.close();
   });

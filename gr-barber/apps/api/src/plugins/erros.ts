@@ -48,6 +48,35 @@ export function registrarTratamentoDeErros(app: App): void {
       }
     }
 
+    // A EXCLUDE USING gist `sem_conflito_horario` é a única garantia real
+    // contra dois clientes confirmando o mesmo horário ao mesmo tempo — a
+    // validação por calcularHorariosDisponiveis, que roda antes, tem uma
+    // janela entre a leitura e a escrita.
+    //
+    // O Prisma 5.22 não tipa esse erro: ele chega como
+    // PrismaClientUnknownRequestError com `code` e `meta` undefined, e o
+    // SQLSTATE existe só dentro da mensagem (medido em 2026-09-02, ver o
+    // plano da fase 4). Daí a checagem por substring.
+    //
+    // Os dois pedaços, e não só um: o `23P01` porque é o código do
+    // Postgres e não é traduzido — a prosa da mensagem vem no idioma do
+    // servidor —, e o nome da constraint porque uma EXCLUDE constraint
+    // futura traria o mesmo código e viraria "horário ocupado" por
+    // engano.
+    if (
+      erro instanceof Prisma.PrismaClientUnknownRequestError &&
+      erro.message.includes("23P01") &&
+      erro.message.includes("sem_conflito_horario")
+    ) {
+      // Mensagem nossa, nunca a do Postgres: a crua carrega o caminho do
+      // arquivo que fez a query e os valores da chave em conflito, que
+      // incluem a data e a hora do agendamento de outra pessoa.
+      return reply.code(409).send({
+        erro: "horario_ocupado",
+        mensagem: "esse horário já está ocupado",
+      });
+    }
+
     // Validação de schema do Fastify e erros de JWT já vêm com
     // statusCode — é isso que os branches abaixo consultam.
     const status = erro.statusCode ?? 500;

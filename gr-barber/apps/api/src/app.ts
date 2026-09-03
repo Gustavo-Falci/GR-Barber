@@ -6,6 +6,10 @@ import { prisma } from "@gr-barber/database";
 import { registrarTratamentoDeErros } from "./plugins/erros";
 import { autenticar, registrarAuth } from "./plugins/auth";
 import { registrarRotasAuth } from "./rotas/auth";
+import {
+  registrarRotasAgendamentos,
+  registrarRotasAgendamentosPublicas,
+} from "./rotas/agendamentos";
 import { registrarRotasClientes } from "./rotas/clientes";
 import {
   registrarRotasBarbeariasProtegidas,
@@ -51,6 +55,7 @@ export function buildApp(opts: { logger?: boolean } = {}): App {
   registrarRotasAuth(app);
   registrarRotasBarbeariasPublicas(app);
   registrarRotasServicosPublicas(app);
+  registrarRotasAgendamentosPublicas(app);
 
   // Escopo dos protegidos: o hook vale pra tudo que for registrado aqui
   // dentro. Pendurar onRequest rota a rota dependeria de ninguém
@@ -62,6 +67,7 @@ export function buildApp(opts: { logger?: boolean } = {}): App {
     registrarRotasHorarios(protegidas);
     registrarRotasServicos(protegidas);
     registrarRotasClientes(protegidas);
+    registrarRotasAgendamentos(protegidas);
   });
 
   app.get("/health", async () => ({ status: "ok" }));

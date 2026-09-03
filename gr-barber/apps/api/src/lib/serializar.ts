@@ -161,3 +161,18 @@ export function serializarAgendamento(agendamento: {
     })),
   };
 }
+
+// A agenda do barbeiro mostra o nome do cliente em cada linha, então as
+// rotas de agendamento devolvem os dois juntos. Serializador separado, e
+// não um campo opcional no de cima, pra o fluxo público não devolver o
+// cadastro do cliente sem querer.
+export function serializarAgendamentoComCliente(
+  agendamento: Parameters<typeof serializarAgendamento>[0] & {
+    cliente: Parameters<typeof serializarCliente>[0];
+  }
+): AgendamentoSerializado & { cliente: ClienteSerializado } {
+  return {
+    ...serializarAgendamento(agendamento),
+    cliente: serializarCliente(agendamento.cliente),
+  };
+}
