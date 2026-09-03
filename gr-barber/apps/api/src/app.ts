@@ -12,6 +12,10 @@ import {
 } from "./rotas/barbearias";
 import { registrarRotasHorarios } from "./rotas/horarios";
 import { registrarRotasMe } from "./rotas/me";
+import {
+  registrarRotasServicos,
+  registrarRotasServicosPublicas,
+} from "./rotas/servicos";
 import type { App } from "./tipos";
 
 // Monta a instância sem escutar em porta nenhuma. É o que permite os
@@ -45,6 +49,7 @@ export function buildApp(opts: { logger?: boolean } = {}): App {
   registrarAuth(app);
   registrarRotasAuth(app);
   registrarRotasBarbeariasPublicas(app);
+  registrarRotasServicosPublicas(app);
 
   // Escopo dos protegidos: o hook vale pra tudo que for registrado aqui
   // dentro. Pendurar onRequest rota a rota dependeria de ninguém
@@ -54,24 +59,10 @@ export function buildApp(opts: { logger?: boolean } = {}): App {
     registrarRotasMe(protegidas);
     registrarRotasBarbeariasProtegidas(protegidas);
     registrarRotasHorarios(protegidas);
+    registrarRotasServicos(protegidas);
   });
 
   app.get("/health", async () => ({ status: "ok" }));
-
-  // Exemplo real usando o Prisma — lista os serviços ativos de
-  // uma barbearia, o primeiro passo do fluxo de agendamento do cliente.
-  app.get(
-    "/barbearias/:slug/servicos",
-    { schema: { params: { type: "object", properties: { slug: { type: "string" } }, required: ["slug"] } } },
-    async (request) => {
-      const { slug } = request.params;
-      const barbearia = await prisma.barbearia.findUniqueOrThrow({ where: { slug } });
-      return prisma.servico.findMany({
-        where: { barbeariaId: barbearia.id, ativo: true },
-        orderBy: { nome: "asc" },
-      });
-    }
-  );
 
   // Exemplo do padrão "schema da rota é a validação": o mesmo
   // objeto que valida o body também tipa `request.body` — sem

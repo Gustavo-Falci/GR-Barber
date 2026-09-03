@@ -45,7 +45,7 @@ Públicas:
 | `POST` | `/auth/signup` | cria barbearia + barbeiro numa transação e devolve JWT |
 | `POST` | `/auth/login` | `{ email, senha }` → JWT |
 | `GET` | `/barbearias/:slug` | perfil público + horários de funcionamento |
-| `GET` | `/barbearias/:slug/servicos` | serviços ativos da barbearia |
+| `GET` | `/barbearias/:slug/servicos` | serviços ativos da barbearia, `{ servicos: [...] }` |
 | `POST` | `/disponibilidade` | horários livres, via `@gr-barber/scheduling` |
 
 Protegidas (JWT no `Authorization: Bearer`), registradas num escopo
@@ -59,6 +59,8 @@ e já nasce protegida:
 | `PATCH` | `/barbearias/me` | edita nome, telefone, endereço e logo da barbearia do token |
 | `GET` | `/barbearias/me/horarios` | os 7 dias da semana, mesmo os não gravados |
 | `PUT` | `/barbearias/me/horarios` | grava a semana inteira; dia ausente vira fechado |
+| `GET` | `/servicos` | serviços da barbearia do token, inclusive os inativos |
+| `POST` | `/servicos` | cria serviço; `preco` é string (`"45.00"`) |
 
 O `barbeariaId` e o id do barbeiro saem sempre do token, nunca do corpo
 nem da URL. O token vale 7 dias, e o hook confere no banco se o barbeiro
