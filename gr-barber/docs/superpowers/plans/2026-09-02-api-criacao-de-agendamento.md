@@ -1688,6 +1688,27 @@ git commit -m "feat(api): let a client book from the public link"
 
 ## Task 6: Os testes que justificam o banco real
 
+> **Corrigido na execução (2026-09-02).** A corrida por HTTP **não**
+> alcança a trava do banco de forma confiável: contra um Postgres local,
+> o segundo pedido lê depois de o primeiro commitar e para no 422 da
+> checagem de disponibilidade. Medido — o `Promise.all` das duas rotas
+> deu `[201, 422]`, nunca `[201, 409]`.
+>
+> Uma sonda no nível do banco (duas transações interativas inserindo o
+> mesmo horário, sem passar pela checagem) deu `23P01` em uma e sucesso
+> na outra, com total de 1 linha. Então o teste virou dois:
+>
+> - **por HTTP**, o invariante determinístico: exatamente um `201`, exatamente
+>   um agendamento no banco, e o perdedor com `409` ou `422` — as duas
+>   respostas são corretas, e qual delas sai depende de quem leu antes de
+>   quem commitou;
+> - **no banco**, a trava sob concorrência real, checando que a mensagem
+>   do erro traz `23P01` e `sem_conflito_horario` — os dois pedaos que o
+>   tratador da Task 1 usa. Se o Prisma mudar o formato, esse teste avisa.
+>
+> Um teste de corrida verde que nunca correu seria pior que nenhum.
+
+
 Os cinco casos da seção "Testes" da spec. **Um deles a spec descreve
 errado**, e o plano corrige: a spec diz que "um segundo pedido
 sobrepondo devolve 409", mas o passo 4 do próprio caminho de escrita
