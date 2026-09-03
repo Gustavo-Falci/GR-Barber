@@ -38,6 +38,29 @@ const corpoNovoAgendamento = {
   },
 } as const;
 
+const paramsComId = {
+  type: "object",
+  required: ["id"],
+  additionalProperties: false,
+  properties: { id: { type: "string", pattern: PADRAO_UUID } },
+} as const;
+
+// Só status e observações. Data, hora e serviços ficam de fora: remarcar
+// está fora de escopo (cancela e cria outro), e aceitar data/hora aqui
+// pularia a checagem de disponibilidade inteira.
+const corpoPatchAgendamento = {
+  type: "object",
+  additionalProperties: false,
+  minProperties: 1,
+  properties: {
+    status: {
+      type: "string",
+      enum: ["pendente", "confirmado", "concluido", "cancelado", "no_show"],
+    },
+    observacoes: { type: ["string", "null"], maxLength: 500 },
+  },
+} as const;
+
 const filtroAgendamentos = {
   type: "object",
   additionalProperties: false,
@@ -192,6 +215,44 @@ export function registrarRotasAgendamentos(app: App): void {
       return {
         agendamentos: agendamentos.map(serializarAgendamentoComCliente),
       };
+    }
+  );
+
+  app.get(
+    "/agendamentos/:id",
+    { schema: { params: paramsComId } },
+    async (request) => {
+      const agendamento = await prisma.agendamento.findFirstOrThrow({
+        where: {
+          id: request.params.id,
+          barbeariaId: request.user.barbeariaId,
+        },
+        include: INCLUDE_AGENDAMENTO,
+      });
+
+      return serializarAgendamentoComCliente(agendamento);
+    }
+  );
+
+  app.patch(
+    "/agendamentos/:id",
+    { schema: { params: paramsComId, body: corpoPatchAgendamento } },
+    async (request) => {
+      // Qualquer transição de status é aceita: o barbeiro é a autoridade
+      // sobre o próprio dia. A única recusa vem do banco — reativar um
+      // cancelado cujo horário já foi tomado faz a linha voltar pro
+      // escopo da constraint parcial, o Postgres re-checa, e o conflito
+      // sai como 409.
+      const agendamento = await prisma.agendamento.update({
+        where: {
+          id: request.params.id,
+          barbeariaId: request.user.barbeariaId,
+        },
+        data: request.body,
+        include: INCLUDE_AGENDAMENTO,
+      });
+
+      return serializarAgendamentoComCliente(agendamento);
     }
   );
 }
