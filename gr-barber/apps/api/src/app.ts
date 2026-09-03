@@ -14,6 +14,14 @@ import type { App } from "./tipos";
 export function buildApp(opts: { logger?: boolean } = {}): App {
   const app = Fastify({
     logger: opts.logger ?? false,
+    // O AJV do Fastify vem com `removeAdditional: true`: campo fora do
+    // schema é apagado do corpo em silêncio, e a rota responde 200 como
+    // se estivesse tudo certo. Com `additionalProperties: false` nos
+    // corpos, queremos o contrário — 400 dizendo qual campo sobra. É o
+    // que separa "mandei `telephone` em vez de `telefone`" de "salvou
+    // sem esse campo e não me avisou", e o que faz um `barbeariaId`
+    // no corpo de rota protegida ser recusado em vez de ignorado.
+    ajv: { customOptions: { removeAdditional: false } },
   }).withTypeProvider<JsonSchemaToTsProvider>();
 
   // origin: true por enquanto — trocar por uma lista explícita

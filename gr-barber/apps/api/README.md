@@ -54,6 +54,7 @@ e já nasce protegida:
 | Método | Rota | O que faz |
 |---|---|---|
 | `GET` | `/me` | barbeiro do token |
+| `PATCH` | `/me` | edita nome e telefone do barbeiro do token |
 
 O `barbeariaId` e o id do barbeiro saem sempre do token, nunca do corpo
 nem da URL. O token vale 7 dias, e o hook confere no banco se o barbeiro

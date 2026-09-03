@@ -28,6 +28,7 @@ próprios depois desta.
 - **Rota protegida nunca aceita `barbeariaId` no corpo nem na URL** — sai de `request.user.barbeariaId`. Rota pública escopa pelo `:slug`.
 - **`Servico.preco` sai como string de duas casas** (`"45.00"`), nunca number: o `Decimal` do Prisma vira `{}` no `JSON.stringify`, e float perde centavo.
 - **Todo `:id` de rota é validado com pattern de UUID no schema.** Sem isso, um id fora do formato chega no Prisma e vira `P2023` — um 500, quando a resposta certa é 400.
+- **`buildApp()` desliga o `removeAdditional` do AJV** (`ajv: { customOptions: { removeAdditional: false } }`, feito na Task 4). Sem isso o Fastify apaga campo fora do schema em silêncio e responde 200 — e todo teste deste plano que espera 400 pra campo extra falha. Descoberto na execução, não previsto no plano original.
 - Os pacotes internos (`@gr-barber/*`) publicam TypeScript cru: `main` aponta pro `src/index.ts`, sem passo de build.
 - Rodar `pnpm --filter @gr-barber/api test` e `pnpm --filter @gr-barber/api type-check` antes de cada commit.
 
