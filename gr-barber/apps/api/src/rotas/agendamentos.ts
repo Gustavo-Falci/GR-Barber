@@ -13,6 +13,7 @@ import {
   serializarAgendamento,
   serializarAgendamentoComCliente,
 } from "../lib/serializar";
+import { comRetryDeDeadlock } from "../lib/transacao";
 import type { App } from "../tipos";
 
 // Sem `barbeariaId` e sem `origem`: os dois seriam forjáveis. O
@@ -133,23 +134,28 @@ export function registrarRotasAgendamentos(app: App): void {
       const barbeariaId = request.user.barbeariaId;
       const { clienteId, ...resto } = request.body;
 
-      const agendamento = await prisma.$transaction(async (tx) => {
-        // O cliente também tem que ser desta barbearia. Mesma resposta
-        // que GET /clientes/:id dá pro cliente alheio: 404, sem
-        // confirmar que o id existe em algum lugar da plataforma.
-        const cliente = await tx.cliente.findFirst({
-          where: { id: clienteId, barbeariaId },
-          select: { id: true },
-        });
-        if (!cliente) throw naoEncontrado("cliente não encontrado");
+      // O retry existe porque dois pedidos simultâneos no mesmo horário
+      // podem virar impasse no Postgres em vez de violação da
+      // constraint — e aí a resposta certa (409) viraria 500.
+      const agendamento = await comRetryDeDeadlock(() =>
+        prisma.$transaction(async (tx) => {
+          // O cliente também tem que ser desta barbearia. Mesma resposta
+          // que GET /clientes/:id dá pro cliente alheio: 404, sem
+          // confirmar que o id existe em algum lugar da plataforma.
+          const cliente = await tx.cliente.findFirst({
+            where: { id: clienteId, barbeariaId },
+            select: { id: true },
+          });
+          if (!cliente) throw naoEncontrado("cliente não encontrado");
 
-        return criarAgendamento(tx, {
-          ...resto,
-          barbeariaId,
-          clienteId,
-          origem: "barbeiro",
-        });
-      });
+          return criarAgendamento(tx, {
+            ...resto,
+            barbeariaId,
+            clienteId,
+            origem: "barbeiro",
+          });
+        })
+      );
 
       return reply.code(201).send(serializarAgendamentoComCliente(agendamento));
     }
@@ -266,44 +272,49 @@ export function registrarRotasAgendamentosPublicas(app: App): void {
     async (request, reply) => {
       const { cliente: dadosCliente, ...resto } = request.body;
 
-      const agendamento = await prisma.$transaction(async (tx) => {
-        // findUniqueOrThrow: slug inexistente vira P2025 -> 404.
-        const barbearia = await tx.barbearia.findUniqueOrThrow({
-          where: { slug: request.params.slug },
-          select: { id: true },
-        });
+      // Mesmo motivo da rota do walk-in: impasse concorrente não pode
+      // sair como 500.
+      const agendamento = await comRetryDeDeadlock(() =>
+        prisma.$transaction(async (tx) => {
+          // findUniqueOrThrow: slug inexistente vira P2025 -> 404.
+          const barbearia = await tx.barbearia.findUniqueOrThrow({
+            where: { slug: request.params.slug },
+            select: { id: true },
+          });
 
-        // Telefone já cadastrado nesta barbearia reaproveita o registro
-        // — é o que faz o barbeiro reconhecer o cliente recorrente.
-        //
-        // `update: {}` vazio de propósito: nome divergente NÃO
-        // sobrescreve o cadastrado. Quem digita o nome abreviado no
-        // celular não renomeia o cadastro que o barbeiro ajustou.
-        const cliente = await tx.cliente.upsert({
-          where: {
-            barbeariaId_telefone: {
+          // Telefone já cadastrado nesta barbearia reaproveita o
+          // registro — é o que faz o barbeiro reconhecer o cliente
+          // recorrente.
+          //
+          // `update: {}` vazio de propósito: nome divergente NÃO
+          // sobrescreve o cadastrado. Quem digita o nome abreviado no
+          // celular não renomeia o cadastro que o barbeiro ajustou.
+          const cliente = await tx.cliente.upsert({
+            where: {
+              barbeariaId_telefone: {
+                barbeariaId: barbearia.id,
+                telefone: dadosCliente.telefone,
+              },
+            },
+            create: {
               barbeariaId: barbearia.id,
+              nome: dadosCliente.nome,
               telefone: dadosCliente.telefone,
             },
-          },
-          create: {
-            barbeariaId: barbearia.id,
-            nome: dadosCliente.nome,
-            telefone: dadosCliente.telefone,
-          },
-          update: {},
-        });
+            update: {},
+          });
 
-        // Mesma transação do upsert: agendamento recusado desfaz o
-        // cliente recém-criado junto, senão cada tentativa inválida
-        // deixaria um cadastro fantasma.
-        return criarAgendamento(tx, {
-          ...resto,
-          barbeariaId: barbearia.id,
-          clienteId: cliente.id,
-          origem: "cliente",
-        });
-      });
+          // Mesma transação do upsert: agendamento recusado desfaz o
+          // cliente recém-criado junto, senão cada tentativa inválida
+          // deixaria um cadastro fantasma.
+          return criarAgendamento(tx, {
+            ...resto,
+            barbeariaId: barbearia.id,
+            clienteId: cliente.id,
+            origem: "cliente",
+          });
+        })
+      );
 
       // Só o agendamento recém-criado, sem o cliente e sem histórico:
       // quem sabe o telefone de alguém não pode puxar a agenda dessa
