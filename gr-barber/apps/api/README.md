@@ -46,6 +46,7 @@ Públicas:
 | `POST` | `/auth/login` | `{ email, senha }` → JWT |
 | `GET` | `/barbearias/:slug` | perfil público + horários de funcionamento |
 | `GET` | `/barbearias/:slug/servicos` | serviços ativos da barbearia, `{ servicos: [...] }` |
+| `POST` | `/barbearias/:slug/agendamentos` | agendamento pelo link público, `origem: "cliente"` |
 | `POST` | `/disponibilidade` | horários livres, via `@gr-barber/scheduling` |
 
 Protegidas (JWT no `Authorization: Bearer`), registradas num escopo
