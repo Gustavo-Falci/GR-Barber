@@ -1,7 +1,11 @@
 import type { Prisma } from "@gr-barber/database";
-import { calcularHorariosDisponiveis } from "@gr-barber/scheduling";
+import {
+  carregarServicos,
+  garantirBarbeiro,
+  horariosLivres,
+} from "./disponibilidade";
 import { ErroDeNegocio } from "./erro-negocio";
-import { dataParaDate, dateParaHora, horaParaDate, somarMinutos } from "./horas";
+import { dataParaDate, horaParaDate, somarMinutos } from "./horas";
 
 // O que as rotas precisam junto do agendamento: o nome de cada serviço
 // (o preço vem congelado no AgendamentoServico) e o cliente, que a
@@ -40,53 +44,17 @@ export async function criarAgendamento(
     observacoes,
   } = params;
 
-  // O barbeiroId vem do corpo nos dois fluxos — no público, sem token
-  // nenhum. Sem esta checagem dava pra encher a agenda de um barbeiro de
-  // outra barbearia.
-  const barbeiro = await tx.barbeiro.findFirst({
-    where: { id: barbeiroId, barbeariaId, ativo: true },
-    select: { id: true },
-  });
-  if (!barbeiro) {
-    throw new ErroDeNegocio(
-      "barbeiro não encontrado nesta barbearia",
-      "barbeiro_invalido"
-    );
-  }
+  await garantirBarbeiro(tx, barbeariaId, barbeiroId);
 
-  // Serviços lidos do banco, e não do corpo: é daqui que saem preço e
-  // duração. Confiar no corpo deixaria o cliente escolher quanto paga.
-  //
-  // Set porque a mesma lista com id repetido só conta uma vez — o
-  // findMany devolveria uma linha só e a contagem não bateria.
-  const idsUnicos = [...new Set(servicoIds)];
-  const servicos = await tx.servico.findMany({
-    where: { id: { in: idsUnicos }, barbeariaId },
-  });
-
-  if (servicos.length !== idsUnicos.length) {
-    throw new ErroDeNegocio(
-      "serviço não encontrado nesta barbearia",
-      "servico_invalido"
-    );
-  }
-
-  const inativo = servicos.find((servico) => !servico.ativo);
-  if (inativo) {
-    throw new ErroDeNegocio(
-      `o serviço "${inativo.nome}" não está mais disponível`,
-      "servico_inativo"
-    );
-  }
-
-  const duracaoTotal = servicos.reduce(
-    (soma, servico) => soma + servico.duracaoMinutos,
-    0
+  const { servicos, duracaoTotalMinutos } = await carregarServicos(
+    tx,
+    barbeariaId,
+    servicoIds
   );
 
   let horaFim: string;
   try {
-    horaFim = somarMinutos(horaInicio, duracaoTotal);
+    horaFim = somarMinutos(horaInicio, duracaoTotalMinutos);
   } catch {
     // somarMinutos lança quando a soma passa da meia-noite. Isso é
     // pedido inválido, não bug: 422 em vez de 500.
@@ -109,37 +77,18 @@ export async function criarAgendamento(
   // getUTCDay e não getDay: a Date foi construída em UTC por
   // dataParaDate, e o dia da semana tem que ser lido no mesmo fuso em
   // que foi escrito.
-  const diaSemana = dataDate.getUTCDay();
-
   const janela = await tx.horarioFuncionamento.findUnique({
-    where: { barbeariaId_diaSemana: { barbeariaId, diaSemana } },
+    where: {
+      barbeariaId_diaSemana: { barbeariaId, diaSemana: dataDate.getUTCDay() },
+    },
   });
 
   // Só o que a trava do banco também considera: cancelado não ocupa
   // horário, o resto ocupa. As duas regras têm que concordar, senão o
   // cálculo oferece um horário que o banco recusa.
-  const existentes = await tx.agendamento.findMany({
+  const ocupados = await tx.agendamento.findMany({
     where: { barbeiroId, data: dataDate, status: { not: "cancelado" } },
     select: { horaInicio: true, horaFim: true },
-  });
-
-  const horarios = calcularHorariosDisponiveis({
-    horarioFuncionamento: {
-      horaAbertura: janela?.horaAbertura
-        ? dateParaHora(janela.horaAbertura)
-        : null,
-      horaFechamento: janela?.horaFechamento
-        ? dateParaHora(janela.horaFechamento)
-        : null,
-      // Dia sem linha nenhuma é dia fechado — mesma regra do PUT de
-      // horários da fase 3.
-      fechado: janela?.fechado ?? true,
-    },
-    agendamentosExistentes: existentes.map((agendamento) => ({
-      horaInicio: dateParaHora(agendamento.horaInicio),
-      horaFim: dateParaHora(agendamento.horaFim),
-    })),
-    duracaoTotalMinutos: duracaoTotal,
   });
 
   // Esta checagem e a EXCLUDE constraint do banco são redundantes de
@@ -148,7 +97,11 @@ export async function criarAgendamento(
   // — dia fechado, fora do expediente, fora da grade. A do banco é a
   // única garantia real contra dois clientes confirmando ao mesmo tempo,
   // porque entre esta leitura e o insert existe uma janela.
-  if (!horarios.includes(horaInicio)) {
+  if (
+    !horariosLivres({ janela, ocupados, duracaoTotalMinutos }).includes(
+      horaInicio
+    )
+  ) {
     throw new ErroDeNegocio(
       "esse horário não está disponível",
       "horario_indisponivel"
