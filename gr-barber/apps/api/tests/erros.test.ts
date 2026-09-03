@@ -39,8 +39,9 @@ describe("tratamento de erros", () => {
     const app = buildApp();
     const resposta = await app.inject({
       method: "POST",
-      url: "/disponibilidade",
-      payload: { duracaoTotalMinutos: 45 },
+      url: "/auth/login",
+      // Falta a senha: o schema recusa antes de a rota rodar.
+      payload: { email: "gu@exemplo.com" },
     });
 
     expect(resposta.statusCode).toBe(400);
@@ -276,6 +277,23 @@ describe("tratamento de erros", () => {
 
     expect(resposta.statusCode).toBe(500);
     expect(resposta.json()).toEqual({ erro: "erro_interno" });
+
+    await app.close();
+  });
+  it("não expõe mais a calculadora sem estado", async () => {
+    const app = buildApp();
+
+    // Substituída pelas rotas de disponibilidade que leem do banco: esta
+    // recebia horário de funcionamento e agendamentos pelo corpo, o que
+    // nenhuma tela tem — e quem tivesse poderia mentir.
+    const resposta = await app.inject({
+      method: "POST",
+      url: "/disponibilidade",
+      payload: { duracaoTotalMinutos: 45 },
+    });
+
+    expect(resposta.statusCode).toBe(404);
+    expect(resposta.json()).toEqual({ erro: "nao_encontrado" });
 
     await app.close();
   });

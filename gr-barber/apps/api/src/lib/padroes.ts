@@ -28,3 +28,7 @@ export const PADRAO_EMAIL = "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$";
 // "YYYY-MM-DD". O pattern só garante a forma; se a data existe mesmo
 // (31 de fevereiro, por exemplo) quem decide é o dataParaDate.
 export const PADRAO_DATA = "^[0-9]{4}-[0-9]{2}-[0-9]{2}$";
+
+// "YYYY-MM". O mês vai de 01 a 12 no próprio pattern — assim "2026-13"
+// morre no schema, e não numa data inválida lá adiante.
+export const PADRAO_MES = "^[0-9]{4}-(0[1-9]|1[0-2])$";
