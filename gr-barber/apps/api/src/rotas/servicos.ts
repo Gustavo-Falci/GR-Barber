@@ -1,5 +1,5 @@
 import { prisma } from "@gr-barber/database";
-import { PADRAO_PRECO } from "../lib/padroes";
+import { PADRAO_PRECO, PADRAO_UUID } from "../lib/padroes";
 import { serializarServico } from "../lib/serializar";
 import type { App } from "../tipos";
 
@@ -25,6 +25,32 @@ const corpoNovoServico = {
       multipleOf: 5,
     },
     preco: { type: "string", pattern: PADRAO_PRECO },
+  },
+} as const;
+
+const paramsComId = {
+  type: "object",
+  required: ["id"],
+  additionalProperties: false,
+  properties: { id: { type: "string", pattern: PADRAO_UUID } },
+} as const;
+
+// `ativo` entra aqui porque é como o barbeiro reativa o que desativou —
+// o DELETE é reversível de propósito.
+const corpoPatchServico = {
+  type: "object",
+  additionalProperties: false,
+  minProperties: 1,
+  properties: {
+    nome: { type: "string", minLength: 2, maxLength: 120 },
+    duracaoMinutos: {
+      type: "integer",
+      minimum: 5,
+      maximum: 480,
+      multipleOf: 5,
+    },
+    preco: { type: "string", pattern: PADRAO_PRECO },
+    ativo: { type: "boolean" },
   },
 } as const;
 
@@ -58,6 +84,39 @@ export function registrarRotasServicos(app: App): void {
       });
 
       return reply.code(201).send(serializarServico(servico));
+    }
+  );
+
+  app.patch(
+    "/servicos/:id",
+    { schema: { params: paramsComId, body: corpoPatchServico } },
+    async (request) => {
+      const servico = await prisma.servico.update({
+        // O barbeariaId vai no MESMO where da escrita. Conferir a posse
+        // numa consulta separada antes deixaria uma janela entre a
+        // checagem e o update; aqui, se a barbearia não casa, o Prisma
+        // lança P2025 e o tratador central devolve 404.
+        where: { id: request.params.id, barbeariaId: request.user.barbeariaId },
+        data: request.body,
+      });
+
+      return serializarServico(servico);
+    }
+  );
+
+  app.delete(
+    "/servicos/:id",
+    { schema: { params: paramsComId } },
+    async (request) => {
+      // Soft delete: AgendamentoServico tem FK ON DELETE RESTRICT pro
+      // serviço — apagar de verdade quebraria o histórico de quem já foi
+      // atendido. Some da listagem pública, continua na do barbeiro.
+      const servico = await prisma.servico.update({
+        where: { id: request.params.id, barbeariaId: request.user.barbeariaId },
+        data: { ativo: false },
+      });
+
+      return serializarServico(servico);
     }
   );
 }

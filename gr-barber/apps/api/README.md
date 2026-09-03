@@ -61,6 +61,8 @@ e já nasce protegida:
 | `PUT` | `/barbearias/me/horarios` | grava a semana inteira; dia ausente vira fechado |
 | `GET` | `/servicos` | serviços da barbearia do token, inclusive os inativos |
 | `POST` | `/servicos` | cria serviço; `preco` é string (`"45.00"`) |
+| `PATCH` | `/servicos/:id` | edita nome, duração, preço, e reativa |
+| `DELETE` | `/servicos/:id` | soft delete: `ativo = false`, 200 com o serviço |
 
 O `barbeariaId` e o id do barbeiro saem sempre do token, nunca do corpo
 nem da URL. O token vale 7 dias, e o hook confere no banco se o barbeiro
