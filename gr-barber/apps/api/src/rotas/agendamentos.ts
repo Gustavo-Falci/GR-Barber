@@ -1,6 +1,8 @@
 import { prisma } from "@gr-barber/database";
-import { criarAgendamento } from "../lib/agendamento";
-import { naoEncontrado } from "../lib/erro-http";
+import { criarAgendamento, INCLUDE_AGENDAMENTO } from "../lib/agendamento";
+import { ErroDeNegocio } from "../lib/erro-negocio";
+import { ErroHttp, naoEncontrado } from "../lib/erro-http";
+import { dataParaDate } from "../lib/horas";
 import {
   PADRAO_DATA,
   PADRAO_HORA,
@@ -35,6 +37,33 @@ const corpoNovoAgendamento = {
     observacoes: { type: "string", maxLength: 500 },
   },
 } as const;
+
+const filtroAgendamentos = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    data: { type: "string", pattern: PADRAO_DATA },
+    de: { type: "string", pattern: PADRAO_DATA },
+    ate: { type: "string", pattern: PADRAO_DATA },
+  },
+} as const;
+
+// Um dia em milissegundos — o intervalo é fechado nas duas pontas, daí
+// o `+ 1` na contagem.
+const UM_DIA = 24 * 60 * 60 * 1000;
+const MAXIMO_DE_DIAS = 92;
+
+// O pattern do schema garante a forma "YYYY-MM-DD", não que a data
+// exista: "2026-02-31" passa por ele e explode no dataParaDate. Sem este
+// wrapper isso seria um RangeError não tratado, ou seja, um 500 por
+// culpa de quem chamou.
+function dataDoFiltro(valor: string): Date {
+  try {
+    return dataParaDate(valor);
+  } catch {
+    throw new ErroDeNegocio(`a data ${valor} não existe`, "data_invalida");
+  }
+}
 
 const paramsSlug = {
   type: "object",
@@ -100,6 +129,69 @@ export function registrarRotasAgendamentos(app: App): void {
       });
 
       return reply.code(201).send(serializarAgendamentoComCliente(agendamento));
+    }
+  );
+
+  app.get(
+    "/agendamentos",
+    { schema: { querystring: filtroAgendamentos } },
+    async (request) => {
+      const { data, de, ate } = request.query;
+
+      const temDia = data !== undefined;
+      const temIntervalo = de !== undefined || ate !== undefined;
+
+      // Exatamente uma das duas formas. As duas juntas seriam ambíguas;
+      // nenhuma devolveria a base inteira, e a tela não pagina isso.
+      if (temDia === temIntervalo) {
+        throw new ErroHttp(
+          400,
+          "requisicao_invalida",
+          "informe ou `data`, ou o par `de` e `ate`"
+        );
+      }
+
+      if (temIntervalo && (de === undefined || ate === undefined)) {
+        throw new ErroHttp(
+          400,
+          "requisicao_invalida",
+          "o intervalo precisa de `de` e `ate`"
+        );
+      }
+
+      const inicio = dataDoFiltro(temDia ? data : de!);
+      const fim = dataDoFiltro(temDia ? data : ate!);
+
+      if (fim.getTime() < inicio.getTime()) {
+        throw new ErroDeNegocio(
+          "`ate` não pode ser antes de `de`",
+          "intervalo_invalido"
+        );
+      }
+
+      // Teto de 92 dias: a agenda é uma tela de dia ou de trimestre, e
+      // sem limite um `de=2020&ate=2030` puxaria a base inteira.
+      const dias = (fim.getTime() - inicio.getTime()) / UM_DIA + 1;
+      if (dias > MAXIMO_DE_DIAS) {
+        throw new ErroDeNegocio(
+          `o intervalo não pode passar de ${MAXIMO_DE_DIAS} dias`,
+          "intervalo_longo_demais"
+        );
+      }
+
+      const agendamentos = await prisma.agendamento.findMany({
+        // Sempre o barbeariaId do token.
+        where: {
+          barbeariaId: request.user.barbeariaId,
+          data: { gte: inicio, lte: fim },
+        },
+        orderBy: [{ data: "asc" }, { horaInicio: "asc" }],
+        include: INCLUDE_AGENDAMENTO,
+      });
+
+      return {
+        agendamentos: agendamentos.map(serializarAgendamentoComCliente),
+      };
     }
   );
 }

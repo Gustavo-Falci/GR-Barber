@@ -69,6 +69,7 @@ e já nasce protegida:
 | `GET` | `/clientes/:id` | cliente + histórico de agendamentos na barbearia |
 | `PATCH` | `/clientes/:id` | edita nome, telefone e email |
 | `POST` | `/agendamentos` | walk-in do barbeiro, `origem: "barbeiro"` |
+| `GET` | `/agendamentos` | `?data=` (um dia) ou `?de=&ate=` (até 92 dias) |
 
 O `barbeariaId` e o id do barbeiro saem sempre do token, nunca do corpo
 nem da URL. O token vale 7 dias, e o hook confere no banco se o barbeiro
