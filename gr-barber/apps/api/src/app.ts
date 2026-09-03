@@ -7,6 +7,7 @@ import { registrarTratamentoDeErros } from "./plugins/erros";
 import { autenticar, registrarAuth } from "./plugins/auth";
 import { registrarRotasAuth } from "./rotas/auth";
 import { registrarRotasBarbeariasProtegidas } from "./rotas/barbearias";
+import { registrarRotasHorarios } from "./rotas/horarios";
 import { registrarRotasMe } from "./rotas/me";
 import type { App } from "./tipos";
 
@@ -48,6 +49,7 @@ export function buildApp(opts: { logger?: boolean } = {}): App {
     protegidas.addHook("onRequest", autenticar);
     registrarRotasMe(protegidas);
     registrarRotasBarbeariasProtegidas(protegidas);
+    registrarRotasHorarios(protegidas);
   });
 
   app.get("/health", async () => ({ status: "ok" }));

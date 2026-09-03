@@ -56,6 +56,8 @@ e já nasce protegida:
 | `GET` | `/me` | barbeiro do token |
 | `PATCH` | `/me` | edita nome e telefone do barbeiro do token |
 | `PATCH` | `/barbearias/me` | edita nome, telefone, endereço e logo da barbearia do token |
+| `GET` | `/barbearias/me/horarios` | os 7 dias da semana, mesmo os não gravados |
+| `PUT` | `/barbearias/me/horarios` | grava a semana inteira; dia ausente vira fechado |
 
 O `barbeariaId` e o id do barbeiro saem sempre do token, nunca do corpo
 nem da URL. O token vale 7 dias, e o hook confere no banco se o barbeiro
