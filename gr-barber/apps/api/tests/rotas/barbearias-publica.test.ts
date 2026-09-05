@@ -78,7 +78,7 @@ describe("GET /barbearias/:slug", () => {
     await app.close();
   });
 
-  it("não vaza barbeiro, email nem senhaHash", async () => {
+  it("expõe só id e nome do barbeiro, sem email nem senhaHash", async () => {
     const app = buildApp();
     await criarBarbeariaComToken(app, "um");
 

@@ -98,9 +98,10 @@ async function agendar(params: {
   return resposta.json().id as string;
 }
 
-// Semeado direto no Prisma, e não pela rota pública de agendamento: essa
-// rota valida disponibilidade e recusaria uma data no passado. `data` e
-// `clienteId` batem com PASSADO e com o cliente do teste — sem o
+// Semeado direto no Prisma, e não pela rota pública de agendamento: é
+// só pra ter controle exato da data, não porque a rota recusaria uma
+// data no passado — ela aceita, é uma dívida conhecida do roadmap.
+// `data` e `clienteId` batem com PASSADO e com o cliente do teste — sem o
 // clienteId certo o `findFirstOrThrow` da rota nem chegaria a
 // `garantirAlteravel`, e o teste passaria pelo motivo errado (404).
 // `dataParaDate`/`horaParaDate`, e não `new Date(string)`: nenhuma Date
