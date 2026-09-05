@@ -12,9 +12,14 @@ import { usePassoDoFluxo } from "../fluxo/usePassoDoFluxo";
 import { sessaoDoCliente } from "../sessao/armazenamento";
 import estilos from "./DadosDoCliente.module.css";
 
-export function DadosDoCliente() {
-  const { slug, servicoIds, data, hora, remarcar, pronto } =
-    usePassoDoFluxo("dados");
+// `agora` é prop com padrão, mesma forma das outras telas do fluxo
+// (EscolhaDaData, EscolhaDoHorario): é o que permite ao teste desta
+// tela fixar "hoje" sem depender do relógio real da máquina.
+export function DadosDoCliente({ agora = new Date() }: { agora?: Date }) {
+  const { slug, servicoIds, data, hora, remarcar, pronto } = usePassoDoFluxo(
+    "dados",
+    agora
+  );
   const router = useRouter();
   const api = useApi();
 

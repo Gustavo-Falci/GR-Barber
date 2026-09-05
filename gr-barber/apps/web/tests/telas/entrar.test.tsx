@@ -141,6 +141,25 @@ describe("entrar", () => {
     expect(tentou).toBe(false);
   });
 
+  it("um telefone inválido não deixa um erro de senha de tentativa anterior preso na tela", async () => {
+    // Regressão: erroSenha só era limpo dentro do próprio `if` da senha,
+    // que nunca rodava quando o telefone barrava antes. Um erro de senha
+    // de uma tentativa anterior sobrevivia a um telefone que falhou
+    // depois.
+    montar();
+    await userEvent.type(screen.getByLabelText(/telefone/i), "11999998888");
+    await userEvent.click(screen.getByRole("button", { name: "Entrar" }));
+    expect(await screen.findByText(/informe sua senha/i)).toBeInTheDocument();
+
+    await userEvent.clear(screen.getByLabelText(/telefone/i));
+    await userEvent.type(screen.getByLabelText(/telefone/i), "99999");
+    await userEvent.type(screen.getByLabelText(/senha/i), "segredo123");
+    await userEvent.click(screen.getByRole("button", { name: "Entrar" }));
+
+    expect(await screen.findByText(/informe o ddd/i)).toBeInTheDocument();
+    expect(screen.queryByText(/informe sua senha/i)).toBeNull();
+  });
+
   it("I4: senha curta no primeiro acesso acusa o campo em vez da mensagem do AJV", async () => {
     // Sem essa checagem, "abc123" (6 caracteres) ia até a API e voltava
     // 400 com "body/senha must NOT have fewer than 8 characters" — em

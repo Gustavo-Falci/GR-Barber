@@ -5,9 +5,12 @@ import { useState } from "react";
 import { usePassoDoFluxo } from "../../src/fluxo/usePassoDoFluxo";
 import { navegacaoFalsa } from "../ajudantes/navegacao";
 
-// Nove da manhã do dia 9 — o "hoje" fixo que as novas asserções de data
-// passada usam. Prop, e não relógio global, pelo mesmo motivo das telas:
-// determinismo sem fake timers.
+// Nove da manhã do dia 9 — o "hoje" fixo que toda asserção envolvendo
+// data usa, inclusive as que já existiam antes da checagem de data
+// passada. A suíte não pode depender do dia em que roda, senão passa
+// hoje e falha sozinha amanhã: qualquer caso com uma data hardcoded na
+// query precisa deste `agora` amarrado à mesma data-base, senão vira
+// passado de verdade assim que o relógio real da máquina avançar.
 const HOJE = new Date("2026-09-09T09:00:00-03:00");
 
 // Componente de prova que chama o hook e expõe seus valores pra assertion.
@@ -48,12 +51,14 @@ describe("usePassoDoFluxo", () => {
 
   it("retorna pronto=true quando o passo tem tudo que precisa", async () => {
     // Passo "horario" precisa de data. A query tem servicos e data, então
-    // está pronto.
+    // está pronto. `agora` fixo: sem ele este caso passa hoje e falha
+    // sozinho no dia seguinte, quando "2026-09-09" vira passado de
+    // verdade pro relógio real da máquina que roda o teste.
     navegacaoFalsa.redefinir({
       query: { servicos: "s1", data: "2026-09-09" },
     });
 
-    render(<ProvaDoFluxo passo="horario" />);
+    render(<ProvaDoFluxo passo="horario" agora={HOJE} />);
 
     await waitFor(() => {
       expect(screen.getByText("pronto: sim")).toBeInTheDocument();

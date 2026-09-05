@@ -7,7 +7,16 @@ import { Confirmacao } from "../../src/telas/Confirmacao";
 import { gravarDadosDoCliente, lerDadosDoCliente } from "../../src/fluxo/dadosDoCliente";
 import { navegacaoFalsa } from "../ajudantes/navegacao";
 
-function montar(falso = criarApiClientFalso(), agora?: Date) {
+// Oito da manhã do dia 10 — antes das 09:00 que o `beforeEach` escolhe
+// como hora do agendamento, e antes de toda outra data usada neste
+// arquivo (as de remarcar são todas depois de setembro). A suíte não
+// pode depender do dia em que roda, senão passa hoje e falha sozinha
+// amanhã: sem este padrão fixo, `montar()` sem `agora` explícito caía
+// no relógio real da máquina, e "2026-09-10" deixaria de ser "hoje ou
+// depois" assim que a data virasse.
+const MANHA = new Date("2026-09-10T08:00:00-03:00");
+
+function montar(falso = criarApiClientFalso(), agora: Date = MANHA) {
   render(
     <ProvedorDaApi valor={falso}>
       <Confirmacao agora={agora} />

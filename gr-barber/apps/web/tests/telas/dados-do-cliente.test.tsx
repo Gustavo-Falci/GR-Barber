@@ -8,10 +8,17 @@ import { lerDadosDoCliente } from "../../src/fluxo/dadosDoCliente";
 import { sessaoDoCliente } from "../../src/sessao/armazenamento";
 import { navegacaoFalsa } from "../ajudantes/navegacao";
 
-function montar(falso = criarApiClientFalso()) {
+// Manhã do dia 10 — a mesma data usada em toda query deste arquivo. A
+// suíte não pode depender do dia em que roda, senão passa hoje e falha
+// sozinha amanhã: sem este padrão fixo, `montar()` caía no relógio real
+// da máquina, e "2026-09-10" deixaria de ser "hoje ou depois" assim que
+// a data virasse.
+const MANHA = new Date("2026-09-10T08:00:00-03:00");
+
+function montar(falso = criarApiClientFalso(), agora: Date = MANHA) {
   render(
     <ProvedorDaApi valor={falso}>
-      <DadosDoCliente />
+      <DadosDoCliente agora={agora} />
     </ProvedorDaApi>
   );
 }

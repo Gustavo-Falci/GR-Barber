@@ -44,6 +44,13 @@ export function Entrar() {
   // seria a sondagem que o 409 do signup já permite.
   async function submeter(acao: "entrar" | "primeiro-acesso") {
     setAviso(undefined);
+    // Limpos antes de qualquer validação rodar, não dentro do próprio
+    // `if` que a aprova: um telefone inválido retorna cedo, e limpar
+    // erroSenha só no `if` da senha nunca chegava a rodar — um erro de
+    // senha de uma tentativa anterior sobrevivia a um telefone que
+    // falhou depois.
+    setErroTelefone(undefined);
+    setErroSenha(undefined);
 
     // Só o primeiro acesso manda nome — o login nem tem esse campo no
     // schema. Checar sem essa condição quebraria "entrar" pra quem
@@ -76,7 +83,6 @@ export function Entrar() {
       );
       return;
     }
-    setErroTelefone(undefined);
 
     // A API só exige 8 caracteres no primeiro acesso — o login aceita
     // qualquer senha já cadastrada e reage com nao_autenticado se ela
@@ -89,7 +95,6 @@ export function Entrar() {
       setErroSenha("A senha deve ter pelo menos 8 caracteres");
       return;
     }
-    setErroSenha(undefined);
 
     setEnviando(true);
 
