@@ -62,6 +62,35 @@ describe("dados do cliente", () => {
     expect(navegacaoFalsa.push).not.toHaveBeenCalled();
   });
 
+  it("aponta o nome vazio sem culpar o telefone, que está certo", async () => {
+    // A falha é só do nome; a mensagem de DDD do telefone não pode
+    // aparecer, senão a pessoa corrige o campo errado.
+    montar();
+
+    await userEvent.type(screen.getByLabelText(/telefone/i), "11999998888");
+    await userEvent.click(screen.getByRole("button", { name: /continuar/i }));
+
+    expect(screen.getByText(/informe seu nome/i)).toBeInTheDocument();
+    expect(screen.queryByText(/informe o ddd/i)).not.toBeInTheDocument();
+    expect(navegacaoFalsa.push).not.toHaveBeenCalled();
+  });
+
+  it("some com o erro do telefone assim que a pessoa volta a digitar", async () => {
+    // Erro que sobrevive à correção faz o formulário parecer travado —
+    // some no onChange, antes mesmo de um novo clique em Continuar.
+    montar();
+
+    await userEvent.type(screen.getByLabelText(/nome/i), "João");
+    await userEvent.type(screen.getByLabelText(/telefone/i), "999998888");
+    await userEvent.click(screen.getByRole("button", { name: /continuar/i }));
+    expect(screen.getByText(/informe o ddd/i)).toBeInTheDocument();
+
+    await userEvent.clear(screen.getByLabelText(/telefone/i));
+    await userEvent.type(screen.getByLabelText(/telefone/i), "11999998888");
+
+    expect(screen.queryByText(/informe o ddd/i)).not.toBeInTheDocument();
+  });
+
   it("chega preenchido quando existe sessão daquela barbearia", async () => {
     sessaoDoCliente("gr-barber").gravar("jwt-do-cliente");
     montar();

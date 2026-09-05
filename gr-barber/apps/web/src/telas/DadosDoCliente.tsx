@@ -21,7 +21,11 @@ export function DadosDoCliente() {
   const guardados = lerDadosDoCliente();
   const [nome, setNome] = useState(guardados?.nome ?? "");
   const [telefone, setTelefone] = useState(guardados?.telefone ?? "");
-  const [erro, setErro] = useState<string | undefined>();
+  // Um erro por campo, não um só: a mensagem precisa apontar o campo
+  // que está errado, senão nome vazio mostra a instrução de DDD do
+  // telefone, que está correto.
+  const [erroNome, setErroNome] = useState<string | undefined>();
+  const [erroTelefone, setErroTelefone] = useState<string | undefined>();
 
   // Se a pessoa já tem conta nesta barbearia, o cadastro é a fonte —
   // digitar de novo o que a API já sabe é trabalho à toa.
@@ -48,26 +52,32 @@ export function DadosDoCliente() {
   if (!pronto) return null;
 
   function continuar() {
-    let normalizado: string;
+    const nomeAparado = nome.trim();
+
+    let normalizado: string | null = null;
+    let proximoErroTelefone: string | undefined;
     try {
       // A mesma função que a API usa. Barrar aqui evita a ida e volta
       // que voltaria 400 sem dizer o que fazer.
-      normalizado = normalizarTelefone(telefone) ?? "";
+      normalizado = normalizarTelefone(telefone);
     } catch (causa) {
-      setErro(
+      proximoErroTelefone =
         causa instanceof TelefoneInvalido
           ? "Informe o DDD e o número, como (11) 99999-8888"
-          : "Telefone inválido"
-      );
-      return;
+          : "Telefone inválido";
+    }
+    if (!proximoErroTelefone && !normalizado) {
+      proximoErroTelefone = "Informe o DDD e o número, como (11) 99999-8888";
     }
 
-    if (!nome.trim() || !normalizado) {
-      setErro("Informe o DDD e o número, como (11) 99999-8888");
-      return;
-    }
+    const proximoErroNome = nomeAparado ? undefined : "Informe seu nome";
 
-    gravarDadosDoCliente({ nome: nome.trim(), telefone: normalizado });
+    setErroNome(proximoErroNome);
+    setErroTelefone(proximoErroTelefone);
+
+    if (proximoErroNome || proximoErroTelefone) return;
+
+    gravarDadosDoCliente({ nome: nomeAparado, telefone: normalizado as string });
     router.push(
       caminhoDoPasso(slug, "confirmar", { servicoIds, data, hora, remarcar })
     );
@@ -76,13 +86,27 @@ export function DadosDoCliente() {
   return (
     <main className={estilos.pagina}>
       <h1>Seus dados</h1>
-      <Campo rotulo="Nome" valor={nome} onChange={setNome} />
+      <Campo
+        rotulo="Nome"
+        valor={nome}
+        // Mensagem que sobrevive à correção faz o formulário parecer
+        // travado: limpar no próprio onChange já tira o erro assim que
+        // a pessoa volta a digitar, antes mesmo do próximo Continuar.
+        onChange={(proximo) => {
+          setNome(proximo);
+          setErroNome(undefined);
+        }}
+        erro={erroNome}
+      />
       <Campo
         rotulo="Telefone (WhatsApp)"
         formato="telefone"
         valor={telefone}
-        onChange={setTelefone}
-        erro={erro}
+        onChange={(proximo) => {
+          setTelefone(proximo);
+          setErroTelefone(undefined);
+        }}
+        erro={erroTelefone}
       />
       <Botao onClick={continuar}>Continuar</Botao>
     </main>
