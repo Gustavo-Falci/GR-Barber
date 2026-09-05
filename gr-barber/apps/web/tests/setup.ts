@@ -13,15 +13,17 @@ afterEach(cleanup);
 // next/navigation só funciona dentro do roteador do Next. O mock vive
 // aqui, e não em cada arquivo de teste, porque o vi.mock é içado pro
 // topo do módulo em que aparece.
+const rotadorFalso = {
+  push: navegacaoFalsa.push,
+  replace: navegacaoFalsa.replace,
+  refresh: vi.fn(),
+  prefetch: vi.fn(),
+  back: vi.fn(),
+  forward: vi.fn(),
+};
+
 vi.mock("next/navigation", () => ({
   useParams: () => ({ slug: navegacaoFalsa.slug }),
   useSearchParams: () => navegacaoFalsa.query,
-  useRouter: () => ({
-    push: navegacaoFalsa.push,
-    replace: navegacaoFalsa.replace,
-    refresh: vi.fn(),
-    prefetch: vi.fn(),
-    back: vi.fn(),
-    forward: vi.fn(),
-  }),
+  useRouter: () => rotadorFalso,
 }));
