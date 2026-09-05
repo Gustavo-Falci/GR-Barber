@@ -26,8 +26,27 @@ O que falta pro GR Barber sair do papel, mais ou menos em ordem:
    spec deixou de fora continua fora (múltiplos barbeiros por
    barbearia, barbearias em fusos diferentes).
 3. **Construir as telas reais** — as 23 telas já mapeadas
-   (`docs/screens.md`) em React Native e Next.js de verdade, usando
-   os tokens de `packages/design-tokens`.
+   (`docs/screens.md`), quebradas em quatro sub-projetos com spec e
+   plano próprios. A decomposição e as decisões que a moldaram estão em
+   `docs/superpowers/specs/2026-09-05-fundacao-das-telas-design.md`.
+
+   - **A — fundação (0 telas): pronto.** PR #7, merge `4ea6f43`, em
+     2026-09-05. É a camada que faltava entre a API e as telas:
+     `packages/api-client` (com dublê em memória), `packages/formato`
+     (telefone e email, que saíram da API), os DTOs de resposta em
+     `@gr-barber/types`, tokens de espaço/borda/texto, Clash Grotesk
+     self-hosted, Vitest + Testing Library no `apps/web`, os primitivos
+     e a sessão. A suíte foi de 305 pra 370 testes.
+   - **B — fluxo do cliente na web (7 telas)**, sob `/[slug]`.
+   - **C — painel web do barbeiro (6 telas)**.
+   - **D — app do barbeiro no Expo (10 telas)**.
+
+   Duas decisões do sub-projeto A que mudam o resto do roteiro: o
+   painel e o link público ficam no mesmo app Next, separados por route
+   groups (ver passo 6), e **o app opcional do cliente saiu do MVP** —
+   nenhuma tela foi cortada, as 7 do cliente viraram rotas web, porque
+   o login do cliente é por barbearia e um app instalado não tem slug
+   antes de receber um deep link.
 4. **Lembretes automáticos** — decidir WhatsApp Business API vs
    push notification via Expo, e integrar o disparo ao confirmar
    um agendamento. Ainda não arquitetado.
@@ -35,10 +54,13 @@ O que falta pro GR Barber sair do papel, mais ou menos em ordem:
    configurar variáveis de ambiente, deploy do backend e do painel.
 6. **Domínio `barchop.com.br` — comprado.** Falta apontar o DNS, e isso
    depende do passo 5: sem a VM da OCI de pé não existe endereço pra
-   onde apontar. Quando chegar a hora, decidir também se o painel do
-   barbeiro e o link público do cliente ficam no mesmo host ou em
-   subdomínios separados — o fluxo do cliente é um link que vai por
-   WhatsApp, então o endereço que ele mostra importa.
+   onde apontar. Continua de pé decidir se o painel do barbeiro e o
+   link público do cliente ficam no mesmo host ou em subdomínios
+   separados — o fluxo do cliente é um link que vai por WhatsApp, então
+   o endereço que ele mostra importa. O que mudou é o custo: como os
+   dois vivem no mesmo app Next, separados por route groups, essa
+   escolha virou configuração de roteamento no deploy, não migração de
+   código.
 7. **Piloto com o barbeiro real** que validou o problema original,
    antes de pensar em abrir pra outras barbearias.
 
