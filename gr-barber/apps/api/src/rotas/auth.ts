@@ -1,4 +1,5 @@
 import { prisma } from "@gr-barber/database";
+import { normalizarEmail } from "../lib/email";
 import { PADRAO_EMAIL } from "../lib/padroes";
 import {
   conferirSenha,
@@ -6,15 +7,6 @@ import {
   obterHashDescartavel,
 } from "../lib/senha";
 import type { App } from "../tipos";
-
-// A coluna é VARCHAR com índice único simples — sem citext e sem índice
-// funcional, o Postgres compara caixa a caixa. Sem normalizar,
-// "Gu@Exemplo.com" e "gu@exemplo.com" viram duas contas distintas, e
-// quem cadastrou numa não entra pela outra. A mesma função na gravação
-// e na busca, senão a busca nunca acha o que a gravação guardou.
-function normalizarEmail(email: string): string {
-  return email.trim().toLowerCase();
-}
 
 const corpoSignup = {
   type: "object",
@@ -50,7 +42,12 @@ export function registrarRotasAuth(app: App): void {
     { schema: { body: corpoSignup } },
     async (request, reply) => {
       const { barbearia, barbeiro } = request.body;
-      const email = normalizarEmail(barbeiro.email);
+      // `!`: o schema exige `email` como string obrigatória e não vazia
+      // (PADRAO_EMAIL casa só com algo antes e depois do "@"), então
+      // `normalizarEmail` nunca devolve null aqui — o `null` do retorno
+      // existe pra chamador que aceita email ausente, como o de
+      // clientes-me.ts.
+      const email = normalizarEmail(barbeiro.email)!;
       const senhaHash = await gerarHashSenha(barbeiro.senha);
 
       // Transação: uma barbearia sem barbeiro seria inacessível pra
@@ -113,7 +110,8 @@ export function registrarRotasAuth(app: App): void {
       const { email, senha } = request.body;
 
       const barbeiro = await prisma.barbeiro.findUnique({
-        where: { email: normalizarEmail(email) },
+        // `!`: mesmo motivo do signup — o schema exige email não vazio.
+        where: { email: normalizarEmail(email)! },
         include: { barbearia: true },
       });
 

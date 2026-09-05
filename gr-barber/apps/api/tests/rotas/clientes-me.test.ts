@@ -73,6 +73,22 @@ describe("PATCH /clientes/me", () => {
     });
   });
 
+  it("normaliza o email pra minúsculas antes de gravar", async () => {
+    const app = buildApp();
+    const { slug } = await criarBarbeariaComToken(app);
+    const { token } = await criarClienteComToken(app, slug);
+
+    const resposta = await app.inject({
+      method: "PATCH",
+      url: "/clientes/me",
+      headers: auth(token),
+      payload: { email: "Joao@Exemplo.COM" },
+    });
+
+    expect(resposta.statusCode).toBe(200);
+    expect(resposta.json().cliente.email).toBe("joao@exemplo.com");
+  });
+
   it("400 em corpo vazio", async () => {
     const app = buildApp();
     const { slug } = await criarBarbeariaComToken(app);

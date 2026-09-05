@@ -1,5 +1,6 @@
 import { prisma } from "@gr-barber/database";
 import { clienteDoToken } from "../plugins/auth";
+import { normalizarEmail } from "../lib/email";
 import { PADRAO_EMAIL } from "../lib/padroes";
 import { serializarCliente } from "../lib/serializar";
 import type { App } from "../tipos";
@@ -35,12 +36,18 @@ export function registrarRotasClientesMe(app: App): void {
 
   app.patch("/clientes/me", { schema: { body: corpoPatch } }, async (request) => {
     const { clienteId } = clienteDoToken(request);
+    const { nome, email } = request.body;
 
-    // `request.body` já passou pelo schema com additionalProperties:
-    // false, então só carrega os campos editáveis.
     const cliente = await prisma.cliente.update({
       where: { id: clienteId },
-      data: request.body,
+      data: {
+        ...(nome !== undefined ? { nome } : {}),
+        // `email` tem tratamento próprio porque passa pela
+        // normalização — e porque `null` aqui significa "limpar", não
+        // "não mexer". `!== undefined` distingue "campo ausente" (não
+        // mexe) de "campo presente" (grava, mesmo que seja null).
+        ...(email !== undefined ? { email: normalizarEmail(email) } : {}),
+      },
     });
 
     return { cliente: serializarCliente(cliente) };

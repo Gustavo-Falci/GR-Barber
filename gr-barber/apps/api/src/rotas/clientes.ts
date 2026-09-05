@@ -1,4 +1,5 @@
 import { prisma } from "@gr-barber/database";
+import { normalizarEmail } from "../lib/email";
 import { PADRAO_EMAIL, PADRAO_TELEFONE, PADRAO_UUID } from "../lib/padroes";
 import { serializarAgendamento, serializarCliente } from "../lib/serializar";
 import type { App } from "../tipos";
@@ -37,13 +38,6 @@ const buscaClientes = {
   additionalProperties: false,
   properties: { busca: { type: "string", minLength: 1, maxLength: 120 } },
 } as const;
-
-// Mesma normalização do login: a coluna é VARCHAR com índice único, que
-// compara caixa a caixa. Sem isto, "Joao@Exemplo.com" e
-// "joao@exemplo.com" viram dois cadastros do mesmo cliente.
-function normalizarEmail(email: string | null | undefined): string | null {
-  return email ? email.trim().toLowerCase() : null;
-}
 
 export function registrarRotasClientes(app: App): void {
   app.get(
