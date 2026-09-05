@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { criarApiClientFalso, ErroDaApi } from "@gr-barber/api-client";
 import { ProvedorDaApi } from "../../src/api/ProvedorDaApi";
 import { useApi } from "../../src/api/ProvedorDaApi";
@@ -99,5 +99,38 @@ describe("useRequisicao", () => {
       expect(screen.getByText("erro: erro_interno")).toBeInTheDocument()
     );
     expect(ErroDaApi).toBeDefined();
+  });
+
+  it("desmontagem enquanto requisição está em voo não tenta setState", async () => {
+    // Quando o cliente toca voltar enquanto a requisição está pendente, a
+    // tela sai do DOM. Sem a trava de vivo, o .then tentaria fazer
+    // setDados num componente que já saiu — React reclamaria no console.
+    let resolver: (value: unknown) => void;
+    const promiseControlada = new Promise((resolve) => {
+      resolver = resolve;
+    });
+
+    function TelaComPromiseControla() {
+      const { carregando } = useRequisicao(
+        () => promiseControlada,
+        []
+      );
+      return <p>{carregando ? "carregando" : "pronto"}</p>;
+    }
+
+    const erroSpy = vi.spyOn(console, "error");
+    const { unmount } = render(
+      <ProvedorDaApi valor={criarApiClientFalso()}>
+        <TelaComPromiseControla />
+      </ProvedorDaApi>
+    );
+
+    expect(screen.getByText("carregando")).toBeInTheDocument();
+    unmount();
+    resolver!(undefined);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(erroSpy).not.toHaveBeenCalled();
+    erroSpy.mockRestore();
   });
 });
