@@ -55,3 +55,20 @@ não afiliado ao GR Barber. Decisão consciente de seguir de perto
 essa linguagem visual, não só usar como inspiração solta.
 Tokens completos em `packages/design-tokens` e
 `docs/design-system.html`.
+
+## Pasta de rotas: `routers`
+
+`apps/api/src/rotas` virou `apps/api/src/routers` em 2026-09-04, e
+`apps/api/tests/rotas` acompanhou. O plural casa com a pasta irmã
+`plugins/`.
+
+O resto do código continua em português — os registradores ainda se
+chamam `registrarRotasClientes`, e comentário e mensagem de erro seguem
+a mesma regra de antes. É um ponto misto assumido, não um começo de
+tradução do código.
+
+**Consequência**: os documentos em `docs/superpowers/` citam caminhos
+`rotas/...`. Eles não foram reescritos de propósito — são specs e planos
+datados, e corrigi-los faria cada um descrever um código que não existia
+naquele dia. Ao seguir um caminho `rotas/` num documento antigo, leia
+`routers/`.

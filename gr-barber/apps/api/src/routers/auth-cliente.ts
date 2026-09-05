@@ -127,7 +127,7 @@ export function registrarRotasAuthCliente(app: App): void {
       // conferirSenha quando não há cliente faria essa resposta voltar
       // muito mais rápido, porque o scrypt é lento de propósito, e o
       // relógio entregaria o que o corpo esconde. Mesmo raciocínio do
-      // login do barbeiro, em rotas/auth.ts.
+      // login do barbeiro, em routers/auth.ts.
       const hashParaConferir =
         autorizado?.senhaHash ?? (await obterHashDescartavel());
       const senhaConfere = await conferirSenha(senha, hashParaConferir);
