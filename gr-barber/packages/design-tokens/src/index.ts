@@ -71,3 +71,30 @@ export const typography = {
 
 export type ThemeMode = "light" | "dark";
 export type Colors = typeof colors.light;
+
+// Escala de espaçamento em múltiplos de 4, que é o que o design system
+// usa em todas as telas. Sem token, cada tela repetiria o número solto.
+export const spacing = {
+  xs: 4,
+  sm: 8,
+  md: 16,
+  lg: 24,
+  xl: 32,
+  xxl: 48,
+} as const;
+
+// 2px é a borda da assinatura neobrutalista; 1px fica pras divisórias
+// internas de lista, que com 2px virariam grade.
+export const borderWidth = {
+  hairline: 1,
+  padrao: 2,
+} as const;
+
+export const fontSize = {
+  xs: 12,
+  sm: 14,
+  md: 16,
+  lg: 20,
+  xl: 28,
+  display: 40,
+} as const;
