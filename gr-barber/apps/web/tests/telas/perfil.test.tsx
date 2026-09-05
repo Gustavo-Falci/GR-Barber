@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it } from "vitest";
-import { criarApiClientFalso } from "@gr-barber/api-client";
+import { criarApiClientFalso, ErroDaApi } from "@gr-barber/api-client";
 import { ProvedorDaApi } from "../../src/api/ProvedorDaApi";
 import { PerfilDaBarbearia } from "../../src/telas/PerfilDaBarbearia";
 import { navegacaoFalsa } from "../ajudantes/navegacao";
@@ -43,6 +43,22 @@ describe("perfil da barbearia", () => {
 
     await waitFor(() =>
       expect(screen.getByText(/não encontramos essa barbearia/i)).toBeInTheDocument()
+    );
+  });
+
+  it("distingue barbearia inexistente de API indisponível", async () => {
+    // Uma barbearia inexistente (404) é tráfego comum do WhatsApp.
+    // Uma API indisponível (500) precisa ser clara: não é "barbearia não
+    // encontrada", porque o cliente precisaria de ações diferentes (tentar
+    // de novo mais tarde vs. reportar link quebrado).
+    const falso = criarApiClientFalso();
+    falso.publico.perfilDaBarbearia = async () => {
+      throw new ErroDaApi(500, "erro_interno", "");
+    };
+    montar(falso);
+
+    await waitFor(() =>
+      expect(screen.getByText(/não foi possível abrir esta página/i)).toBeInTheDocument()
     );
   });
 });
