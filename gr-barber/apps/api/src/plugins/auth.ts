@@ -3,12 +3,32 @@ import type { FastifyRequest } from "fastify";
 import { prisma } from "@gr-barber/database";
 import type { App } from "../tipos";
 
-// Tipa o payload do token. Sem isso, request.user seria `any` e o
-// escopo por barbearia dependeria de disciplina em vez do compilador.
+// As duas identidades da plataforma. O `tipo` é o que separa uma da
+// outra dentro de um token: sem ele, um token de cliente e um de
+// barbeiro só se distinguiriam pelos campos presentes, e um payload
+// forjado com os dois passaria pelos dois hooks.
+export interface PayloadBarbeiro {
+  tipo: "barbeiro";
+  barbeiroId: string;
+  barbeariaId: string;
+}
+
+export interface PayloadCliente {
+  tipo: "cliente";
+  clienteId: string;
+  barbeariaId: string;
+}
+
 declare module "@fastify/jwt" {
   interface FastifyJWT {
-    payload: { barbeiroId: string; barbeariaId: string };
-    user: { barbeiroId: string; barbeariaId: string };
+    // O que se assina pode ser qualquer uma das duas...
+    payload: PayloadBarbeiro | PayloadCliente;
+    // ...mas `request.user` é lido só dentro do escopo protegido do
+    // barbeiro, onde o hook abaixo já garantiu qual é. Declarar a união
+    // aqui obrigaria narrowing em seis arquivos de rota que hoje leem
+    // `request.user.barbeariaId` direto, sem ganhar segurança nenhuma:
+    // quem garante não é o tipo, é o hook.
+    user: PayloadBarbeiro;
   }
 }
 
@@ -28,13 +48,24 @@ export function registrarAuth(app: App): void {
 // Hook onRequest das rotas protegidas. Token ausente ou inválido faz o
 // jwtVerify lançar com statusCode 401, que o tratador de erros repassa.
 export async function autenticar(request: FastifyRequest): Promise<void> {
-  await request.jwtVerify();
+  // O retorno do jwtVerify, e não o request.user: `user` está declarado
+  // como PayloadBarbeiro, então `request.user.tipo` teria o tipo
+  // literal "barbeiro" e o compilador trataria a comparação abaixo como
+  // sempre falsa — a checagem funcionaria em runtime e pareceria código
+  // morto pra quem refatorasse depois.
+  const payload = await request.jwtVerify<PayloadBarbeiro | PayloadCliente>();
+
+  if (payload.tipo !== "barbeiro") {
+    throw Object.assign(new Error("token não é de barbeiro"), {
+      statusCode: 401,
+    });
+  }
 
   // Verificar a assinatura não basta: desativar um barbeiro não tiraria
   // o acesso de quem já tem token na mão. Uma query por requisição
   // protegida é o preço de a desativação ser real.
   const barbeiro = await prisma.barbeiro.findUnique({
-    where: { id: request.user.barbeiroId },
+    where: { id: payload.barbeiroId },
     select: { ativo: true },
   });
 

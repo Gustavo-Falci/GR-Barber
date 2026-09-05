@@ -87,6 +87,7 @@ export function registrarRotasAuth(app: App): void {
       });
 
       const token = app.jwt.sign({
+        tipo: "barbeiro",
         barbeiroId: criado.barbeiro.id,
         barbeariaId: criado.barbearia.id,
       });
@@ -157,6 +158,7 @@ export function registrarRotasAuth(app: App): void {
       }
 
       const token = app.jwt.sign({
+        tipo: "barbeiro",
         barbeiroId: autorizado.id,
         barbeariaId: autorizado.barbeariaId,
       });
