@@ -36,7 +36,7 @@ Quatro perguntas fechadas com o dono do projeto:
    "Meus agendamentos" do escopo e construir 22 telas. Escolhido
    construir a identidade do cliente primeiro, e entregar as 23.
 2. **Telefone + senha, não email.** O telefone já é o identificador do
-   fluxo público — o upsert de `rotas/agendamentos.ts:296` casa por
+   fluxo público — o upsert de `rotas/agendamentos.ts:292-294` casa por
    `barbeariaId_telefone`. Email é nulo em todo cliente criado pelo
    link do WhatsApp, então login por email não alcançaria nenhuma conta
    existente. O `Cliente` já tem `email` e `senhaHash` nuláveis no
@@ -104,6 +104,31 @@ código estável. O que garante que `user` é mesmo barbeiro não é o tipo:
 de consultar o banco, e `autenticarCliente` faz o espelho, decorando
 `request.cliente`.
 
+**Os hooks leem a união pelo retorno do `jwtVerify`, não pelo
+`request.user`:**
+
+```ts
+const payload = await request.jwtVerify<PayloadBarbeiro | PayloadCliente>();
+if (payload.tipo !== "barbeiro") {
+  throw Object.assign(new Error("token não é de barbeiro"), { statusCode: 401 });
+}
+```
+
+O `jwtVerify` do `@fastify/jwt` v9 aceita o genérico e devolve
+`Promise<Decoded>` (`types/jwt.d.ts:29`). Isso importa: ramificar em
+cima de `request.user.tipo` compilaria, mas como `user` está declarado
+como `PayloadBarbeiro`, o campo teria o tipo literal `"barbeiro"` e o
+compilador trataria o `!==` como sempre falso — a checagem funcionaria
+em runtime e pareceria código morto para quem refatorasse depois. Lendo
+a união, a checagem é real para o compilador, e `request.user` continua
+tipado como barbeiro para as rotas de dentro do escopo.
+
+`request.cliente` é opcional na declaração, então as seis rotas do
+cliente não leem o campo direto: usam um helper `clienteDoToken(request)`
+que devolve `PayloadCliente` e lança 401 se estiver ausente. Um `!` em
+cada uma das seis dependeria de ninguém esquecer — o mesmo argumento do
+escopo com hook, um nível abaixo.
+
 `autenticarCliente` consulta o `Cliente` a cada requisição, pela mesma
 razão que `autenticar` já paga essa query (`plugins/auth.ts:33-36`):
 apagar um cadastro tem que invalidar o token na hora, não em sete dias.
@@ -151,6 +176,12 @@ Três consequências que a tabela decide:
   resposta diria "esse telefone não é cliente daqui" — o vazamento que
   o login evita. Assim o único caminho que revela algo é o `409` de
   telefone que já tem senha.
+- **O `nome` do signup não sobrescreve cadastro existente.** Ele só é
+  usado quando o telefone é novo. Em cadastro que já existe, o signup
+  define a senha e ignora o nome — mesma regra do `update: {}` vazio do
+  upsert público (`rotas/agendamentos.ts:289-291`), que existe para
+  quem digita o nome abreviado no celular não renomear o cadastro que o
+  barbeiro ajustou.
 - **Cancelar e remarcar precisam de "agora".** `Agendamento.data` é
   `@db.Date` e `horaInicio` é `@db.Time`, ambos sem fuso. Uma constante
   `America/Sao_Paulo` em `lib/horas.ts` resolve; barbearias em fusos
