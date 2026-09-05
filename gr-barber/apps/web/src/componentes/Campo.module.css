@@ -1,0 +1,30 @@
+.campo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-xs);
+}
+
+.rotulo {
+  font-size: var(--texto-sm);
+  font-weight: 600;
+  color: var(--cor-ink-soft);
+}
+
+.entrada {
+  padding: var(--espaco-sm) var(--espaco-md);
+  border: var(--borda-padrao) solid var(--cor-ink);
+  border-radius: var(--raio-sm);
+  background: var(--cor-surface);
+  color: var(--cor-ink);
+  font-family: var(--fonte-corpo), system-ui, sans-serif;
+  font-size: var(--texto-md);
+}
+
+.entrada[aria-invalid="true"] {
+  border-color: #b3261e;
+}
+
+.erro {
+  font-size: var(--texto-xs);
+  color: #b3261e;
+}

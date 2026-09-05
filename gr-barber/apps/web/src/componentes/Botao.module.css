@@ -1,0 +1,44 @@
+.botao {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--espaco-sm);
+  padding: var(--espaco-sm) var(--espaco-lg);
+  border: var(--borda-padrao) solid var(--cor-ink);
+  border-radius: var(--raio-md);
+  font-family: var(--fonte-display), system-ui, sans-serif;
+  font-size: var(--texto-md);
+  font-weight: 700;
+  cursor: pointer;
+  /* Sombra offset, sem desfoque: a assinatura neobrutalista do design
+     system. O translate no :active faz o botão "afundar" nela. */
+  box-shadow: 0 4px 0 var(--cor-ink);
+  transition: transform 80ms ease, box-shadow 80ms ease;
+}
+
+.botao:active:not(:disabled) {
+  transform: translateY(4px);
+  box-shadow: 0 0 0 var(--cor-ink);
+}
+
+.botao:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.primario {
+  background: var(--cor-accent);
+  color: var(--cor-dark);
+}
+
+.fantasma {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  color: var(--cor-ink);
+}
+
+.contorno {
+  background: var(--cor-surface);
+  color: var(--cor-ink);
+}

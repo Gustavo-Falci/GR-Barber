@@ -4,37 +4,16 @@
 
 body {
   margin: 0;
-  padding: 48px 24px;
   background: var(--cor-paper);
   color: var(--cor-ink);
-  font-family: Inter, system-ui, -apple-system, sans-serif;
+  font-family: var(--fonte-corpo), Inter, system-ui, -apple-system, sans-serif;
+  font-size: var(--texto-md);
 }
 
-h1 {
+h1,
+h2,
+h3 {
   margin: 0;
-  font-size: 40px;
+  font-family: var(--fonte-display), system-ui, sans-serif;
   letter-spacing: -0.02em;
-}
-
-.subtitulo {
-  margin: 4px 0 24px;
-  color: var(--cor-muted);
-  font-size: 14px;
-}
-
-.grade {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.chip {
-  padding: 8px 16px;
-  border: 2px solid var(--cor-ink);
-  border-radius: var(--raio-pill);
-  background: var(--cor-accent);
-  color: var(--cor-dark);
-  font-size: 15px;
-  font-weight: 600;
-  box-shadow: 0 3px 0 var(--cor-ink);
 }

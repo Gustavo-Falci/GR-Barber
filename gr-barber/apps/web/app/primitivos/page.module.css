@@ -1,0 +1,17 @@
+.pagina {
+  display: grid;
+  gap: var(--espaco-lg);
+  padding: var(--espaco-lg);
+  max-width: 480px;
+}
+
+.linha {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--espaco-sm);
+}
+
+.coluna {
+  display: grid;
+  gap: var(--espaco-md);
+}
