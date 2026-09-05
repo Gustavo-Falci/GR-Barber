@@ -1,11 +1,12 @@
 import { prisma } from "@gr-barber/database";
 import { clienteDoToken } from "../plugins/auth";
 import { normalizarEmail } from "../lib/email";
-import { INCLUDE_AGENDAMENTO } from "../lib/agendamento";
+import { criarAgendamento, INCLUDE_AGENDAMENTO } from "../lib/agendamento";
 import { garantirAlteravel } from "../lib/agendamento-alteravel";
 import { ErroDeNegocio } from "../lib/erro-negocio";
 import { dataParaDate } from "../lib/horas";
-import { PADRAO_DATA, PADRAO_EMAIL, PADRAO_UUID } from "../lib/padroes";
+import { comRetryDeDeadlock } from "../lib/transacao";
+import { PADRAO_DATA, PADRAO_EMAIL, PADRAO_HORA, PADRAO_UUID } from "../lib/padroes";
 import { serializarAgendamento, serializarCliente } from "../lib/serializar";
 import type { App } from "../tipos";
 
@@ -37,6 +38,25 @@ const filtroAgendamentos = {
   properties: {
     de: { type: "string", pattern: PADRAO_DATA },
     ate: { type: "string", pattern: PADRAO_DATA },
+  },
+} as const;
+
+const corpoRemarcar = {
+  type: "object",
+  required: ["data", "horaInicio"],
+  additionalProperties: false,
+  properties: {
+    data: { type: "string", pattern: PADRAO_DATA },
+    horaInicio: { type: "string", pattern: PADRAO_HORA },
+    // Opcional: sem ele, o remarcar herda os serviços do agendamento
+    // antigo. Com ele, o cliente troca de serviço e a duração muda
+    // junto — que é o caminho quando o serviço antigo foi desativado.
+    servicoIds: {
+      type: "array",
+      minItems: 1,
+      maxItems: 10,
+      items: { type: "string", pattern: PADRAO_UUID },
+    },
   },
 } as const;
 
@@ -138,6 +158,60 @@ export function registrarRotasClientesMe(app: App): void {
       });
 
       return { agendamento: serializarAgendamento(cancelado) };
+    }
+  );
+
+  app.post(
+    "/clientes/me/agendamentos/:id/remarcar",
+    { schema: { params: paramsComId, body: corpoRemarcar } },
+    async (request, reply) => {
+      const { clienteId } = clienteDoToken(request);
+      const { data, horaInicio, servicoIds } = request.body;
+
+      // Mesmo motivo das rotas de criação: impasse concorrente não pode
+      // sair como 500.
+      const agendamento = await comRetryDeDeadlock(() =>
+        prisma.$transaction(async (tx) => {
+          const antigo = await tx.agendamento.findFirstOrThrow({
+            where: { id: request.params.id, clienteId },
+            include: { servicos: { select: { servicoId: true } } },
+          });
+
+          garantirAlteravel(antigo);
+
+          // O cancelamento vem ANTES da criação, e é o que permite
+          // remarcar pra um horário que sobrepõe o próprio agendamento
+          // (10:00 -> 10:15). Sem ele, o agendamento antigo bloquearia a
+          // si mesmo duas vezes: no cálculo de disponibilidade, que só
+          // ignora cancelado, e na EXCLUDE constraint, que é parcial no
+          // mesmo predicado.
+          //
+          // E é a transação que torna isso seguro: se a criação falhar,
+          // este update desfaz junto e o cliente continua com o
+          // agendamento que tinha.
+          await tx.agendamento.update({
+            where: { id: antigo.id },
+            data: { status: "cancelado" },
+          });
+
+          return criarAgendamento(tx, {
+            barbeariaId: antigo.barbeariaId,
+            // Herdado: trocar de barbeiro é agendar outro, e a
+            // barbearia do MVP tem um só.
+            barbeiroId: antigo.barbeiroId,
+            clienteId,
+            servicoIds:
+              servicoIds ?? antigo.servicos.map((servico) => servico.servicoId),
+            data,
+            horaInicio,
+            origem: "cliente",
+          });
+        })
+      );
+
+      return reply.code(201).send({
+        agendamento: serializarAgendamento(agendamento),
+      });
     }
   );
 }
