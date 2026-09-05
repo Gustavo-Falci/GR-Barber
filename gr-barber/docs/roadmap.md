@@ -23,9 +23,8 @@ O que falta pro GR Barber sair do papel, mais ou menos em ordem:
    `docs/superpowers/specs/2026-09-04-api-identidade-cliente-design.md`.
 
    A superfície HTTP que as 23 telas consomem está completa; o que a
-   spec deixou de fora continua fora (login de cliente com senha,
-   remarcar agendamento, múltiplos barbeiros por barbearia, barbearias
-   em fusos diferentes).
+   spec deixou de fora continua fora (múltiplos barbeiros por
+   barbearia, barbearias em fusos diferentes).
 3. **Construir as telas reais** — as 23 telas já mapeadas
    (`docs/screens.md`) em React Native e Next.js de verdade, usando
    os tokens de `packages/design-tokens`.
