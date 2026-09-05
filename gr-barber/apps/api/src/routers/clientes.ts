@@ -1,5 +1,5 @@
 import { prisma } from "@gr-barber/database";
-import { normalizarEmail } from "../lib/email";
+import { normalizarEmail } from "@gr-barber/formato";
 import { PADRAO_EMAIL, PADRAO_TELEFONE, PADRAO_UUID } from "../lib/padroes";
 import { serializarAgendamento, serializarCliente } from "../lib/serializar";
 import {

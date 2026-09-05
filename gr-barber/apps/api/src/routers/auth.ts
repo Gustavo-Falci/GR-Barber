@@ -1,5 +1,5 @@
 import { prisma } from "@gr-barber/database";
-import { normalizarEmail } from "../lib/email";
+import { normalizarEmail } from "@gr-barber/formato";
 import { PADRAO_EMAIL } from "../lib/padroes";
 import {
   conferirSenha,

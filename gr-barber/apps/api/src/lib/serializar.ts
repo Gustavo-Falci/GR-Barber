@@ -1,6 +1,28 @@
 import type { Prisma } from "@gr-barber/database";
-import type { ClientePublico } from "@gr-barber/types";
+import type {
+  AgendamentoComCliente,
+  AgendamentoSerializado,
+  AgendamentoServicoSerializado,
+  BarbeariaSerializada,
+  ClienteSerializado,
+  HorarioSerializado,
+  ServicoSerializado,
+} from "@gr-barber/types";
 import { dateParaData, dateParaHora } from "./horas";
+
+// Reexportados porque routers/horarios.ts e os testes importam daqui. A
+// declaração agora mora em @gr-barber/types, junto do que as telas
+// consomem — o serializador importa o tipo, então divergir os dois
+// quebra o type-check em vez de quebrar uma tela.
+export type {
+  AgendamentoComCliente,
+  AgendamentoSerializado,
+  AgendamentoServicoSerializado,
+  BarbeariaSerializada,
+  ClienteSerializado,
+  HorarioSerializado,
+  ServicoSerializado,
+};
 
 // O que sai pelo HTTP não é o registro do Prisma. Dois motivos, os dois
 // silenciosos se ninguém cuidar: `Decimal` vira `{}` no JSON.stringify
@@ -8,15 +30,6 @@ import { dateParaData, dateParaHora } from "./horas";
 // serializa como "1970-01-01T09:00:00.000Z" em vez de "09:00". De
 // quebra, montar a resposta campo a campo é o que garante que
 // `senhaHash` nunca escape por um spread distraído.
-
-export interface BarbeariaSerializada {
-  id: string;
-  nome: string;
-  slug: string;
-  telefone: string | null;
-  endereco: string | null;
-  logoUrl: string | null;
-}
 
 export function serializarBarbearia(barbearia: {
   id: string;
@@ -34,13 +47,6 @@ export function serializarBarbearia(barbearia: {
     endereco: barbearia.endereco,
     logoUrl: barbearia.logoUrl,
   };
-}
-
-export interface HorarioSerializado {
-  diaSemana: number;
-  horaAbertura: string | null;
-  horaFechamento: string | null;
-  fechado: boolean;
 }
 
 export function serializarHorario(horario: {
@@ -61,14 +67,6 @@ export function serializarHorario(horario: {
   };
 }
 
-export interface ServicoSerializado {
-  id: string;
-  nome: string;
-  duracaoMinutos: number;
-  preco: string;
-  ativo: boolean;
-}
-
 export function serializarServico(servico: {
   id: string;
   nome: string;
@@ -87,10 +85,6 @@ export function serializarServico(servico: {
   };
 }
 
-// Um nome só, um formato só: a resposta da API e o tipo que web e
-// mobile importam não têm como divergir em silêncio.
-export type ClienteSerializado = ClientePublico;
-
 export function serializarCliente(cliente: {
   id: string;
   nome: string;
@@ -107,24 +101,6 @@ export function serializarCliente(cliente: {
     // pra saber se ele existe. O valor nunca entra na resposta.
     temConta: cliente.senhaHash !== null,
   };
-}
-
-export interface AgendamentoServicoSerializado {
-  servicoId: string;
-  nome: string;
-  precoNoMomento: string;
-  duracaoNoMomento: number;
-}
-
-export interface AgendamentoSerializado {
-  id: string;
-  data: string;
-  horaInicio: string;
-  horaFim: string;
-  status: string;
-  origem: string;
-  observacoes: string | null;
-  servicos: AgendamentoServicoSerializado[];
 }
 
 export function serializarAgendamento(agendamento: {
@@ -170,7 +146,7 @@ export function serializarAgendamentoComCliente(
   agendamento: Parameters<typeof serializarAgendamento>[0] & {
     cliente: Parameters<typeof serializarCliente>[0];
   }
-): AgendamentoSerializado & { cliente: ClienteSerializado } {
+): AgendamentoComCliente {
   return {
     ...serializarAgendamento(agendamento),
     cliente: serializarCliente(agendamento.cliente),

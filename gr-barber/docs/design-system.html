@@ -6,7 +6,11 @@
 <title>GR Barber — Design system</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<!-- Clash Grotesk vem do Fontshare, que é a origem dela; no app e no
+     painel ela é self-hosted pelo next/font/local, a partir do pacote
+     em font/ na raiz do monorepo. -->
+<link href="https://api.fontshare.com/v2/css?f%5B%5D=clash-grotesk@600,700&display=swap" rel="stylesheet">
 <style>
   :root{
     --paper: #F3F0E7;
@@ -26,8 +30,8 @@
   *{ box-sizing:border-box; }
   body{ margin:0; background:var(--paper); color:var(--ink); font-family:"Inter", system-ui, sans-serif; line-height:1.55; }
   .wrap{ max-width:1180px; margin:0 auto; padding:3rem 1.6rem 6rem; }
-  h1,h2,h3{ font-family:"Space Grotesk", "Inter", sans-serif; font-weight:700; letter-spacing:-0.01em; margin:0; }
-  .eyebrow{ font-family:"Space Grotesk", sans-serif; font-weight:600; font-size:0.78rem; letter-spacing:0.12em; text-transform:uppercase; color:var(--ink-soft); }
+  h1,h2,h3{ font-family:"Clash Grotesk", "Inter", sans-serif; font-weight:700; letter-spacing:-0.01em; margin:0; }
+  .eyebrow{ font-family:"Clash Grotesk", sans-serif; font-weight:600; font-size:0.78rem; letter-spacing:0.12em; text-transform:uppercase; color:var(--ink-soft); }
   h1{ font-size:clamp(1.9rem,3.4vw,2.6rem); margin:0.5rem 0 0.8rem; }
   .lede{ max-width:64ch; color:var(--ink-soft); font-size:1.05rem; margin:0 0 1rem; }
   .note{ display:inline-block; font-size:0.82rem; color:var(--ink-soft); background:var(--surface); border:1.5px solid var(--ink); border-radius:8px; padding:0.4rem 0.7rem; box-shadow:2px 2px 0 0 var(--shadow); }
@@ -45,11 +49,11 @@
   .type-row{ display:flex; flex-direction:column; gap:1.2rem; }
   .type-card{ border:1.5px solid var(--ink); border-radius:14px; background:var(--surface); padding:1.2rem 1.4rem; box-shadow:4px 4px 0 0 var(--shadow); }
   .type-card .meta{ font-size:0.78rem; color:var(--muted); margin-bottom:0.6rem; }
-  .type-card .big{ font-family:"Space Grotesk"; font-weight:700; font-size:2rem; }
+  .type-card .big{ font-family:"Clash Grotesk"; font-weight:700; font-size:2rem; }
   .type-card .body-sample{ font-size:0.98rem; color:var(--ink-soft); max-width:60ch; }
 
   .btn-row{ display:flex; flex-wrap:wrap; gap:1.4rem; align-items:flex-start; }
-  .btn{ font-family:"Space Grotesk", sans-serif; font-weight:700; border-style:solid; cursor:pointer; }
+  .btn{ font-family:"Clash Grotesk", sans-serif; font-weight:700; border-style:solid; cursor:pointer; }
   .btn-primary{ background:var(--accent); color:var(--ink); font-size:17px; border-radius:14px; border-width:2px; border-color:var(--accent-border); box-shadow:0 4px 0 0 var(--shadow); padding:13px 24px; }
   .btn-ghost{ background:var(--dark); color:#fff; font-size:15px; border-radius:14px; border-width:2px; border-color:#3a3a3a; box-shadow:0 4px 0 0 var(--shadow); padding:10px 20px; }
   .btn-outline{ background:var(--surface); color:var(--ink); font-size:15px; border-radius:14px; border-width:2px; border-color:var(--ink); box-shadow:0 4px 0 0 var(--shadow); padding:11px 22px; }
@@ -64,12 +68,12 @@
   .group-tag{ font-family:"Inter"; font-weight:600; font-size:0.68rem; color:var(--muted); background:var(--surface); border:1px solid var(--line); border-radius:999px; padding:2px 9px; text-transform:none; letter-spacing:0; }
   .tile-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:1.6rem 1.2rem; }
   .tile-grid.web{ grid-template-columns:repeat(auto-fill,minmax(340px,1fr)); }
-  .tile .label{ font-family:"Space Grotesk"; font-weight:600; font-size:0.78rem; color:var(--ink-soft); margin-bottom:0.5rem; }
+  .tile .label{ font-family:"Clash Grotesk"; font-weight:600; font-size:0.78rem; color:var(--ink-soft); margin-bottom:0.5rem; }
   .screen{ background:var(--paper-soft); border:1.5px solid var(--ink); border-radius:14px; box-shadow:3px 3px 0 0 var(--shadow); overflow:hidden; display:flex; flex-direction:column; }
   .screen.mobile{ aspect-ratio:9/17.5; }
   .screen.web{ aspect-ratio:16/10; }
 
-  .s-header{ display:flex; align-items:center; justify-content:space-between; padding:8px 10px; background:var(--surface); border-bottom:1.5px solid var(--ink); font-family:"Space Grotesk"; font-weight:700; font-size:11px; flex:none; }
+  .s-header{ display:flex; align-items:center; justify-content:space-between; padding:8px 10px; background:var(--surface); border-bottom:1.5px solid var(--ink); font-family:"Clash Grotesk"; font-weight:700; font-size:11px; flex:none; }
   .s-header .back{ width:16px; height:16px; border-radius:5px; border:1px solid var(--ink); display:flex; align-items:center; justify-content:center; font-size:9px; margin-right:5px; }
   .s-sub{ font-size:8px; color:var(--muted); font-weight:400; display:block; }
   .s-body{ padding:8px 10px; flex:1; display:flex; flex-direction:column; gap:6px; overflow:hidden; }
@@ -79,7 +83,7 @@
   .s-chip.blue{ background:var(--pale-blue); }
   .s-chip.grey{ background:var(--surface); color:var(--muted); border-color:var(--line); }
   .s-avatar{ width:15px; height:15px; border-radius:50%; background:var(--ink); color:var(--paper-soft); font-size:6.5px; display:flex; align-items:center; justify-content:center; font-weight:700; flex:none; }
-  .s-btn{ font-family:"Space Grotesk"; font-weight:700; font-size:9px; background:var(--accent); color:#202020; border:1px solid var(--ink); border-radius:7px; box-shadow:2px 2px 0 0 var(--shadow); padding:6px 8px; text-align:center; }
+  .s-btn{ font-family:"Clash Grotesk"; font-weight:700; font-size:9px; background:var(--accent); color:#202020; border:1px solid var(--ink); border-radius:7px; box-shadow:2px 2px 0 0 var(--shadow); padding:6px 8px; text-align:center; }
   .s-btn.outline{ background:var(--surface); color:var(--ink); box-shadow:none; }
   .s-input{ font-size:8.5px; color:var(--muted); padding:5px 7px; background:var(--surface); border:1px solid var(--ink); border-radius:6px; }
   .s-card{ padding:6px 7px; background:var(--surface); border:1px solid var(--ink); border-radius:8px; font-size:9px; box-shadow:2px 2px 0 0 var(--shadow); display:flex; justify-content:space-between; align-items:center; }
@@ -100,10 +104,10 @@
   .s-slot .empty{ flex:1; padding:3px 6px; border:1px dashed var(--line); border-radius:5px; color:var(--muted); }
   .s-banner{ height:44px; background:var(--dark); flex:none; }
 
-  .web-topbar{ display:flex; align-items:center; justify-content:space-between; padding:8px 12px; background:var(--surface); border-bottom:1.5px solid var(--ink); font-family:"Space Grotesk"; font-weight:700; font-size:11px; flex:none; }
+  .web-topbar{ display:flex; align-items:center; justify-content:space-between; padding:8px 12px; background:var(--surface); border-bottom:1.5px solid var(--ink); font-family:"Clash Grotesk"; font-weight:700; font-size:11px; flex:none; }
   .web-stat-row{ display:flex; gap:6px; }
   .web-stat{ flex:1; background:var(--surface); border:1px solid var(--ink); border-radius:8px; padding:6px 8px; box-shadow:2px 2px 0 0 var(--shadow); }
-  .web-stat .n{ font-family:"Space Grotesk"; font-weight:700; font-size:13px; }
+  .web-stat .n{ font-family:"Clash Grotesk"; font-weight:700; font-size:13px; }
   .web-stat .l{ font-size:7px; color:var(--muted); }
   .web-table{ background:var(--surface); border:1px solid var(--ink); border-radius:8px; overflow:hidden; }
   .web-table-row{ display:grid; grid-template-columns:1.3fr 1fr 1fr; gap:6px; font-size:8px; padding:6px 8px; border-bottom:1px solid var(--line); }
@@ -136,7 +140,7 @@
     <p class="eyebrow">Design system · GR Barber</p>
     <h1>Identidade visual do GR Barber</h1>
     <p class="lede">Linguagem neobrutalista adaptada a partir da referência do barbeiro.app: bordas grossas, sombras duras sem desfoque, amarelo saturado como cor de ação única, sobre uma base editorial em tons de creme.</p>
-    <span class="note">Fontes de produção: Clash Grotesk (via Fontshare, licença Indie gratuita) + Inter. Aqui uso Space Grotesk como substituto próximo.</span>
+    <span class="note">Fontes de produção: Clash Grotesk (via Fontshare, licença Indie gratuita) + Inter. Aqui uso Clash Grotesk como substituto próximo.</span>
   </header>
 
   <section id="cores">
@@ -163,7 +167,7 @@
   <section id="tipografia">
     <h2>Tipografia</h2>
     <div class="type-row">
-      <div class="type-card"><div class="meta">Space Grotesk 700 · títulos, números, botões</div><div class="big">Agenda cheia, sem esforço</div></div>
+      <div class="type-card"><div class="meta">Clash Grotesk 700 · títulos, números, botões</div><div class="big">Agenda cheia, sem esforço</div></div>
       <div class="type-card"><div class="meta">Inter 400/600 · corpo de texto</div><div class="body-sample">O cliente escolhe os serviços, o app calcula o tempo total e mostra só os horários que cabem na agenda do barbeiro.</div></div>
     </div>
   </section>
@@ -285,7 +289,7 @@
     <div class="tile-grid">
 
       <div class="tile"><div class="label">Perfil da barbearia</div><div class="screen mobile"><div class="s-banner"></div><div class="s-body">
-        <div style="font-family:'Space Grotesk';font-weight:700;font-size:11px;">GR Barber · Centro</div>
+        <div style="font-family:'Clash Grotesk';font-weight:700;font-size:11px;">GR Barber · Centro</div>
         <div style="font-size:8px;color:var(--muted);">Rua das Tesouras, 123</div>
         <div class="s-btn" style="margin-top:auto;">Agendar agora</div>
       </div></div></div>

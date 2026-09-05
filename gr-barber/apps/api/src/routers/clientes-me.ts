@@ -1,6 +1,6 @@
 import { prisma } from "@gr-barber/database";
 import { clienteDoToken } from "../plugins/auth";
-import { normalizarEmail } from "../lib/email";
+import { normalizarEmail } from "@gr-barber/formato";
 import { criarAgendamento, INCLUDE_AGENDAMENTO } from "../lib/agendamento";
 import { garantirAlteravel } from "../lib/agendamento-alteravel";
 import { ErroDeNegocio } from "../lib/erro-negocio";
