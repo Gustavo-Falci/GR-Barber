@@ -118,4 +118,53 @@ describe("PATCH /clientes/me", () => {
 
     expect(resposta.statusCode).toBe(400);
   });
+
+  it("mandar só o nome não mexe no email já salvo", async () => {
+    const app = buildApp();
+    const { slug } = await criarBarbeariaComToken(app);
+    const { token } = await criarClienteComToken(app, slug);
+
+    await app.inject({
+      method: "PATCH",
+      url: "/clientes/me",
+      headers: auth(token),
+      payload: { email: "joao@exemplo.com" },
+    });
+
+    const resposta = await app.inject({
+      method: "PATCH",
+      url: "/clientes/me",
+      headers: auth(token),
+      payload: { nome: "João S." },
+    });
+
+    expect(resposta.statusCode).toBe(200);
+    expect(resposta.json().cliente).toMatchObject({
+      nome: "João S.",
+      email: "joao@exemplo.com",
+    });
+  });
+
+  it("mandar email null limpa o email salvo", async () => {
+    const app = buildApp();
+    const { slug } = await criarBarbeariaComToken(app);
+    const { token } = await criarClienteComToken(app, slug);
+
+    await app.inject({
+      method: "PATCH",
+      url: "/clientes/me",
+      headers: auth(token),
+      payload: { email: "joao@exemplo.com" },
+    });
+
+    const resposta = await app.inject({
+      method: "PATCH",
+      url: "/clientes/me",
+      headers: auth(token),
+      payload: { email: null },
+    });
+
+    expect(resposta.statusCode).toBe(200);
+    expect(resposta.json().cliente.email).toBeNull();
+  });
 });

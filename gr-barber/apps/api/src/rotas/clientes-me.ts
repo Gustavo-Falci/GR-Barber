@@ -1,8 +1,11 @@
 import { prisma } from "@gr-barber/database";
 import { clienteDoToken } from "../plugins/auth";
 import { normalizarEmail } from "../lib/email";
-import { PADRAO_EMAIL } from "../lib/padroes";
-import { serializarCliente } from "../lib/serializar";
+import { INCLUDE_AGENDAMENTO } from "../lib/agendamento";
+import { ErroDeNegocio } from "../lib/erro-negocio";
+import { dataParaDate } from "../lib/horas";
+import { PADRAO_DATA, PADRAO_EMAIL } from "../lib/padroes";
+import { serializarAgendamento, serializarCliente } from "../lib/serializar";
 import type { App } from "../tipos";
 
 // Telefone fica de fora: é a chave do login e do upsert do agendamento
@@ -19,6 +22,27 @@ const corpoPatch = {
     email: { type: ["string", "null"], pattern: PADRAO_EMAIL, maxLength: 160 },
   },
 } as const;
+
+const filtroAgendamentos = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    de: { type: "string", pattern: PADRAO_DATA },
+    ate: { type: "string", pattern: PADRAO_DATA },
+  },
+} as const;
+
+// O pattern garante a forma "YYYY-MM-DD", não que a data exista:
+// "2026-02-31" passa por ele e explode no dataParaDate. Sem este
+// wrapper seria um RangeError não tratado, ou seja, 500 por culpa de
+// quem chamou.
+function dataDoFiltro(valor: string): Date {
+  try {
+    return dataParaDate(valor);
+  } catch {
+    throw new ErroDeNegocio(`a data ${valor} não existe`, "data_invalida");
+  }
+}
 
 // Sem `onRequest` aqui: quem autentica é o escopo do cliente, no app.ts.
 export function registrarRotasClientesMe(app: App): void {
@@ -52,4 +76,36 @@ export function registrarRotasClientesMe(app: App): void {
 
     return { cliente: serializarCliente(cliente) };
   });
+
+  app.get(
+    "/clientes/me/agendamentos",
+    { schema: { querystring: filtroAgendamentos } },
+    async (request) => {
+      const { clienteId } = clienteDoToken(request);
+      const { de, ate } = request.query;
+
+      const agendamentos = await prisma.agendamento.findMany({
+        where: {
+          // O clienteId sai do token, nunca da query: é o que faz o
+          // histórico de outra pessoa ser inalcançável, e não só
+          // escondido.
+          clienteId,
+          ...(de || ate
+            ? {
+                data: {
+                  ...(de ? { gte: dataDoFiltro(de) } : {}),
+                  ...(ate ? { lte: dataDoFiltro(ate) } : {}),
+                },
+              }
+            : {}),
+        },
+        include: INCLUDE_AGENDAMENTO,
+        // Mais recente primeiro: a tela "Meus agendamentos" abre no que
+        // está por vir, não no corte do ano passado.
+        orderBy: [{ data: "desc" }, { horaInicio: "desc" }],
+      });
+
+      return { agendamentos: agendamentos.map(serializarAgendamento) };
+    }
+  );
 }
