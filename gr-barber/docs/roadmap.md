@@ -17,6 +17,11 @@ O que falta pro GR Barber sair do papel, mais ou menos em ordem:
    as rotas nasceriam abertas ou receberiam `barbeariaId` no corpo, e
    seriam reescritas quando o JWT chegasse.
 
+   A fase 6 (identidade do cliente) fechou as duas lacunas que
+   sobraram: o `barbeiroId` que nenhuma rota pública devolvia, e a
+   conta do cliente que a tela "Meus agendamentos" precisa. Spec em
+   `docs/superpowers/specs/2026-09-04-api-identidade-cliente-design.md`.
+
    A superfície HTTP que as 23 telas consomem está completa; o que a
    spec deixou de fora continua fora (login de cliente com senha,
    remarcar agendamento, múltiplos barbeiros por barbearia, barbearias
@@ -41,3 +46,14 @@ O que falta pro GR Barber sair do papel, mais ou menos em ordem:
   precisa de verificação de email ou de rate limiting, os dois fora do
   escopo da spec atual — fica pro passo de infra, junto com o que mais
   proteger o fluxo público.
+- **Quem definir a senha primeiro assume o cadastro de um telefone.**
+  Os cadastros de `Cliente` são criados por outra pessoa — pelo upsert
+  do agendamento público, ou pelo barbeiro no walk-in. Sem verificar
+  posse do número, a API não distingue o dono do telefone de quem só o
+  conhece, e quem chegar primeiro passa a ver o histórico daquela
+  pessoa naquela barbearia. Mitigado, não resolvido: definir senha só é
+  permitido em cadastro que ainda não tem uma. Fecha junto com o canal
+  de mensagem do passo 4, que traz o código de verificação.
+- **O `409` do signup de cliente diz que aquele telefone já tem conta**,
+  exatamente como o do barbeiro diz do email. Mesma dívida, mesmo
+  fechamento.
