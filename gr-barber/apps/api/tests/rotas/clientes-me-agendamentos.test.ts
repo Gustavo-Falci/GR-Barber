@@ -105,7 +105,7 @@ describe("GET /clientes/me/agendamentos", () => {
     expect(resposta.json().agendamentos[0].data).toBe("2026-10-20");
   });
 
-  it("400 em data com forma errada", async () => {
+  it("400 em data com forma errada (barra no schema)", async () => {
     const app = buildApp();
     const { slug } = await criarBarbeariaComToken(app);
     const { token } = await criarClienteComToken(app, slug);
@@ -117,5 +117,27 @@ describe("GET /clientes/me/agendamentos", () => {
     });
 
     expect(resposta.statusCode).toBe(400);
+  });
+
+  // Este caso é diferente do de cima: "2026-02-31" tem a forma
+  // "YYYY-MM-DD" e passa pelo PADRAO_DATA do schema — quem barra é o
+  // dataDoFiltro, no try/catch que traduz o RangeError do dataParaDate
+  // em ErroDeNegocio. Sem esse try/catch a resposta seria 500. Por isso
+  // a asserção olha o código do erro, não só a faixa do status: um 4xx
+  // genérico também passaria se a requisição estivesse caindo na barra
+  // do schema em vez de aqui.
+  it("422 em data que não existe no calendário", async () => {
+    const app = buildApp();
+    const { slug } = await criarBarbeariaComToken(app);
+    const { token } = await criarClienteComToken(app, slug);
+
+    const resposta = await app.inject({
+      method: "GET",
+      url: "/clientes/me/agendamentos?de=2026-02-31",
+      headers: auth(token),
+    });
+
+    expect(resposta.statusCode).toBe(422);
+    expect(resposta.json().erro).toBe("data_invalida");
   });
 });
