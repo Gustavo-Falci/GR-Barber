@@ -4,6 +4,8 @@ import { criarApiPublica } from "./publico";
 import { criarRequisicao, type OpcoesDoClient } from "./requisicao";
 
 export { ErroDaApi } from "./erro";
+export { criarApiClientFalso } from "./falso";
+export type { EstadoFalso } from "./falso";
 export { criarRequisicao } from "./requisicao";
 export type {
   OpcoesDaChamada,
