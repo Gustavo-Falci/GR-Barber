@@ -1,0 +1,6 @@
+.calendario { display: grid; gap: var(--espaco-sm); }
+.cabecalho { display: flex; align-items: center; justify-content: space-between; font-weight: 600; }
+.grade { display: grid; grid-template-columns: repeat(7, 1fr); gap: var(--espaco-xs); }
+.dia { padding: var(--espaco-sm); border: var(--borda-padrao) solid var(--cor-ink); border-radius: var(--raio-sm); background: var(--cor-surface); font-size: var(--texto-sm); cursor: pointer; }
+.dia:disabled { opacity: 0.35; cursor: not-allowed; }
+.vazio { border: none; background: transparent; }
