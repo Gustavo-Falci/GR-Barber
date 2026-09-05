@@ -72,3 +72,39 @@ export function somarMinutos(hora: string, minutos: number): string {
   const m = String(total % 60).padStart(2, "0");
   return `${h}:${m}`;
 }
+
+// A barbearia do MVP fica em São Paulo, e barbearias em fusos
+// diferentes estão fora de escopo. As colunas do agendamento não têm
+// fuso (`@db.Date` e `@db.Time`), então "já passou" só faz sentido
+// contra um fuso escolhido — e escolher é melhor que herdar o da
+// máquina onde a API estiver rodando.
+export const FUSO_DA_BARBEARIA = "America/Sao_Paulo";
+
+// Devolve o instante já nos formatos do contrato HTTP, para poder
+// comparar com string: "YYYY-MM-DD" e "HH:mm" ordenam
+// lexicograficamente na mesma ordem que cronologicamente.
+//
+// O instante entra por parâmetro, com `new Date()` como padrão, e é o
+// que torna a conversão de fuso testável sem fake timers: a suíte roda
+// contra um Postgres real, e mockar o relógio do processo mexeria nos
+// timeouts do pool de conexão junto.
+export function agoraNaBarbearia(instante: Date = new Date()): {
+  data: string;
+  hora: string;
+} {
+  // Locale "sv-SE" porque o sueco formata data e hora em ISO
+  // ("2026-09-04 23:30"), o que evita montar a string peça por peça a
+  // partir de formatToParts.
+  const formatado = new Intl.DateTimeFormat("sv-SE", {
+    timeZone: FUSO_DA_BARBEARIA,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(instante);
+
+  const [data, hora] = formatado.split(" ");
+  return { data, hora };
+}

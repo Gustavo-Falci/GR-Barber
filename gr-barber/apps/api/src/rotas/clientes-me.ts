@@ -2,9 +2,10 @@ import { prisma } from "@gr-barber/database";
 import { clienteDoToken } from "../plugins/auth";
 import { normalizarEmail } from "../lib/email";
 import { INCLUDE_AGENDAMENTO } from "../lib/agendamento";
+import { garantirAlteravel } from "../lib/agendamento-alteravel";
 import { ErroDeNegocio } from "../lib/erro-negocio";
 import { dataParaDate } from "../lib/horas";
-import { PADRAO_DATA, PADRAO_EMAIL } from "../lib/padroes";
+import { PADRAO_DATA, PADRAO_EMAIL, PADRAO_UUID } from "../lib/padroes";
 import { serializarAgendamento, serializarCliente } from "../lib/serializar";
 import type { App } from "../tipos";
 
@@ -21,6 +22,13 @@ const corpoPatch = {
     nome: { type: "string", minLength: 2, maxLength: 120 },
     email: { type: ["string", "null"], pattern: PADRAO_EMAIL, maxLength: 160 },
   },
+} as const;
+
+const paramsComId = {
+  type: "object",
+  required: ["id"],
+  additionalProperties: false,
+  properties: { id: { type: "string", pattern: PADRAO_UUID } },
 } as const;
 
 const filtroAgendamentos = {
@@ -106,6 +114,30 @@ export function registrarRotasClientesMe(app: App): void {
       });
 
       return { agendamentos: agendamentos.map(serializarAgendamento) };
+    }
+  );
+
+  app.post(
+    "/clientes/me/agendamentos/:id/cancelar",
+    { schema: { params: paramsComId } },
+    async (request) => {
+      const { clienteId } = clienteDoToken(request);
+
+      // O clienteId no where é o que faz o agendamento de outra pessoa
+      // responder 404 (P2025) em vez de 403.
+      const agendamento = await prisma.agendamento.findFirstOrThrow({
+        where: { id: request.params.id, clienteId },
+      });
+
+      garantirAlteravel(agendamento);
+
+      const cancelado = await prisma.agendamento.update({
+        where: { id: agendamento.id },
+        data: { status: "cancelado" },
+        include: INCLUDE_AGENDAMENTO,
+      });
+
+      return { agendamento: serializarAgendamento(cancelado) };
     }
   );
 }
