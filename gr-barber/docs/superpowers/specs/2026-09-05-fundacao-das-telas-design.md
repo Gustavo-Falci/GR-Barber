@@ -149,10 +149,17 @@ semana completa de horários e a lista de barbeiros ativos (`id`,
 `nome`) — este último é o `barbeiroId` que o fluxo público inteiro
 exige. O tipo dessa resposta composta também vive em `types`.
 
-## `packages/telefone`
+## `packages/formato`
 
-`apps/api/src/lib/telefone.ts` sai da API e vira pacote; a API importa
-de lá. Nada de reescrever a regra no front: o formato guardado é
+Telefone **e** email saem da API juntos: `lib/telefone.ts` e
+`lib/email.ts` viram `packages/formato`, e a API importa de lá. Os dois,
+e não só o telefone, porque as telas precisam dos dois — o cadastro do
+barbeiro e o perfil do cliente mandam email, e `PATCH /clientes/me`
+compara em caixa baixa. Extrair um e deixar o outro é como a terceira
+cópia aparece no sub-projeto B; foi exatamente o que aconteceu na fase
+6, quando o plano reimplementou duas vezes o que já existia.
+
+Nada de reescrever a regra no front: o formato guardado é
 `(AA) NNNNN-NNNN`, o `55` inicial cai em 12 ou 13 dígitos mas não em
 10, e assinante fora de 8 ou 9 dígitos é erro.
 
@@ -161,9 +168,28 @@ formatação progressiva enquanto se digita, que aceita entrada
 incompleta sem lançar. `normalizarTelefone` continua sendo a que lança,
 e continua sendo a que roda antes de enviar.
 
-O `ErroDeNegocio` que ele lança hoje é da API. O pacote passa a lançar
-um erro próprio, e a API o traduz — o front não pode depender de uma
-classe que carrega semântica de HTTP.
+**O erro precisa de cuidado, porque é o único ponto da fase que toca
+teste que já passa.** Hoje `normalizarTelefone` lança `ErroDeNegocio`,
+que é da API: estende `ErroHttp`, carrega status 422 e o código
+`telefone_invalido`. O front não pode depender de uma classe com
+semântica de HTTP, então o pacote passa a lançar um `TelefoneInvalido`
+próprio.
+
+O que preserva os 305 testes:
+
+- A API mantém um `lib/telefone.ts` fino, que reexporta as funções do
+  pacote convertendo `TelefoneInvalido` em
+  `ErroDeNegocio(mensagem, "telefone_invalido")`. Status, código e
+  mensagem ficam idênticos, e nenhum router muda de import.
+- Os testes de rota assertam 400 do `pattern` do schema, não 422, então
+  não enxergam a troca.
+- `tests/lib/telefone.test.ts` é o único que assertava a classe
+  (`toThrow(ErroDeNegocio)`). Ele se divide: os casos de normalização
+  vão pro pacote e assertam `TelefoneInvalido`; fica na API um teste
+  novo, pequeno, provando que a tradução para 422 e `telefone_invalido`
+  acontece.
+
+`normalizarEmail` não lança, então a mudança dele é só de endereço.
 
 ## Tokens, fonte e estilo do web
 
@@ -200,6 +226,7 @@ app/
   (painel)/     sessão do barbeiro; claro/escuro
   (publico)/    sem sessão obrigatória; sempre claro
     [slug]/
+  primitivos/   vitrine dos componentes; fora dos dois grupos
 ```
 
 Os dois grupos têm layout próprio. O grupo público não impõe login: das
@@ -208,7 +235,10 @@ e o login exigem token.
 
 `apps/web/AGENTS.md` avisa que este Next difere do que o modelo
 aprendeu e manda ler `node_modules/next/dist/docs/` antes de escrever
-código. Vale na implementação, não aqui.
+código. Vale na implementação, não aqui — e vale em particular pro
+`next/font/local` e o `next/font/google` citados acima, e pra forma dos
+route groups: o plano confirma os três na documentação instalada antes
+de escrever, em vez de descobrir divergência no meio da fase.
 
 ## Sessão
 
@@ -229,14 +259,21 @@ usará bearer de qualquer forma.
 
 ## Testes
 
-Vitest em todos os pacotes e nos dois apps, `@testing-library/react` no
-web. Cada `package.json` ganha `test` e `lint` — hoje o `turbo run test`
-da raiz roda contra apps que não têm o script.
+Vitest nos pacotes e no `apps/web`, com `@testing-library/react`. Cada
+`package.json` ganha `test` e `lint` — hoje o `turbo run test` da raiz
+roda contra apps que não têm o script.
+
+**O `apps/mobile` fica de fora**, com um `test` que roda
+`vitest run --passWithNoTests` só pra não derrubar o turbo. Instalar
+`@testing-library/react-native` e o transform de RN numa fase que não
+escreve uma linha de React Native é escopo do sub-projeto D, e é lá que
+o setup entra junto dos primeiros testes que ele roda.
 
 O que esta fase testa, já que não tem tela:
 
-- `packages/telefone` — normalização, o `55` que cai e o que não cai,
-  formatação progressiva, entrada inválida.
+- `packages/formato` — normalização de telefone, o `55` que cai e o que
+  não cai, formatação progressiva, entrada inválida, e a caixa do
+  email.
 - `packages/api-client` — montagem de URL e corpo, cabeçalho de
   autorização, tradução de cada código de erro em `ErroDaApi`, e o
   `aoExpirarSessao` disparando no 401. Tudo com `fetch` injetado.
@@ -250,8 +287,8 @@ candidato ao passo de infra, junto com o CI.
 ## Fora de escopo
 
 - Qualquer uma das 23 telas.
-- React Native, `expo-router`, `expo-secure-store` e os primitivos em
-  `StyleSheet` — sub-projeto D.
+- React Native, `expo-router`, `expo-secure-store`, os primitivos em
+  `StyleSheet` e o setup de teste do `apps/mobile` — sub-projeto D.
 - Troca manual de tema claro/escuro — sub-projeto C, junto do painel.
 - Fechar as dívidas da API listadas no roadmap. Em particular o
   `garantirFuturo`: continua aberta, e por isso as telas de data do
@@ -268,11 +305,14 @@ candidato ao passo de infra, junto com o CI.
 
 ## Critérios de conclusão
 
-1. `pnpm test` na raiz roda e passa em todos os pacotes e nos dois apps.
+1. `pnpm test` na raiz roda e passa nos pacotes e no `apps/web`, e não
+   quebra no `apps/mobile`, que ainda não tem teste.
 2. `pnpm type-check` passa com os tipos de resposta já morando em
    `@gr-barber/types` e a API importando de lá.
-3. A API continua com os 305 testes passando depois de perder
-   `lib/telefone.ts` e as interfaces do serializador para os pacotes.
+3. A API continua verde depois de perder a normalização e as
+   interfaces do serializador para os pacotes: dos 305 testes, os de
+   rota passam sem alteração nenhuma, e o `tests/lib/telefone.test.ts`
+   se divide entre o pacote e um teste novo da tradução do erro.
 4. `apps/web` sobe com os dois route groups e seus layouts, a fonte
    Clash Grotesk carregando, e os primitivos renderizando numa página
    de vitrine em `/primitivos` — que substitui a tela provisória de
