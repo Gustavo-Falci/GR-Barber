@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { prisma } from "@gr-barber/database";
 import { buildApp } from "../../src/app";
+import { dataParaDate, horaParaDate } from "../../src/lib/horas";
 import { auth, criarBarbeariaComToken } from "../helpers/barbearia";
 import { criarClienteComToken } from "../helpers/cliente";
 import type { App } from "../../src/tipos";
@@ -17,6 +18,7 @@ function diaRelativo(dias: number): string {
 }
 
 const DIA = diaRelativo(30);
+const PASSADO = diaRelativo(-30);
 
 // A barbearia precisa de horário de funcionamento gravado, senão o
 // motor de disponibilidade trata todo dia como fechado e nenhum
@@ -94,6 +96,45 @@ async function agendar(params: {
   }
 
   return resposta.json().id as string;
+}
+
+// Semeado direto no Prisma, e não pela rota pública de agendamento: essa
+// rota valida disponibilidade e recusaria uma data no passado. `data` e
+// `clienteId` batem com PASSADO e com o cliente do teste — sem o
+// clienteId certo o `findFirstOrThrow` da rota nem chegaria a
+// `garantirAlteravel`, e o teste passaria pelo motivo errado (404).
+// `dataParaDate`/`horaParaDate`, e não `new Date(string)`: nenhuma Date
+// destinada ao banco pode vir do fuso da máquina.
+async function semearAgendamentoPassado(params: {
+  barbeariaId: string;
+  barbeiroId: string;
+  clienteId: string;
+}) {
+  const servico = await prisma.servico.create({
+    data: {
+      barbeariaId: params.barbeariaId,
+      nome: "Corte",
+      duracaoMinutos: 45,
+      preco: "45.00",
+    },
+  });
+
+  return prisma.agendamento.create({
+    data: {
+      barbeariaId: params.barbeariaId,
+      barbeiroId: params.barbeiroId,
+      clienteId: params.clienteId,
+      data: dataParaDate(PASSADO),
+      horaInicio: horaParaDate("10:00"),
+      horaFim: horaParaDate("10:45"),
+      status: "confirmado",
+      servicos: {
+        create: [
+          { servicoId: servico.id, precoNoMomento: "45.00", duracaoNoMomento: 45 },
+        ],
+      },
+    },
+  });
 }
 
 describe("POST /clientes/me/agendamentos/:id/remarcar", () => {
@@ -311,6 +352,31 @@ describe("POST /clientes/me/agendamentos/:id/remarcar", () => {
 
     expect(resposta.statusCode).toBe(422);
     expect(resposta.json().erro).toBe("status_nao_permite");
+  });
+
+  it("422 agendamento_passado ao remarcar um agendamento que já passou", async () => {
+    const app = buildApp();
+    const barbearia = await criarBarbeariaComToken(app);
+    const { token, clienteId } = await criarClienteComToken(app, barbearia.slug);
+    const agendamento = await semearAgendamentoPassado({
+      barbeariaId: barbearia.barbeariaId,
+      barbeiroId: barbearia.barbeiroId,
+      clienteId,
+    });
+
+    const resposta = await app.inject({
+      method: "POST",
+      url: `/clientes/me/agendamentos/${agendamento.id}/remarcar`,
+      headers: auth(token),
+      payload: { data: DIA, horaInicio: "14:00" },
+    });
+
+    // status confirmado, mas data no passado: se viesse
+    // status_nao_permite em vez de agendamento_passado, o seed estaria
+    // errado, não a rota — é o check de data que tem que travar aqui, e
+    // não o de status, que não é o problema desta linha.
+    expect(resposta.statusCode).toBe(422);
+    expect(resposta.json().erro).toBe("agendamento_passado");
   });
 
   it("404 no agendamento de outro cliente", async () => {
