@@ -1,0 +1,2 @@
+.pagina { display: grid; gap: var(--espaco-md); padding: var(--espaco-lg); max-width: 480px; }
+.acoes { display: grid; gap: var(--espaco-sm); }

@@ -1,0 +1,114 @@
+"use client";
+
+import { useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import type { ErroDaApi } from "@gr-barber/api-client";
+import { normalizarTelefoneObrigatorio, TelefoneInvalido } from "@gr-barber/formato";
+import { useApi } from "../api/ProvedorDaApi";
+import { Aviso } from "../componentes/Aviso";
+import { Botao } from "../componentes/Botao";
+import { Campo } from "../componentes/Campo";
+import { sessaoDoCliente } from "../sessao/armazenamento";
+import estilos from "./Entrar.module.css";
+
+export function Entrar() {
+  const { slug } = useParams<{ slug: string }>();
+  const router = useRouter();
+  const api = useApi();
+
+  const [nome, setNome] = useState("");
+  const [telefone, setTelefone] = useState("");
+  const [senha, setSenha] = useState("");
+  // Erro de telefone é do campo, não da tentativa: um DDD faltando é
+  // problema de digitação, e misturar com o aviso da API faria um
+  // telefone incompleto aparecer como se a senha estivesse errada.
+  const [erroTelefone, setErroTelefone] = useState<string | undefined>();
+  // Aviso é o que a API respondeu numa tentativa válida — nao_autenticado
+  // no login, conflito no primeiro acesso, ou qualquer outra falha.
+  const [aviso, setAviso] = useState<string | undefined>();
+  const [enviando, setEnviando] = useState(false);
+
+  // Quem escolhe entre entrar e primeiro acesso é a pessoa: não existe
+  // rota pública que responda se um telefone já tem senha, e perguntar
+  // seria a sondagem que o 409 do signup já permite.
+  async function submeter(acao: "entrar" | "primeiro-acesso") {
+    setAviso(undefined);
+
+    let numero: string;
+    try {
+      // A mesma função que a API usa pra guardar o telefone. Barrar
+      // aqui evita a ida e volta que voltaria 400 sem dizer o que
+      // fazer, e mantém o erro no campo certo.
+      numero = normalizarTelefoneObrigatorio(telefone);
+    } catch (causa) {
+      setErroTelefone(
+        causa instanceof TelefoneInvalido
+          ? "Informe o DDD e o número, como (11) 99999-8888"
+          : "Telefone inválido"
+      );
+      return;
+    }
+    setErroTelefone(undefined);
+
+    setEnviando(true);
+    try {
+      const sessao =
+        acao === "entrar"
+          ? await api.publico.loginCliente(slug, { telefone: numero, senha })
+          : await api.publico.signupCliente(slug, {
+              nome,
+              telefone: numero,
+              senha,
+            });
+
+      sessaoDoCliente(slug).gravar(sessao.token);
+      router.push(`/${slug}/minha-conta`);
+    } catch (causa) {
+      const erro = causa as ErroDaApi;
+
+      if (erro.codigo === "nao_autenticado") {
+        setAviso("Telefone ou senha incorretos.");
+      } else if (erro.codigo === "conflito") {
+        setAviso("Esse telefone já tem senha. Use Entrar.");
+      } else {
+        setAviso(erro.mensagem || "Não foi possível continuar agora.");
+      }
+    } finally {
+      setEnviando(false);
+    }
+  }
+
+  return (
+    <main className={estilos.pagina}>
+      <h1>Minha conta</h1>
+
+      <Campo rotulo="Nome (só no primeiro acesso)" valor={nome} onChange={setNome} />
+      <Campo
+        rotulo="Telefone"
+        formato="telefone"
+        valor={telefone}
+        onChange={(proximo) => {
+          setTelefone(proximo);
+          setErroTelefone(undefined);
+        }}
+        erro={erroTelefone}
+      />
+      <Campo rotulo="Senha" type="password" valor={senha} onChange={setSenha} />
+
+      {aviso ? <Aviso>{aviso}</Aviso> : null}
+
+      <div className={estilos.acoes}>
+        <Botao carregando={enviando} onClick={() => submeter("entrar")}>
+          Entrar
+        </Botao>
+        <Botao
+          variante="contorno"
+          carregando={enviando}
+          onClick={() => submeter("primeiro-acesso")}
+        >
+          Primeiro acesso
+        </Botao>
+      </div>
+    </main>
+  );
+}
