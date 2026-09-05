@@ -2,14 +2,15 @@
 
 O que falta pro GR Barber sair do papel, mais ou menos em ordem:
 
-1. **Rodar os scaffolds do Expo e do Next.js** — dentro de
-   `apps/mobile` e `apps/web`, seguindo os READMEs de cada um, sem
-   sobrescrever `package.json`/`metro.config.js`.
+1. **Scaffolds do Expo e do Next.js — pronto.** `apps/mobile` e
+   `apps/web` já têm o scaffold versionado (commit `6abe8a1`), com o
+   `package.json` e o `metro.config.js` do monorepo preservados.
 2. **Rotas da API — pronto.** A spec
    `docs/superpowers/specs/2026-08-30-api-crud-agendamentos-design.md`
    dividiu o trabalho em cinco fases, todas concluídas: fundação e
    autenticação (PR #1), cadastros do barbeiro (PR #2), criação de
-   agendamento (PR #3) e disponibilidade. Cada uma tem plano próprio em
+   agendamento (PR #3) e disponibilidade (PR #4), mais o retry em
+   deadlock do PR #5. Cada uma tem plano próprio em
    `docs/superpowers/plans/`. A autenticação foi
    fundida aqui dentro (era o passo 3 separado), porque quase toda rota
    de escrita precisa saber qual barbearia é a do chamador — sem isso
