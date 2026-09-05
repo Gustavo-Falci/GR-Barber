@@ -1,7 +1,7 @@
 import { prisma } from "@gr-barber/database";
 import { conflito } from "../lib/erro-http";
 import { PADRAO_TELEFONE } from "../lib/padroes";
-import { gerarHashSenha } from "../lib/senha";
+import { conferirSenha, gerarHashSenha } from "../lib/senha";
 import { serializarCliente } from "../lib/serializar";
 import type { App } from "../tipos";
 
@@ -22,6 +22,28 @@ const corpoSignup = {
     senha: { type: "string", minLength: 8, maxLength: 200 },
   },
 } as const;
+
+const corpoLogin = {
+  type: "object",
+  required: ["telefone", "senha"],
+  additionalProperties: false,
+  properties: {
+    telefone: { type: "string", pattern: PADRAO_TELEFONE, maxLength: 20 },
+    senha: { type: "string", minLength: 1, maxLength: 200 },
+  },
+} as const;
+
+// Nada de `const HASH = await gerarHashSenha(...)` no topo do módulo: a
+// API compila pra CJS via tsup, onde top-level await não existe. O hash
+// é calculado na primeira recusa e reaproveitado — o custo que interessa
+// é o do conferirSenha, que roda sempre.
+let hashDescartavel: string | null = null;
+
+async function custoDeSenhaInvalida(senha: string): Promise<false> {
+  hashDescartavel ??= await gerarHashSenha("senha-que-nao-existe");
+  await conferirSenha(senha, hashDescartavel);
+  return false;
+}
 
 // Públicas: são as telas de criar conta e entrar, abertas pelo link do
 // WhatsApp. Ficam fora dos dois escopos protegidos do app.ts.
@@ -75,6 +97,47 @@ export function registrarRotasAuthCliente(app: App): void {
       });
 
       return reply.code(201).send({ token, cliente: serializarCliente(cliente) });
+    }
+  );
+
+  app.post(
+    "/barbearias/:slug/auth/cliente/login",
+    { schema: { params: paramsSlug, body: corpoLogin } },
+    async (request, reply) => {
+      const { telefone, senha } = request.body;
+
+      const barbearia = await prisma.barbearia.findUniqueOrThrow({
+        where: { slug: request.params.slug },
+        select: { id: true },
+      });
+
+      const cliente = await prisma.cliente.findUnique({
+        where: {
+          barbeariaId_telefone: { barbeariaId: barbearia.id, telefone },
+        },
+      });
+
+      // Telefone inexistente, cadastro sem senha e senha errada dão
+      // exatamente a mesma resposta — e custam o mesmo. Pular o
+      // conferirSenha quando não há cliente faria essa resposta voltar
+      // muito mais rápido, porque o scrypt é lento de propósito: o
+      // relógio entregaria o que o corpo esconde. Mesmo raciocínio do
+      // login do barbeiro, em rotas/auth.ts.
+      const autorizado = cliente?.senhaHash
+        ? await conferirSenha(senha, cliente.senhaHash)
+        : await custoDeSenhaInvalida(senha);
+
+      if (!autorizado || !cliente) {
+        return reply.code(401).send({ erro: "nao_autenticado" });
+      }
+
+      const token = app.jwt.sign({
+        tipo: "cliente",
+        clienteId: cliente.id,
+        barbeariaId: barbearia.id,
+      });
+
+      return reply.send({ token, cliente: serializarCliente(cliente) });
     }
   );
 }
