@@ -87,4 +87,45 @@ describe("minha conta", () => {
       expect(navegacaoFalsa.replace).toHaveBeenCalledWith("/gr-barber/entrar")
     );
   });
+
+  it("avisa quando não consegue carregar, sem esvaziar a lista por engano", async () => {
+    // Uma falha que não seja 401 (aqui, 500) não pode virar tela de
+    // histórico vazio: pra quem usa, as duas são indistinguíveis, e só
+    // uma delas é verdade.
+    const falso = criarApiClientFalso();
+    falso.cliente.meusAgendamentos = async () => {
+      throw new ErroDaApi(500, "erro_interno", "");
+    };
+    montar(falso);
+    await waitFor(() =>
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        /não foi possível carregar/i
+      )
+    );
+    // A prova de que não virou lista vazia: se tivesse um agendamento
+    // "de mentira" nenhum botão apareceria, mas também não apareceria
+    // se a tela genuinamente não tivesse nada pra mostrar — o texto do
+    // aviso é o que distingue os dois casos.
+    expect(
+      screen.queryByRole("button", { name: /cancelar|remarcar/i })
+    ).not.toBeInTheDocument();
+  });
+
+  it("agendamento cancelado não oferece cancelar nem remarcar", async () => {
+    montar(await comUmAgendamento());
+    await waitFor(() => screen.getByText("20 de setembro"));
+
+    // Depois de cancelado o próprio agendamento sai do estado
+    // "alterável": nem cancelar de novo, nem remarcar pra outro dia
+    // fazem sentido pra uma linha que já chegou no destino.
+    await userEvent.click(screen.getByRole("button", { name: /cancelar/i }));
+    await waitFor(() => screen.getByText(/cancelado/i));
+
+    expect(
+      screen.queryByRole("button", { name: /cancelar/i })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /remarcar/i })
+    ).not.toBeInTheDocument();
+  });
 });
