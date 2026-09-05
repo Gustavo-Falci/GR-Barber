@@ -5,6 +5,7 @@ import { prisma } from "@gr-barber/database";
 import { registrarTratamentoDeErros } from "./plugins/erros";
 import { autenticar, registrarAuth } from "./plugins/auth";
 import { registrarRotasAuth } from "./rotas/auth";
+import { registrarRotasAuthCliente } from "./rotas/auth-cliente";
 import {
   registrarRotasAgendamentos,
   registrarRotasAgendamentosPublicas,
@@ -53,6 +54,7 @@ export function buildApp(opts: { logger?: boolean } = {}): App {
 
   registrarAuth(app);
   registrarRotasAuth(app);
+  registrarRotasAuthCliente(app);
   registrarRotasBarbeariasPublicas(app);
   registrarRotasServicosPublicas(app);
   registrarRotasAgendamentosPublicas(app);
