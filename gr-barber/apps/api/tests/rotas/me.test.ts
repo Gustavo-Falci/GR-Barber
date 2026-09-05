@@ -140,6 +140,7 @@ describe("GET /me", () => {
     // respeita o `exp` que vier pronto no payload em vez de recalcular
     // a partir do expiresIn do plugin.
     const payloadExpirado = {
+      tipo: "barbeiro" as const,
       barbeiroId: cadastro.barbeiro.id,
       barbeariaId: cadastro.barbearia.id,
       exp: Math.floor(Date.now() / 1000) - 60,

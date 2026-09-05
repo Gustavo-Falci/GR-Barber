@@ -1,4 +1,5 @@
 import { prisma } from "@gr-barber/database";
+import { normalizarTelefone } from "../lib/telefone";
 import { PADRAO_TELEFONE } from "../lib/padroes";
 import { serializarBarbearia } from "../lib/serializar";
 import { completarSemana } from "./horarios";
@@ -39,9 +40,19 @@ export function registrarRotasBarbeariasProtegidas(app: App): void {
     async (request) => {
       // O id sai do token. Não existe rota `/barbearias/:id` de escrita:
       // sem id na URL não há o que escopar errado.
+      // `telefone` sai do corpo pra ser normalizado; o resto vai
+      // direto, porque o additionalProperties: false já garantiu que só
+      // há campo editável ali.
+      const { telefone, ...resto } = request.body;
+
       const barbearia = await prisma.barbearia.update({
         where: { id: request.user.barbeariaId },
-        data: request.body,
+        data: {
+          ...resto,
+          ...(telefone !== undefined
+            ? { telefone: normalizarTelefone(telefone) }
+            : {}),
+        },
       });
 
       return serializarBarbearia(barbearia);
@@ -69,14 +80,27 @@ export function registrarRotasBarbeariasPublicas(app: App): void {
       // central traduz pra 404.
       const barbearia = await prisma.barbearia.findUniqueOrThrow({
         where: { slug: request.params.slug },
-        include: { horariosFuncionamento: true },
+        include: {
+          horariosFuncionamento: true,
+          // Só id e nome, e só os ativos. O select explícito é o que
+          // impede o senhaHash do barbeiro de sair numa rota pública —
+          // é exatamente o que o comentário do serializador alertava.
+          barbeiros: {
+            where: { ativo: true },
+            select: { id: true, nome: true },
+            orderBy: { nome: "asc" },
+          },
+        },
       });
 
-      // Campos escolhidos pelo serializador: um spread traria os
-      // barbeiros e o senhaHash junto.
+      // Campos escolhidos pelo serializador: um spread traria o
+      // senhaHash junto.
       return {
         ...serializarBarbearia(barbearia),
         horarios: completarSemana(barbearia.horariosFuncionamento),
+        // O cliente precisa deste id pra chamar /disponibilidade e pra
+        // criar o agendamento; sem ele o fluxo público não fecha.
+        barbeiros: barbearia.barbeiros,
       };
     }
   );

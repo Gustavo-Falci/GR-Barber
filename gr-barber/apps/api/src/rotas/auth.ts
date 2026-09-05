@@ -1,34 +1,12 @@
-import { randomUUID } from "node:crypto";
-
 import { prisma } from "@gr-barber/database";
+import { normalizarEmail } from "../lib/email";
 import { PADRAO_EMAIL } from "../lib/padroes";
-import { conferirSenha, gerarHashSenha } from "../lib/senha";
+import {
+  conferirSenha,
+  gerarHashSenha,
+  obterHashDescartavel,
+} from "../lib/senha";
 import type { App } from "../tipos";
-
-// A coluna é VARCHAR com índice único simples — sem citext e sem índice
-// funcional, o Postgres compara caixa a caixa. Sem normalizar,
-// "Gu@Exemplo.com" e "gu@exemplo.com" viram duas contas distintas, e
-// quem cadastrou numa não entra pela outra. A mesma função na gravação
-// e na busca, senão a busca nunca acha o que a gravação guardou.
-function normalizarEmail(email: string): string {
-  return email.trim().toLowerCase();
-}
-
-// Hash de uma senha aleatória, no mesmo formato e tamanho de um real.
-// Serve só pra dar ao login sem barbeiro o mesmo custo de derivação do
-// login com barbeiro — ver o comentário na rota. Tem que ser bem
-// formado: um valor malformado sairia pelo atalho do conferirSenha sem
-// derivar nada, que é justamente o vazamento que ele existe pra fechar.
-//
-// Calculado sob demanda e guardado: derivar a cada requisição seria
-// desperdício, e no topo do módulo exigiria await de nível superior,
-// que o bundle CJS do tsup não tem.
-let hashDescartavel: Promise<string> | null = null;
-
-export function obterHashDescartavel(): Promise<string> {
-  hashDescartavel ??= gerarHashSenha(randomUUID());
-  return hashDescartavel;
-}
 
 const corpoSignup = {
   type: "object",
@@ -64,7 +42,12 @@ export function registrarRotasAuth(app: App): void {
     { schema: { body: corpoSignup } },
     async (request, reply) => {
       const { barbearia, barbeiro } = request.body;
-      const email = normalizarEmail(barbeiro.email);
+      // `!`: o schema exige `email` como string obrigatória e não vazia
+      // (PADRAO_EMAIL casa só com algo antes e depois do "@"), então
+      // `normalizarEmail` nunca devolve null aqui — o `null` do retorno
+      // existe pra chamador que aceita email ausente, como o de
+      // clientes-me.ts.
+      const email = normalizarEmail(barbeiro.email)!;
       const senhaHash = await gerarHashSenha(barbeiro.senha);
 
       // Transação: uma barbearia sem barbeiro seria inacessível pra
@@ -87,6 +70,7 @@ export function registrarRotasAuth(app: App): void {
       });
 
       const token = app.jwt.sign({
+        tipo: "barbeiro",
         barbeiroId: criado.barbeiro.id,
         barbeariaId: criado.barbearia.id,
       });
@@ -126,7 +110,8 @@ export function registrarRotasAuth(app: App): void {
       const { email, senha } = request.body;
 
       const barbeiro = await prisma.barbeiro.findUnique({
-        where: { email: normalizarEmail(email) },
+        // `!`: mesmo motivo do signup — o schema exige email não vazio.
+        where: { email: normalizarEmail(email)! },
         include: { barbearia: true },
       });
 
@@ -157,6 +142,7 @@ export function registrarRotasAuth(app: App): void {
       }
 
       const token = app.jwt.sign({
+        tipo: "barbeiro",
         barbeiroId: autorizado.id,
         barbeariaId: autorizado.barbeariaId,
       });

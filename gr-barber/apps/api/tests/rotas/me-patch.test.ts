@@ -17,7 +17,7 @@ describe("PATCH /me", () => {
 
     expect(resposta.statusCode).toBe(200);
     expect(resposta.json().nome).toBe("Gustavo Falci");
-    expect(resposta.json().telefone).toBe("11999998888");
+    expect(resposta.json().telefone).toBe("(11) 99999-8888");
 
     const noBanco = await prisma.barbeiro.findUniqueOrThrow({
       where: { id: um.barbeiroId },

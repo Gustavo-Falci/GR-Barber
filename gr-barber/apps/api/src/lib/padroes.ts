@@ -10,9 +10,17 @@ export const PADRAO_UUID =
   "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$";
 
 // Telefone brasileiro escrito de todo jeito: "11999998888",
-// "(11) 99999-8888", "+55 11 99999-8888". A API guarda o que veio; quem
-// formata é a tela.
-export const PADRAO_TELEFONE = "^[0-9()+\\-\\s]{8,20}$";
+// "(11) 99999-8888", "+55 11 99999-8888". O DDD é obrigatório — sem ele
+// não dá pra produzir o formato único que a coluna guarda, e a chave
+// `[barbeariaId, telefone]` deixaria de identificar uma pessoa. Quem
+// formata na gravação é o normalizarTelefone (lib/telefone.ts).
+//
+// O pattern conta dígitos, não caracteres: 2 do DDD, 8 ou 9 do
+// assinante, com o `55` do país opcional na frente. É isso que faz
+// "99999-8888" (sem DDD) e "12345" morrerem aqui, com 400, em vez de
+// chegarem ao banco.
+export const PADRAO_TELEFONE =
+  "^(?:\\+?55[ -]?)?\\(?\\d{2}\\)?[ -]?\\d{4,5}[ -]?\\d{4}$";
 
 // "HH:mm" em 24 horas. Mesmo formato que lib/horas.ts exige.
 export const PADRAO_HORA = "^([01]\\d|2[0-3]):([0-5]\\d)$";

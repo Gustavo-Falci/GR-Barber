@@ -4,17 +4,9 @@ App do barbeiro — React Native + Expo.
 
 ## Setup
 
-Essa pasta já tem `package.json` e `metro.config.js` prontos pro
-monorepo. Falta o resto do scaffold do Expo:
-
-```bash
-npx create-expo-app@latest tmp-scaffold
-# copie App.tsx, app.json, assets/, tsconfig.json de tmp-scaffold
-# pra cá, sem sobrescrever o package.json e o metro.config.js
-rm -rf tmp-scaffold
-```
-
-Depois, na raiz do monorepo:
+O scaffold do Expo já está aqui (`App.tsx`, `app.json`, `assets/`,
+`tsconfig.json`), ao lado do `package.json` e do `metro.config.js`
+ajustados pro monorepo. Na raiz:
 
 ```bash
 pnpm install

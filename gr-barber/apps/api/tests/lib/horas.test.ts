@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  agoraNaBarbearia,
   dataParaDate,
   dateParaData,
   dateParaHora,
@@ -92,5 +93,27 @@ describe("somarMinutos", () => {
   it("aceita minutos negativos que ainda caem dentro do dia", () => {
     expect(somarMinutos("10:00", -30)).toBe("09:30");
     expect(somarMinutos("00:30", -30)).toBe("00:00");
+  });
+});
+
+describe("agoraNaBarbearia", () => {
+  it("devolve data e hora no formato do contrato", () => {
+    const agora = agoraNaBarbearia();
+
+    expect(agora.data).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(agora.hora).toMatch(/^([01]\d|2[0-3]):[0-5]\d$/);
+  });
+
+  it("lê o fuso da barbearia, não o da máquina", () => {
+    // 2026-09-04T02:30:00Z é 23:30 do dia 3 em São Paulo (UTC-3). Se a
+    // função usasse UTC ou o fuso do processo, a data sairia como dia 4.
+    // O instante entra por parâmetro justamente pra este caso não
+    // precisar de fake timers — ver o comentário na implementação.
+    const instante = new Date("2026-09-04T02:30:00Z");
+
+    expect(agoraNaBarbearia(instante)).toEqual({
+      data: "2026-09-03",
+      hora: "23:30",
+    });
   });
 });

@@ -14,6 +14,7 @@ import {
   serializarAgendamentoComCliente,
 } from "../lib/serializar";
 import { comRetryDeDeadlock } from "../lib/transacao";
+import { normalizarTelefoneObrigatorio } from "../lib/telefone";
 import type { App } from "../tipos";
 
 // Sem `barbeariaId` e sem `origem`: os dois seriam forjáveis. O
@@ -271,6 +272,10 @@ export function registrarRotasAgendamentosPublicas(app: App): void {
     { schema: { params: paramsSlug, body: corpoNovoAgendamentoPublico } },
     async (request, reply) => {
       const { cliente: dadosCliente, ...resto } = request.body;
+      // O mesmo número em formatos diferentes tem que cair no mesmo
+      // cadastro — é o que faz o barbeiro reconhecer o cliente
+      // recorrente, e o que a chave única não garantia sozinha.
+      const telefone = normalizarTelefoneObrigatorio(dadosCliente.telefone);
 
       // Mesmo motivo da rota do walk-in: impasse concorrente não pode
       // sair como 500.
@@ -293,13 +298,13 @@ export function registrarRotasAgendamentosPublicas(app: App): void {
             where: {
               barbeariaId_telefone: {
                 barbeariaId: barbearia.id,
-                telefone: dadosCliente.telefone,
+                telefone,
               },
             },
             create: {
               barbeariaId: barbearia.id,
               nome: dadosCliente.nome,
-              telefone: dadosCliente.telefone,
+              telefone,
             },
             update: {},
           });

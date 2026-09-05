@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildApp } from "../../src/app";
 import { auth, criarBarbeariaComToken } from "../helpers/barbearia";
+import { prisma } from "@gr-barber/database";
 
 describe("GET /barbearias/:slug", () => {
   it("devolve o perfil e os sete dias de horário, sem token", async () => {
@@ -36,7 +37,7 @@ describe("GET /barbearias/:slug", () => {
     const corpo = resposta.json();
     expect(corpo.nome).toBe("Barbearia um");
     expect(corpo.slug).toBe("barbearia-um");
-    expect(corpo.telefone).toBe("1133334444");
+    expect(corpo.telefone).toBe("(11) 3333-4444");
     expect(corpo.endereco).toBe("Rua das Tesouras, 100");
     expect(corpo.horarios).toHaveLength(7);
     expect(corpo.horarios[1]).toEqual({
@@ -77,7 +78,7 @@ describe("GET /barbearias/:slug", () => {
     await app.close();
   });
 
-  it("não vaza barbeiro, email nem senhaHash", async () => {
+  it("expõe só id e nome do barbeiro, sem email nem senhaHash", async () => {
     const app = buildApp();
     await criarBarbeariaComToken(app, "um");
 
@@ -90,7 +91,50 @@ describe("GET /barbearias/:slug", () => {
     // só o que o barbeiro quer mostrar pro cliente.
     expect(resposta.body).not.toContain("scrypt$");
     expect(resposta.body).not.toContain("um@exemplo.com");
-    expect(resposta.json()).not.toHaveProperty("barbeiros");
+    // Barbeiros saem, mas apenas id e nome: sem senhaHash.
+    const corpo = resposta.json();
+    expect(corpo).toHaveProperty("barbeiros");
+    expect(corpo.barbeiros[0]).toHaveProperty("id");
+    expect(corpo.barbeiros[0]).toHaveProperty("nome");
+    expect(corpo.barbeiros[0]).not.toHaveProperty("senhaHash");
+
+    await app.close();
+  });
+
+  it("devolve os barbeiros ativos, que é o que o fluxo do cliente precisa", async () => {
+    const app = buildApp();
+    const { slug, barbeiroId } = await criarBarbeariaComToken(app);
+
+    const resposta = await app.inject({
+      method: "GET",
+      url: `/barbearias/${slug}`,
+    });
+
+    expect(resposta.statusCode).toBe(200);
+    // Sem este id o cliente não consegue chamar /disponibilidade nem
+    // criar agendamento: as duas rotas exigem barbeiroId.
+    expect(resposta.json().barbeiros).toEqual([
+      { id: barbeiroId, nome: "Barbeiro um" },
+    ]);
+
+    await app.close();
+  });
+
+  it("não devolve barbeiro desativado", async () => {
+    const app = buildApp();
+    const { slug, barbeiroId } = await criarBarbeariaComToken(app);
+
+    await prisma.barbeiro.update({
+      where: { id: barbeiroId },
+      data: { ativo: false },
+    });
+
+    const resposta = await app.inject({
+      method: "GET",
+      url: `/barbearias/${slug}`,
+    });
+
+    expect(resposta.json().barbeiros).toEqual([]);
 
     await app.close();
   });

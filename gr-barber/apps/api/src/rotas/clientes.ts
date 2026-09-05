@@ -1,6 +1,11 @@
 import { prisma } from "@gr-barber/database";
+import { normalizarEmail } from "../lib/email";
 import { PADRAO_EMAIL, PADRAO_TELEFONE, PADRAO_UUID } from "../lib/padroes";
 import { serializarAgendamento, serializarCliente } from "../lib/serializar";
+import {
+  apenasDigitos,
+  normalizarTelefoneObrigatorio,
+} from "../lib/telefone";
 import type { App } from "../tipos";
 
 const corpoNovoCliente = {
@@ -38,19 +43,28 @@ const buscaClientes = {
   properties: { busca: { type: "string", minLength: 1, maxLength: 120 } },
 } as const;
 
-// Mesma normalização do login: a coluna é VARCHAR com índice único, que
-// compara caixa a caixa. Sem isto, "Joao@Exemplo.com" e
-// "joao@exemplo.com" viram dois cadastros do mesmo cliente.
-function normalizarEmail(email: string | null | undefined): string | null {
-  return email ? email.trim().toLowerCase() : null;
-}
-
 export function registrarRotasClientes(app: App): void {
   app.get(
     "/clientes",
     { schema: { querystring: buscaClientes } },
     async (request) => {
       const busca = request.query.busca?.trim();
+      const digitos = busca ? apenasDigitos(busca) : "";
+
+      // A coluna guarda o telefone pontuado — "(11) 99999-8888" — então
+      // procurar "999998888" cru com `contains` nunca casaria. O
+      // regexp_replace tira a pontuação do lado do banco, e a busca
+      // compara dígito com dígito: qualquer jeito de digitar o número
+      // acha o mesmo cliente. Vai em SQL porque o Prisma não expressa
+      // função sobre coluna dentro de um `where`.
+      const porTelefone = digitos
+        ? await prisma.$queryRaw<{ id: string }[]>`
+            SELECT id FROM cliente
+            WHERE barbearia_id = ${request.user.barbeariaId}::uuid
+              AND regexp_replace(telefone, '[^0-9]', '', 'g') LIKE ${`%${digitos}%`}
+            LIMIT 200
+          `
+        : [];
 
       const clientes = await prisma.cliente.findMany({
         where: {
@@ -63,7 +77,7 @@ export function registrarRotasClientes(app: App): void {
                   // `mode: "insensitive"` só existe no conector do
                   // Postgres — é o que faz "jo" achar "João".
                   { nome: { contains: busca, mode: "insensitive" as const } },
-                  { telefone: { contains: busca } },
+                  { id: { in: porTelefone.map((linha) => linha.id) } },
                 ],
               }
             : {}),
@@ -90,7 +104,7 @@ export function registrarRotasClientes(app: App): void {
         data: {
           barbeariaId: request.user.barbeariaId,
           nome,
-          telefone,
+          telefone: normalizarTelefoneObrigatorio(telefone),
           email: normalizarEmail(email),
         },
       });
@@ -145,7 +159,16 @@ export function registrarRotasClientes(app: App): void {
         where: { id: request.params.id, barbeariaId: request.user.barbeariaId },
         data: {
           ...(nome !== undefined ? { nome } : {}),
-          ...(telefone !== undefined ? { telefone } : {}),
+          // Mesmo tratamento do email: só entra no `data` quando veio no
+          // corpo, e sempre normalizado — os dois escrevem numa coluna
+          // que faz parte de uma chave única.
+          // `Obrigatorio` e não o normalizarTelefone puro: diferente da
+          // barbearia e do barbeiro, `Cliente.telefone` é NOT NULL no
+          // schema, e o corpo desta rota não aceita null — quem entrega
+          // isso ao compilador é o retorno `string` do wrapper.
+          ...(telefone !== undefined
+            ? { telefone: normalizarTelefoneObrigatorio(telefone) }
+            : {}),
           // `email` tem tratamento próprio porque passa pela
           // normalização — e porque `null` aqui significa "limpar", não
           // "não mexer".
