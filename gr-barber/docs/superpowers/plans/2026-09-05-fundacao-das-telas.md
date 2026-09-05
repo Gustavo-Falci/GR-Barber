@@ -398,7 +398,7 @@ export { normalizarEmail } from "./email";
 - [ ] **Step 5: Rodar e ver passar**
 
 Rodar: `pnpm --filter @gr-barber/formato test`
-Esperado: PASS — 13 testes.
+Esperado: PASS, com os casos de telefone e de email verdes.
 
 - [ ] **Step 6: Escrever o teste do adaptador da API**
 
@@ -433,7 +433,7 @@ describe("adaptador de telefone da API", () => {
 
 - [ ] **Step 7: Rodar e ver PASSAR — é teste de caracterização**
 
-Rodar: `pnpm --filter @gr-barber/api test -- tests/lib/telefone-traducao.test.ts`
+Rodar: `pnpm --filter @gr-barber/api exec vitest run tests/lib/telefone-traducao.test.ts`
 Esperado: PASS. Diferente dos outros testes deste plano, este não começa vermelho de propósito: ele descreve o comportamento que a API **já** tem, e existe pra falhar no Step 8 se a refatoração perder a tradução. Se ele falhar agora, pare — significa que o `ErroDeNegocio` já não sai como 422 com `telefone_invalido`, e a premissa da tarefa está errada.
 
 - [ ] **Step 8: Trocar a API pelo adaptador**
@@ -493,7 +493,7 @@ Rodar: `pnpm install`
 - [ ] **Step 9: Rodar a suíte inteira da API**
 
 Rodar: `pnpm --filter @gr-barber/api test`
-Esperado: PASS. A contagem cai de 305 pra 297 (os 8 casos de `tests/lib/telefone.test.ts` foram pro pacote) e sobe pra 299 com os dois novos do adaptador. Nenhum teste de rota muda: eles assertam o 400 do `pattern` do schema, não o 422.
+Esperado: PASS. A contagem muda — os 7 casos de `tests/lib/telefone.test.ts` foram pro pacote e entraram 2 do adaptador — e o número final não importa; o que importa é que a suíte está verde e que **nenhum arquivo de teste de rota foi editado**. Eles assertam o 400 do `pattern` do schema, não o 422, e por isso não enxergam a troca. Se algum teste de rota precisar de edição pra passar, pare: a tradução do erro está errada.
 
 Rodar: `pnpm --filter @gr-barber/api type-check`
 Esperado: sem erro.
@@ -1055,7 +1055,7 @@ export type {
 - [ ] **Step 5: Rodar e ver passar**
 
 Rodar: `pnpm --filter @gr-barber/api-client test`
-Esperado: PASS — 10 testes.
+Esperado: PASS — os dez casos do núcleo.
 
 - [ ] **Step 6: Commit**
 
@@ -1283,7 +1283,7 @@ describe("api pública", () => {
 
 - [ ] **Step 2: Rodar e ver falhar**
 
-Rodar: `pnpm --filter @gr-barber/api-client test -- tests/publico.test.ts`
+Rodar: `pnpm --filter @gr-barber/api-client exec vitest run tests/publico.test.ts`
 Esperado: FAIL — `criarApiClient is not exported`.
 
 - [ ] **Step 3: Implementar as rotas públicas e a fábrica**
@@ -1429,7 +1429,7 @@ export type ApiClient = ReturnType<typeof criarApiClient>;
 - [ ] **Step 4: Rodar e ver passar**
 
 Rodar: `pnpm --filter @gr-barber/api-client test`
-Esperado: PASS — 17 testes (10 do núcleo + 7 daqui).
+Esperado: PASS — os do núcleo mais os sete daqui.
 
 - [ ] **Step 5: Commit**
 
@@ -1666,7 +1666,7 @@ describe("api do barbeiro", () => {
 
 - [ ] **Step 2: Rodar e ver falhar**
 
-Rodar: `pnpm --filter @gr-barber/api-client test -- tests/barbeiro.test.ts`
+Rodar: `pnpm --filter @gr-barber/api-client exec vitest run tests/barbeiro.test.ts`
 Esperado: FAIL — `Cannot read properties of undefined (reading 'login')`.
 
 - [ ] **Step 3: Implementar**
@@ -1937,7 +1937,7 @@ export type {
 - [ ] **Step 4: Rodar e ver passar**
 
 Rodar: `pnpm --filter @gr-barber/api-client test`
-Esperado: PASS — 26 testes.
+Esperado: PASS — núcleo, públicas e as do barbeiro.
 
 - [ ] **Step 5: Commit**
 
@@ -2079,7 +2079,7 @@ describe("api do cliente logado", () => {
 
 - [ ] **Step 2: Rodar e ver falhar**
 
-Rodar: `pnpm --filter @gr-barber/api-client test -- tests/cliente.test.ts`
+Rodar: `pnpm --filter @gr-barber/api-client exec vitest run tests/cliente.test.ts`
 Esperado: FAIL — `Cannot read properties of undefined (reading 'meuCadastro')`.
 
 - [ ] **Step 3: Implementar**
@@ -2172,7 +2172,7 @@ Em `packages/api-client/src/index.ts`, acrescentar `cliente: criarApiCliente(req
 - [ ] **Step 4: Rodar e ver passar**
 
 Rodar: `pnpm --filter @gr-barber/api-client test`
-Esperado: PASS — 30 testes.
+Esperado: PASS — as quatro áreas verdes.
 
 Rodar: `pnpm --filter @gr-barber/api-client type-check`
 Esperado: sem erro.
@@ -2286,7 +2286,7 @@ describe("criarApiClientFalso", () => {
 
 - [ ] **Step 2: Rodar e ver falhar**
 
-Rodar: `pnpm --filter @gr-barber/api-client test -- tests/falso.test.ts`
+Rodar: `pnpm --filter @gr-barber/api-client exec vitest run tests/falso.test.ts`
 Esperado: FAIL — `criarApiClientFalso is not exported`.
 
 - [ ] **Step 3: Implementar o dublê**
@@ -2350,12 +2350,16 @@ const SERVICOS_PADRAO: ServicoSerializado[] = [
 // assim — os tipos compartilhados pegam divergência de forma, não de
 // comportamento.
 export function criarApiClientFalso(semente: Partial<EstadoFalso> = {}) {
+  // Cópia de toda lista, tanto do padrão quanto da semente: o dublê faz
+  // `push` em `agendamentos` e em `servicos`, e sem a cópia dois testes
+  // do mesmo arquivo veriam o estado um do outro — o padrão é um só
+  // objeto de módulo, e a semente costuma ser reaproveitada.
   const estado: EstadoFalso = {
     perfil: semente.perfil ?? PERFIL_PADRAO,
-    servicos: semente.servicos ?? SERVICOS_PADRAO,
-    horariosLivres: semente.horariosLivres ?? ["09:00", "09:30", "10:00"],
-    diasComVaga: semente.diasComVaga ?? {},
-    agendamentos: semente.agendamentos ?? [],
+    servicos: [...(semente.servicos ?? SERVICOS_PADRAO)],
+    horariosLivres: [...(semente.horariosLivres ?? ["09:00", "09:30", "10:00"])],
+    diasComVaga: { ...(semente.diasComVaga ?? {}) },
+    agendamentos: [...(semente.agendamentos ?? [])],
     cliente: semente.cliente ?? CLIENTE_PADRAO,
   };
 
@@ -2654,10 +2658,13 @@ export type { EstadoFalso } from "./falso";
 - [ ] **Step 4: Rodar e ver passar**
 
 Rodar: `pnpm --filter @gr-barber/api-client test`
-Esperado: PASS — 35 testes.
+Esperado: PASS — o pacote inteiro, dublê incluído.
 
 Rodar: `pnpm --filter @gr-barber/api-client type-check`
-Esperado: sem erro. Se o TypeScript reclamar que o falso não é atribuível a `ApiClient`, ajuste a assinatura do falso — **não** afrouxe o tipo do client real.
+Esperado: sem erro. Duas correções previsíveis, e o que **não** fazer em cada uma:
+
+- Se o TypeScript reclamar que o falso não é atribuível a `ApiClient`, ajuste a assinatura do falso — nunca afrouxe o tipo do client real.
+- Se der erro de `this` em `desativarServico` (que chama `this.atualizarServico`) ou em `remarcar` (que chama `this.cancelar`), extraia os dois ajudantes como funções locais acima do objeto devolvido, ao lado do `novoAgendamento`. Não troque o tipo por `any` nem anote `this` à mão.
 
 - [ ] **Step 5: Commit**
 
@@ -2881,8 +2888,13 @@ Em `apps/web/package.json`, dentro de `scripts`:
 
 ```json
 "test": "vitest run",
-"lint": "next lint",
 ```
+
+**Sem script `lint`.** `next lint` foi removido no Next 16 — confirmado
+em `node_modules/next/dist/cli/`, que tem `next-build`, `next-dev`,
+`next-start` e nenhum `next-lint`. O `apps/api` também não tem `lint`, e
+o `turbo run lint` simplesmente pula pacote sem o script. Montar ESLint
+aqui é escopo próprio, não desta fase.
 
 Acrescentar `"@gr-barber/api-client": "workspace:*"` e `"@gr-barber/formato": "workspace:*"` em `dependencies`.
 
@@ -2899,7 +2911,7 @@ Rodar: `pnpm install`
 - [ ] **Step 5: Rodar**
 
 Rodar: `pnpm --filter @gr-barber/web test`
-Esperado: PASS — 1 teste.
+Esperado: PASS — o teste de fumaça.
 
 Rodar: `pnpm test` (na raiz)
 Esperado: PASS em `@gr-barber/api`, `@gr-barber/api-client`, `@gr-barber/formato`, `@gr-barber/scheduling`, `@gr-barber/web`; `@gr-barber/mobile` passa sem testes.
@@ -3257,7 +3269,7 @@ export function Chip({
 - [ ] **Step 4: Rodar e ver passar**
 
 Rodar: `pnpm --filter @gr-barber/web test`
-Esperado: PASS — 6 testes (3 do Botao, 3 do Campo) mais o de fumaça, que ainda existe.
+Esperado: PASS — os três do Botao e os três do Campo, mais o de fumaça, que ainda existe.
 
 - [ ] **Step 5: Montar os route groups, a vitrine e a saída da tela provisória**
 
@@ -3387,7 +3399,7 @@ Apagar `apps/web/app/page.tsx` e `apps/web/tests/fumaca.test.tsx`.
 - [ ] **Step 6: Verificar rodando**
 
 Rodar: `pnpm --filter @gr-barber/web test`
-Esperado: PASS — 6 testes.
+Esperado: PASS — Botao e Campo; o de fumaça saiu.
 
 Rodar: `pnpm --filter @gr-barber/web build`
 Esperado: build sem erro, com as rotas `/primitivos` listadas.
@@ -3603,7 +3615,7 @@ NEXT_PUBLIC_API_URL=http://localhost:3333
 - [ ] **Step 4: Rodar e ver passar**
 
 Rodar: `pnpm --filter @gr-barber/web test`
-Esperado: PASS — 11 testes.
+Esperado: PASS — componentes e sessão.
 
 - [ ] **Step 5: Rodar tudo e fechar a fase**
 
