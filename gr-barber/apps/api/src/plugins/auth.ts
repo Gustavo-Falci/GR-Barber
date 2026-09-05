@@ -19,6 +19,14 @@ export interface PayloadCliente {
   barbeariaId: string;
 }
 
+declare module "fastify" {
+  interface FastifyRequest {
+    // Preenchido só pelo autenticarCliente. Opcional porque o tipo vale
+    // pra toda requisição da aplicação, inclusive as do barbeiro.
+    cliente?: PayloadCliente;
+  }
+}
+
 declare module "@fastify/jwt" {
   interface FastifyJWT {
     // O que se assina pode ser qualquer uma das duas...
@@ -74,4 +82,42 @@ export async function autenticar(request: FastifyRequest): Promise<void> {
       statusCode: 401,
     });
   }
+}
+
+// Hook onRequest do escopo do cliente. Espelho do `autenticar`: recusa
+// o tipo que não é o seu antes de tocar no banco, e consulta o cadastro
+// pra que apagar um cliente invalide o token na hora, não em sete dias.
+export async function autenticarCliente(request: FastifyRequest): Promise<void> {
+  const payload = await request.jwtVerify<PayloadBarbeiro | PayloadCliente>();
+
+  if (payload.tipo !== "cliente") {
+    throw Object.assign(new Error("token não é de cliente"), {
+      statusCode: 401,
+    });
+  }
+
+  const cliente = await prisma.cliente.findUnique({
+    where: { id: payload.clienteId },
+    select: { id: true },
+  });
+
+  if (!cliente) {
+    throw Object.assign(new Error("cliente inexistente"), { statusCode: 401 });
+  }
+
+  request.cliente = payload;
+}
+
+// Lê o cliente que o hook decorou. `request.cliente` é opcional na
+// declaração — a alternativa seria um `!` em cada uma das seis rotas do
+// escopo, e isso dependeria de ninguém esquecer. Aqui o esquecimento
+// vira 401, não `undefined` vazando pro Prisma.
+export function clienteDoToken(request: FastifyRequest): PayloadCliente {
+  if (!request.cliente) {
+    throw Object.assign(new Error("rota de cliente fora do escopo autenticado"), {
+      statusCode: 401,
+    });
+  }
+
+  return request.cliente;
 }

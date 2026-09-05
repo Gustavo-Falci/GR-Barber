@@ -53,4 +53,21 @@ describe("tipo do token", () => {
 
     expect(resposta.statusCode).toBe(401);
   });
+
+  it("recusa um token de barbeiro numa rota de cliente", async () => {
+    const app = buildApp();
+    const { token } = await criarBarbeariaComToken(app);
+
+    const resposta = await app.inject({
+      method: "GET",
+      url: "/clientes/me",
+      headers: auth(token),
+    });
+
+    // É este caso, mais o inverso lá em cima, que sustenta a escolha de
+    // um segredo de JWT só: sem os dois, a separação entre as duas
+    // identidades seria confiança, não prova.
+    expect(resposta.statusCode).toBe(401);
+    expect(resposta.json()).toEqual({ erro: "nao_autenticado" });
+  });
 });

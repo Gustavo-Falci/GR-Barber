@@ -3,7 +3,7 @@ import Fastify from "fastify";
 import type { JsonSchemaToTsProvider } from "@fastify/type-provider-json-schema-to-ts";
 import { prisma } from "@gr-barber/database";
 import { registrarTratamentoDeErros } from "./plugins/erros";
-import { autenticar, registrarAuth } from "./plugins/auth";
+import { autenticar, autenticarCliente, registrarAuth } from "./plugins/auth";
 import { registrarRotasAuth } from "./rotas/auth";
 import { registrarRotasAuthCliente } from "./rotas/auth-cliente";
 import {
@@ -11,6 +11,7 @@ import {
   registrarRotasAgendamentosPublicas,
 } from "./rotas/agendamentos";
 import { registrarRotasClientes } from "./rotas/clientes";
+import { registrarRotasClientesMe } from "./rotas/clientes-me";
 import { registrarRotasDisponibilidade } from "./rotas/disponibilidade";
 import {
   registrarRotasBarbeariasProtegidas,
@@ -71,6 +72,14 @@ export function buildApp(opts: { logger?: boolean } = {}): App {
     registrarRotasServicos(protegidas);
     registrarRotasClientes(protegidas);
     registrarRotasAgendamentos(protegidas);
+  });
+
+  // Escopo do cliente, irmão do de cima e pelo mesmo motivo: o hook vale
+  // pra tudo que for registrado aqui dentro. São identidades diferentes,
+  // então são escopos diferentes — o hook de um recusa o token do outro.
+  app.register(async (doCliente: App) => {
+    doCliente.addHook("onRequest", autenticarCliente);
+    registrarRotasClientesMe(doCliente);
   });
 
   app.get("/health", async () => ({ status: "ok" }));
