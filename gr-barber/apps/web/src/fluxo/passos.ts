@@ -5,6 +5,10 @@ export interface Escolhas {
   // Quando presente, o fluxo está remarcando um agendamento existente
   // em vez de criar um novo.
   remarcar?: string;
+  // Recado que atravessa uma navegação: a tela de destino monta do
+  // zero, e estado local (useState) não sobrevive a isso. Vai na URL
+  // pelo mesmo motivo que as outras escolhas do fluxo vão.
+  aviso?: string;
 }
 
 export type Passo = "servicos" | "data" | "horario" | "dados" | "confirmar";
@@ -28,6 +32,7 @@ export function lerEscolhas(query: URLSearchParams): Escolhas {
     data: query.get("data") ?? undefined,
     hora: query.get("hora") ?? undefined,
     remarcar: query.get("remarcar") ?? undefined,
+    aviso: query.get("aviso") ?? undefined,
   };
 }
 
@@ -39,6 +44,10 @@ export function montarQuery(escolhas: Escolhas): string {
   if (escolhas.data) params.set("data", escolhas.data);
   if (escolhas.hora) params.set("hora", escolhas.hora);
   if (escolhas.remarcar) params.set("remarcar", escolhas.remarcar);
+  // Por último e de propósito: as asserções de query existentes fixam
+  // a ordem dos campos anteriores, e um campo novo no meio deslocaria
+  // todas elas.
+  if (escolhas.aviso) params.set("aviso", escolhas.aviso);
 
   const texto = params.toString();
   return texto ? `?${texto}` : "";

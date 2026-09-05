@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useApi } from "../api/ProvedorDaApi";
 import { useRequisicao } from "../api/useRequisicao";
+import { Aviso } from "../componentes/Aviso";
 import { ListaDeHorarios } from "../componentes/ListaDeHorarios";
 import { Resumo } from "../componentes/Resumo";
 import { caminhoDoPasso } from "../fluxo/passos";
@@ -13,7 +14,7 @@ import estilos from "./EscolhaDoHorario.module.css";
 // `agora` é prop com padrão, igual ao da tela de data: o instante entra
 // por parâmetro em vez de vir de um relógio congelado.
 export function EscolhaDoHorario({ agora = new Date() }: { agora?: Date }) {
-  const { slug, servicoIds, data, remarcar, pronto } =
+  const { slug, servicoIds, data, remarcar, aviso, pronto } =
     usePassoDoFluxo("horario");
   const router = useRouter();
   const api = useApi();
@@ -55,6 +56,12 @@ export function EscolhaDoHorario({ agora = new Date() }: { agora?: Date }) {
     <main className={estilos.pagina}>
       <h1>Escolha o horário</h1>
       <Resumo itens={[formatarDataLonga(data)]} />
+
+      {/* Recado que veio pela URL da tela anterior: ela montou do
+          zero, e o estado local de lá não atravessa a navegação. */}
+      {aviso === "horario_ocupado" ? (
+        <Aviso>Esse horário acabou de ser ocupado. Escolha outro.</Aviso>
+      ) : null}
 
       {horarios.length === 0 ? (
         <p>Nenhum horário disponível nesse dia. Escolha outra data.</p>

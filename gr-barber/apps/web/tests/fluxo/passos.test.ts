@@ -35,6 +35,24 @@ describe("escolhas na query", () => {
     expect(montarQuery(escolhas)).toBe("?remarcar=a1");
   });
 
+  it("o aviso sobrevive à ida e volta entre lerEscolhas e montarQuery", () => {
+    // O aviso é como a confirmação avisa a tela de horário sem estado
+    // local: precisa ir e voltar intacto, e por último na query pra não
+    // deslocar os campos que os outros testes já fixam.
+    const escolhas = lerEscolhas(
+      new URLSearchParams({ servicos: "s1", data: "2026-09-09", aviso: "horario_ocupado" })
+    );
+    expect(escolhas.aviso).toBe("horario_ocupado");
+    expect(montarQuery(escolhas)).toBe(
+      "?servicos=s1&data=2026-09-09&aviso=horario_ocupado"
+    );
+  });
+
+  it("não inclui aviso quando ele não existe", () => {
+    expect(lerEscolhas(new URLSearchParams()).aviso).toBeUndefined();
+    expect(montarQuery({ servicoIds: [] })).toBe("");
+  });
+
   it("monta o caminho de cada passo com o que já foi escolhido", () => {
     const escolhas = { servicoIds: ["s1"], data: "2026-09-09" };
     expect(caminhoDoPasso("gr-barber", "horario", escolhas)).toBe(

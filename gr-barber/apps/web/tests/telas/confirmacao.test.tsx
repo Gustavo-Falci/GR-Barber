@@ -66,11 +66,12 @@ describe("confirmação", () => {
     await userEvent.click(screen.getByRole("button", { name: /confirmar/i }));
 
     await waitFor(() =>
+      // O aviso vai na URL, não em estado local: a tela de horário
+      // monta do zero, e o `setAviso` desta tela morreria com ela.
       expect(navegacaoFalsa.push).toHaveBeenCalledWith(
-        "/gr-barber/agendar/horario?servicos=s1%2Cs2&data=2026-09-10"
+        "/gr-barber/agendar/horario?servicos=s1%2Cs2&data=2026-09-10&aviso=horario_ocupado"
       )
     );
-    expect(screen.getByText(/esse horário acabou de ser ocupado/i)).toBeInTheDocument();
   });
 
   it("volta pro passo de dados quando não há nome e telefone guardados", async () => {
@@ -82,6 +83,10 @@ describe("confirmação", () => {
         "/gr-barber/agendar/dados?servicos=s1%2Cs2&data=2026-09-10&hora=09%3A00"
       )
     );
+    // Uma vez só: o array de dependências do efeito usa primitivos
+    // (join da lista, não a lista), senão um array novo a cada render
+    // repetiria o replace indefinidamente.
+    expect(navegacaoFalsa.replace).toHaveBeenCalledTimes(1);
     // Sem asserção não-nula: o botão simplesmente não existe enquanto
     // faltam os dados, em vez de existir e confiar num `!` pra chamar a
     // API sem cliente.

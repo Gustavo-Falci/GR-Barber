@@ -110,9 +110,17 @@ export function Confirmacao() {
       // O único erro que uma tela correta ainda encontra: a corrida que
       // a trava do banco pega depois de a disponibilidade ter dito que
       // cabia. Reenviar daria o mesmo 409 — o certo é ver a lista nova.
+      // O aviso vai na URL, não em `setAviso`: a tela de horário monta
+      // do zero, e o estado local desta tela morre com ela.
       if (erro.codigo === "horario_ocupado") {
-        setAviso("Esse horário acabou de ser ocupado. Escolha outro.");
-        router.push(caminhoDoPasso(slug, "horario", { servicoIds, data, remarcar }));
+        router.push(
+          caminhoDoPasso(slug, "horario", {
+            servicoIds,
+            data,
+            remarcar,
+            aviso: "horario_ocupado",
+          })
+        );
         return;
       }
 

@@ -87,6 +87,31 @@ describe("escolha do horário", () => {
     );
   });
 
+  it("mostra o aviso de horário ocupado quando ele vem na URL", async () => {
+    // A tela de confirmação manda este recado pela query porque ela
+    // mesma morre na navegação — estado local não sobreviveria.
+    navegacaoFalsa.redefinir({
+      query: { servicos: "s1", data: "2026-09-10", aviso: "horario_ocupado" },
+    });
+    montar(["09:00"]);
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(/esse horário acabou de ser ocupado/i)
+      ).toBeInTheDocument()
+    );
+  });
+
+  it("não mostra aviso nenhum quando a URL não traz um", async () => {
+    navegacaoFalsa.redefinir({ query: { servicos: "s1", data: "2026-09-10" } });
+    montar(["09:00"]);
+
+    await waitFor(() => screen.getByRole("button", { name: "09:00" }));
+    expect(
+      screen.queryByText(/esse horário acabou de ser ocupado/i)
+    ).not.toBeInTheDocument();
+  });
+
   it("avisa quando não consegue carregar os horários, em vez de dizer que a agenda está cheia", async () => {
     // Slug diferente do da barbearia semeada: o dublê responde 404,
     // igual à API real com um slug que sumiu.
