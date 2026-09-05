@@ -33,7 +33,11 @@ export function usePassoDoFluxo(
     // `replace` e não `push`: o passo incompleto não merece uma entrada
     // no histórico, senão voltar cairia nele de novo.
     router.replace(caminhoDoPasso(slug, regra.volta, escolhas));
-  }, [falta, slug, regra.volta, router, escolhas]);
+    // O array de dependências usa primitivos, não o objeto derivado:
+    // `escolhas` é um novo objeto a cada render, logo [... escolhas]
+    // dispararia o efeito sempre. Depender de seus campos individuais
+    // garante que só muda quando a query muda de verdade.
+  }, [falta, slug, regra.volta, router, escolhas.servicoIds.join(","), escolhas.data, escolhas.hora, escolhas.remarcar]);
 
   return { ...escolhas, slug, pronto: !falta };
 }
