@@ -37,7 +37,7 @@ describe("GET /barbearias/:slug", () => {
     const corpo = resposta.json();
     expect(corpo.nome).toBe("Barbearia um");
     expect(corpo.slug).toBe("barbearia-um");
-    expect(corpo.telefone).toBe("1133334444");
+    expect(corpo.telefone).toBe("(11) 3333-4444");
     expect(corpo.endereco).toBe("Rua das Tesouras, 100");
     expect(corpo.horarios).toHaveLength(7);
     expect(corpo.horarios[1]).toEqual({

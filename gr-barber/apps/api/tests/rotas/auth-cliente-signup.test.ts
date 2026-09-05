@@ -20,7 +20,7 @@ describe("POST /barbearias/:slug/auth/cliente/signup", () => {
     expect(resposta.statusCode).toBe(201);
     expect(resposta.json().cliente).toMatchObject({
       nome: "João da Silva",
-      telefone: "11999998888",
+      telefone: "(11) 99999-8888",
       temConta: true,
     });
 
@@ -36,7 +36,10 @@ describe("POST /barbearias/:slug/auth/cliente/signup", () => {
     // É o cadastro que o upsert do agendamento público cria: sem senha,
     // e com o nome que o barbeiro registrou.
     const existente = await prisma.cliente.create({
-      data: { barbeariaId, nome: "João Silva", telefone: "11999998888" },
+      // No formato que o upsert do agendamento público grava hoje — se
+      // a semente usasse o número cru, o signup normalizaria, não
+      // acharia esta linha, e criaria um segundo cadastro.
+      data: { barbeariaId, nome: "João Silva", telefone: "(11) 99999-8888" },
     });
 
     const resposta = await app.inject({
@@ -51,6 +54,46 @@ describe("POST /barbearias/:slug/auth/cliente/signup", () => {
     // upsert público, pra quem digita abreviado no celular não renomear
     // o cadastro que o barbeiro ajustou.
     expect(resposta.json().cliente.nome).toBe("João Silva");
+  });
+
+  it("acha o cadastro do mesmo número escrito de outro jeito", async () => {
+    const app = buildApp();
+    const { slug, barbeariaId } = await criarBarbeariaComToken(app);
+
+    const existente = await prisma.cliente.create({
+      data: { barbeariaId, nome: "João Silva", telefone: "(11) 99999-8888" },
+    });
+
+    // Signup digitando o número sem pontuação. Era exatamente aqui que
+    // a dívida morava: sem normalizar, isto criava um SEGUNDO cadastro
+    // da mesma pessoa, e o "só define senha quem ainda não tem" deixava
+    // de proteger coisa nenhuma — bastava reformatar pra ganhar outro.
+    const resposta = await app.inject({
+      method: "POST",
+      url: `/barbearias/${slug}/auth/cliente/signup`,
+      payload: { nome: "João", telefone: "11999998888", senha: SENHA },
+    });
+
+    expect(resposta.statusCode).toBe(201);
+    expect(resposta.json().cliente.id).toBe(existente.id);
+    expect(await prisma.cliente.count({ where: { barbeariaId } })).toBe(1);
+
+    await app.close();
+  });
+
+  it("recusa telefone sem DDD com 400", async () => {
+    const app = buildApp();
+    const { slug } = await criarBarbeariaComToken(app);
+
+    const resposta = await app.inject({
+      method: "POST",
+      url: `/barbearias/${slug}/auth/cliente/signup`,
+      payload: { nome: "João da Silva", telefone: "99999-8888", senha: SENHA },
+    });
+
+    expect(resposta.statusCode).toBe(400);
+
+    await app.close();
   });
 
   it("recusa quando o cadastro já tem senha", async () => {

@@ -1,4 +1,5 @@
 import { prisma } from "@gr-barber/database";
+import { normalizarTelefone } from "../lib/telefone";
 import { PADRAO_TELEFONE } from "../lib/padroes";
 import { serializarBarbearia } from "../lib/serializar";
 import { completarSemana } from "./horarios";
@@ -39,9 +40,19 @@ export function registrarRotasBarbeariasProtegidas(app: App): void {
     async (request) => {
       // O id sai do token. Não existe rota `/barbearias/:id` de escrita:
       // sem id na URL não há o que escopar errado.
+      // `telefone` sai do corpo pra ser normalizado; o resto vai
+      // direto, porque o additionalProperties: false já garantiu que só
+      // há campo editável ali.
+      const { telefone, ...resto } = request.body;
+
       const barbearia = await prisma.barbearia.update({
         where: { id: request.user.barbeariaId },
-        data: request.body,
+        data: {
+          ...resto,
+          ...(telefone !== undefined
+            ? { telefone: normalizarTelefone(telefone) }
+            : {}),
+        },
       });
 
       return serializarBarbearia(barbearia);

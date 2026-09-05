@@ -25,7 +25,7 @@ describe("PATCH /barbearias/me", () => {
       id: um.barbeariaId,
       nome: "Barbearia do Gu",
       slug: "barbearia-um",
-      telefone: "1133334444",
+      telefone: "(11) 3333-4444",
       endereco: "Rua das Tesouras, 100",
       logoUrl: "https://exemplo.com/logo.png",
     });

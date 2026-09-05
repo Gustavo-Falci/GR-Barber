@@ -32,6 +32,44 @@ describe("POST /barbearias/:slug/auth/cliente/login", () => {
     expect(decodificarPayload(resposta.json().token).tipo).toBe("cliente");
   });
 
+  it("entra com o telefone escrito de outro jeito", async () => {
+    const app = buildApp();
+    const { slug } = await criarBarbeariaComToken(app);
+    // Cadastro feito com "11999998888"...
+    await criarConta(app, slug);
+
+    // ...e login digitando o mesmo número em três formatos diferentes.
+    // Sem normalizar dos dois lados, nenhum deles acharia a conta.
+    for (const forma of ["(11) 99999-8888", "+55 11 99999-8888", "11 99999 8888"]) {
+      const resposta = await app.inject({
+        method: "POST",
+        url: `/barbearias/${slug}/auth/cliente/login`,
+        payload: { telefone: forma, senha: SENHA },
+      });
+
+      expect(resposta.statusCode).toBe(200);
+    }
+
+    await app.close();
+  });
+
+  it("recusa telefone sem DDD com 400, antes de tocar no banco", async () => {
+    const app = buildApp();
+    const { slug } = await criarBarbeariaComToken(app);
+
+    const resposta = await app.inject({
+      method: "POST",
+      url: `/barbearias/${slug}/auth/cliente/login`,
+      payload: { telefone: "99999-8888", senha: SENHA },
+    });
+
+    // 400 e não 401: número sem DDD não é credencial errada, é pedido
+    // malformado — não existe formato único que ele possa virar.
+    expect(resposta.statusCode).toBe(400);
+
+    await app.close();
+  });
+
   it("responde igual para senha errada e para telefone inexistente", async () => {
     const app = buildApp();
     const { slug } = await criarBarbeariaComToken(app);

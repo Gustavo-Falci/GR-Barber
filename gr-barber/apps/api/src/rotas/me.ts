@@ -1,4 +1,5 @@
 import { prisma } from "@gr-barber/database";
+import { normalizarTelefone } from "../lib/telefone";
 import { PADRAO_TELEFONE } from "../lib/padroes";
 import type { App } from "../tipos";
 
@@ -58,9 +59,19 @@ export function registrarRotasMe(app: App): void {
     // `request.body` já passou pelo schema com additionalProperties:
     // false, então só carrega os campos editáveis — repassá-lo direto
     // pro `data` não abre caminho pra campo inesperado.
+    // `telefone` sai do corpo pra ser normalizado; o resto vai direto,
+    // porque o additionalProperties: false já garantiu que só há campo
+    // editável ali.
+    const { telefone, ...resto } = request.body;
+
     const barbeiro = await prisma.barbeiro.update({
       where: { id: request.user.barbeiroId },
-      data: request.body,
+      data: {
+        ...resto,
+        ...(telefone !== undefined
+          ? { telefone: normalizarTelefone(telefone) }
+          : {}),
+      },
     });
 
     return respostaBarbeiro(barbeiro);

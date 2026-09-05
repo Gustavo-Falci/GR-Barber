@@ -180,7 +180,7 @@ describe("PATCH /clientes/:id", () => {
     expect(resposta.statusCode).toBe(200);
     expect(resposta.json()).toMatchObject({
       nome: "João Silva",
-      telefone: "11977776666",
+      telefone: "(11) 97777-6666",
       email: "joao@exemplo.com",
     });
 

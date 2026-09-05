@@ -7,6 +7,7 @@ import {
   obterHashDescartavel,
 } from "../lib/senha";
 import { serializarCliente } from "../lib/serializar";
+import { normalizarTelefoneObrigatorio } from "../lib/telefone";
 import type { App } from "../tipos";
 
 const paramsSlug = {
@@ -44,7 +45,10 @@ export function registrarRotasAuthCliente(app: App): void {
     "/barbearias/:slug/auth/cliente/signup",
     { schema: { params: paramsSlug, body: corpoSignup } },
     async (request, reply) => {
-      const { nome, telefone, senha } = request.body;
+      const { nome, senha } = request.body;
+      // Normalizado antes da busca E da gravação: é o mesmo valor dos
+      // dois lados que faz o cadastro ser encontrado depois.
+      const telefone = normalizarTelefoneObrigatorio(request.body.telefone);
 
       // findUniqueOrThrow: slug inexistente vira P2025 -> 404.
       const barbearia = await prisma.barbearia.findUniqueOrThrow({
@@ -96,7 +100,10 @@ export function registrarRotasAuthCliente(app: App): void {
     "/barbearias/:slug/auth/cliente/login",
     { schema: { params: paramsSlug, body: corpoLogin } },
     async (request, reply) => {
-      const { telefone, senha } = request.body;
+      const { senha } = request.body;
+      // Mesma normalização da gravação. Sem ela, quem se cadastrou por
+      // um formato não entraria digitando outro.
+      const telefone = normalizarTelefoneObrigatorio(request.body.telefone);
 
       const barbearia = await prisma.barbearia.findUniqueOrThrow({
         where: { slug: request.params.slug },

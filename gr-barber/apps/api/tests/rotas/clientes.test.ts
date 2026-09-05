@@ -19,7 +19,9 @@ describe("POST /clientes", () => {
     expect(resposta.statusCode).toBe(201);
     expect(resposta.json()).toMatchObject({
       nome: "João da Silva",
-      telefone: "11999998888",
+      // Guardado no formato único do cadastro, não como veio no corpo:
+      // é o que faz a chave [barbearia, telefone] identificar a pessoa.
+      telefone: "(11) 99999-8888",
       email: null,
       // Cliente cadastrado pelo barbeiro não tem conta: o fluxo público
       // não pede senha, e o app com login é passo posterior.
@@ -206,6 +208,62 @@ describe("GET /clientes", () => {
     expect(
       resposta.json().clientes.map((c: { nome: string }) => c.nome)
     ).toEqual(["Ana", "Zeca"]);
+
+    await app.close();
+  });
+
+  it("acha pelo telefone digitado de qualquer jeito", async () => {
+    const app = buildApp();
+    const um = await criarBarbeariaComToken(app, "um");
+
+    // Guardado como "(11) 99999-8888" pela normalização.
+    await app.inject({
+      method: "POST",
+      url: "/clientes",
+      headers: auth(um.token),
+      payload: JOAO,
+    });
+
+    // O barbeiro digita o pedaço que lembra. Com a coluna pontuada, um
+    // `contains` cru só acharia a forma exata — a busca compara dígito
+    // com dígito dos dois lados justamente por isso.
+    for (const busca of ["999998888", "11999998888", "(11) 99999-8888", "99999-8888"]) {
+      const resposta = await app.inject({
+        method: "GET",
+        url: `/clientes?busca=${encodeURIComponent(busca)}`,
+        headers: auth(um.token),
+      });
+
+      expect(resposta.statusCode).toBe(200);
+      expect(resposta.json().clientes).toHaveLength(1);
+      expect(resposta.json().clientes[0].telefone).toBe("(11) 99999-8888");
+    }
+
+    await app.close();
+  });
+
+  it("não deixa a busca por telefone atravessar barbearias", async () => {
+    const app = buildApp();
+    const um = await criarBarbeariaComToken(app, "um");
+    const outra = await criarBarbeariaComToken(app, "outra");
+
+    await app.inject({
+      method: "POST",
+      url: "/clientes",
+      headers: auth(outra.token),
+      payload: JOAO,
+    });
+
+    // A consulta do telefone é SQL escrito à mão; o filtro por
+    // barbearia precisa estar lá dentro, senão a lista de clientes de
+    // uma barbearia vazaria pela busca da outra.
+    const resposta = await app.inject({
+      method: "GET",
+      url: "/clientes?busca=999998888",
+      headers: auth(um.token),
+    });
+
+    expect(resposta.json().clientes).toEqual([]);
 
     await app.close();
   });
