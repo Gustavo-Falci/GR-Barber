@@ -2400,6 +2400,11 @@ export function criarApiClientFalso(semente: Partial<EstadoFalso> = {}) {
     // A trava do banco não deixa dois ativos no mesmo horário; o dublê
     // reproduz isso porque a tela precisa saber tratar horario_ocupado
     // mesmo tendo acabado de ver o horário como livre.
+    //
+    // Sem o barbeiroId na comparação: a trava real é por barbeiro, e
+    // esta é por data e hora. Com um barbeiro por barbearia, que é o
+    // MVP, dá no mesmo; com dois, o dublê recusa o que a API aceitaria.
+    // Registrado nas dívidas da spec.
     const conflito = estado.agendamentos.some(
       (a) =>
         a.data === entrada.data &&

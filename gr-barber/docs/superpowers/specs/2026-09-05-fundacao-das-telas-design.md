@@ -301,7 +301,13 @@ candidato ao passo de infra, junto com o CI.
   `httpOnly` e proxy no Next, ou com um domínio próprio e cookie de
   sessão — decisão que casa com o passo 5.
 - **O client falso pode divergir da API real** sem que nenhum teste
-  perceba, enquanto não existir teste de contrato.
+  perceba, enquanto não existir teste de contrato. Uma divergência já
+  nasce conhecida: o `agendar` do dublê considera horário ocupado
+  olhando só data e hora, sem o `barbeiroId`. Com um barbeiro por
+  barbearia, que é o MVP, os dois concordam; num cenário semeado com
+  dois barbeiros o dublê responderia `horario_ocupado` onde a API real
+  aceitaria. Fica anotado porque é o dublê, e não a API, que as telas
+  enxergam ao serem escritas.
 
 ## Critérios de conclusão
 
