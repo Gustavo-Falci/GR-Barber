@@ -33,7 +33,12 @@ O que falta pro GR Barber sair do papel, mais ou menos em ordem:
    um agendamento. Ainda não arquitetado.
 5. **Infra na Oracle OCI** — provisionar a VM, subir o Postgres,
    configurar variáveis de ambiente, deploy do backend e do painel.
-6. **Comprar o domínio** `barchop.com.br` e apontar o DNS.
+6. **Domínio `barchop.com.br` — comprado.** Falta apontar o DNS, e isso
+   depende do passo 5: sem a VM da OCI de pé não existe endereço pra
+   onde apontar. Quando chegar a hora, decidir também se o painel do
+   barbeiro e o link público do cliente ficam no mesmo host ou em
+   subdomínios separados — o fluxo do cliente é um link que vai por
+   WhatsApp, então o endereço que ele mostra importa.
 7. **Piloto com o barbeiro real** que validou o problema original,
    antes de pensar em abrir pra outras barbearias.
 
