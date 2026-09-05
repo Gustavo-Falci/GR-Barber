@@ -1,4 +1,5 @@
 import { criarApiBarbeiro } from "./barbeiro";
+import { criarApiCliente } from "./cliente";
 import { criarApiPublica } from "./publico";
 import { criarRequisicao, type OpcoesDoClient } from "./requisicao";
 
@@ -22,6 +23,11 @@ export type {
   NovoServico,
 } from "./barbeiro";
 export type {
+  EdicaoDoMeuCadastro,
+  FiltroDoHistorico,
+  Remarcacao,
+} from "./cliente";
+export type {
   CredenciaisDoCliente,
   FiltroDoDia,
   FiltroDoMes,
@@ -34,6 +40,7 @@ export function criarApiClient(opcoes: OpcoesDoClient) {
   return {
     publico: criarApiPublica(requisicao),
     barbeiro: criarApiBarbeiro(requisicao),
+    cliente: criarApiCliente(requisicao),
   };
 }
 

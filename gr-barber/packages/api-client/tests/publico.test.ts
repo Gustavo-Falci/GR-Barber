@@ -17,7 +17,7 @@ function clientComFetch(fetchFalso: ReturnType<typeof vi.fn>) {
 
 describe("api pública", () => {
   it("busca o perfil da barbearia pelo slug", async () => {
-    const fetchFalso = vi.fn(async () =>
+    const fetchFalso = vi.fn(async (_url: string, _init?: RequestInit) =>
       respostaJson({
         id: "b1",
         nome: "GR Barber",
@@ -44,7 +44,7 @@ describe("api pública", () => {
   });
 
   it("lista os serviços ativos da barbearia", async () => {
-    const fetchFalso = vi.fn(async () =>
+    const fetchFalso = vi.fn(async (_url: string, _init?: RequestInit) =>
       respostaJson({
         servicos: [
           {
@@ -69,7 +69,7 @@ describe("api pública", () => {
   });
 
   it("pede os horários livres de um dia com os serviços escolhidos", async () => {
-    const fetchFalso = vi.fn(async () =>
+    const fetchFalso = vi.fn(async (_url: string, _init?: RequestInit) =>
       respostaJson({ horarios: ["09:00", "09:15"] })
     );
 
@@ -88,7 +88,7 @@ describe("api pública", () => {
   });
 
   it("pede o mapa do mês pro calendário", async () => {
-    const fetchFalso = vi.fn(async () =>
+    const fetchFalso = vi.fn(async (_url: string, _init?: RequestInit) =>
       respostaJson({ dias: { "2026-09-10": true, "2026-09-11": false } })
     );
 
@@ -104,7 +104,7 @@ describe("api pública", () => {
   });
 
   it("agenda pelo link público mandando nome e telefone", async () => {
-    const fetchFalso = vi.fn(async () =>
+    const fetchFalso = vi.fn(async (_url: string, _init?: RequestInit) =>
       respostaJson(
         {
           id: "a1",
@@ -140,7 +140,7 @@ describe("api pública", () => {
   });
 
   it("entra na conta do cliente daquela barbearia", async () => {
-    const fetchFalso = vi.fn(async () =>
+    const fetchFalso = vi.fn(async (_url: string, _init?: RequestInit) =>
       respostaJson({
         token: "jwt-cliente",
         cliente: {
@@ -165,7 +165,7 @@ describe("api pública", () => {
   });
 
   it("cria a conta do cliente naquela barbearia", async () => {
-    const fetchFalso = vi.fn(async () =>
+    const fetchFalso = vi.fn(async (_url: string, _init?: RequestInit) =>
       respostaJson(
         {
           token: "jwt-novo",

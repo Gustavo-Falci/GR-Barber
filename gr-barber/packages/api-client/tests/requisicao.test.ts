@@ -10,7 +10,7 @@ function respostaJson(corpo: unknown, status = 200): Response {
 
 describe("criarRequisicao", () => {
   it("monta a URL a partir da baseUrl e devolve o JSON", async () => {
-    const fetchFalso = vi.fn(async () => respostaJson({ status: "ok" }));
+    const fetchFalso = vi.fn(async (_url: string, _init?: RequestInit) => respostaJson({ status: "ok" }));
     const requisicao = criarRequisicao({
       baseUrl: "https://api.exemplo.br",
       fetch: fetchFalso as unknown as typeof globalThis.fetch,
@@ -24,7 +24,7 @@ describe("criarRequisicao", () => {
 
   it("repete o mesmo parâmetro de query pra cada item de um array", async () => {
     // A API lê servicoIds como array e conta com ?servicoIds=a&servicoIds=b.
-    const fetchFalso = vi.fn(async () => respostaJson({ horarios: [] }));
+    const fetchFalso = vi.fn(async (_url: string, _init?: RequestInit) => respostaJson({ horarios: [] }));
     const requisicao = criarRequisicao({
       baseUrl: "https://api.exemplo.br",
       fetch: fetchFalso as unknown as typeof globalThis.fetch,
@@ -40,7 +40,7 @@ describe("criarRequisicao", () => {
   });
 
   it("omite parâmetro undefined em vez de mandar a string 'undefined'", async () => {
-    const fetchFalso = vi.fn(async () => respostaJson({ agendamentos: [] }));
+    const fetchFalso = vi.fn(async (_url: string, _init?: RequestInit) => respostaJson({ agendamentos: [] }));
     const requisicao = criarRequisicao({
       baseUrl: "https://api.exemplo.br",
       fetch: fetchFalso as unknown as typeof globalThis.fetch,
@@ -56,7 +56,7 @@ describe("criarRequisicao", () => {
   });
 
   it("manda o token no Authorization quando a rota pede", async () => {
-    const fetchFalso = vi.fn(async () => respostaJson({}));
+    const fetchFalso = vi.fn(async (_url: string, _init?: RequestInit) => respostaJson({}));
     const requisicao = criarRequisicao({
       baseUrl: "https://api.exemplo.br",
       obterToken: () => "jwt-do-barbeiro",
@@ -72,7 +72,7 @@ describe("criarRequisicao", () => {
   });
 
   it("não manda Authorization nas rotas públicas", async () => {
-    const fetchFalso = vi.fn(async () => respostaJson({}));
+    const fetchFalso = vi.fn(async (_url: string, _init?: RequestInit) => respostaJson({}));
     const requisicao = criarRequisicao({
       baseUrl: "https://api.exemplo.br",
       obterToken: () => "jwt-que-nao-deve-vazar",
@@ -88,7 +88,7 @@ describe("criarRequisicao", () => {
   });
 
   it("serializa o corpo como JSON e marca o método", async () => {
-    const fetchFalso = vi.fn(async () => respostaJson({}, 201));
+    const fetchFalso = vi.fn(async (_url: string, _init?: RequestInit) => respostaJson({}, 201));
     const requisicao = criarRequisicao({
       baseUrl: "https://api.exemplo.br",
       fetch: fetchFalso as unknown as typeof globalThis.fetch,
@@ -109,7 +109,7 @@ describe("criarRequisicao", () => {
   });
 
   it("traduz o corpo de erro da API em ErroDaApi", async () => {
-    const fetchFalso = vi.fn(async () =>
+    const fetchFalso = vi.fn(async (_url: string, _init?: RequestInit) =>
       respostaJson(
         { erro: "horario_ocupado", mensagem: "esse horário já está ocupado" },
         409
@@ -140,7 +140,7 @@ describe("criarRequisicao", () => {
     // requisição, então 401 no meio da sessão é evento normal — a tela
     // precisa ser avisada pra limpar o token, não só ver a exceção.
     const aoExpirarSessao = vi.fn();
-    const fetchFalso = vi.fn(async () =>
+    const fetchFalso = vi.fn(async (_url: string, _init?: RequestInit) =>
       respostaJson({ erro: "nao_autenticado" }, 401)
     );
     const requisicao = criarRequisicao({
@@ -178,7 +178,7 @@ describe("criarRequisicao", () => {
   });
 
   it("aceita 204 sem corpo", async () => {
-    const fetchFalso = vi.fn(async () => new Response(null, { status: 204 }));
+    const fetchFalso = vi.fn(async (_url: string, _init?: RequestInit) => new Response(null, { status: 204 }));
     const requisicao = criarRequisicao({
       baseUrl: "https://api.exemplo.br",
       fetch: fetchFalso as unknown as typeof globalThis.fetch,
