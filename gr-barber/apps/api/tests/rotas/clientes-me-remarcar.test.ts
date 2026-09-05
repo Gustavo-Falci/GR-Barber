@@ -41,12 +41,20 @@ async function abrirTodoDia(app: App, token: string) {
   }
 }
 
-async function criarServico(app: App, token: string) {
+async function criarServico(
+  app: App,
+  token: string,
+  opcoes: { nome?: string; duracaoMinutos?: number; preco?: string } = {}
+) {
   const resposta = await app.inject({
     method: "POST",
     url: "/servicos",
     headers: auth(token),
-    payload: { nome: "Corte", duracaoMinutos: 45, preco: "45.00" },
+    payload: {
+      nome: opcoes.nome ?? "Corte",
+      duracaoMinutos: opcoes.duracaoMinutos ?? 45,
+      preco: opcoes.preco ?? "45.00",
+    },
   });
 
   return resposta.json().id as string;
@@ -153,7 +161,7 @@ describe("POST /clientes/me/agendamentos/:id/remarcar", () => {
     expect(resposta.json().agendamento.horaInicio).toBe("10:15");
   });
 
-  it("horário tomado devolve 409 e deixa o antigo em pé", async () => {
+  it("horário tomado devolve 422 e deixa o antigo em pé", async () => {
     const app = buildApp();
     const barbearia = await criarBarbeariaComToken(app);
     await abrirTodoDia(app, barbearia.token);
@@ -225,6 +233,84 @@ describe("POST /clientes/me/agendamentos/:id/remarcar", () => {
     // reagendado. A tela tem que pedir os serviços de novo.
     expect(resposta.statusCode).toBe(422);
     expect(resposta.json().erro).toBe("servico_inativo");
+
+    // Este caminho também cancela antes de falhar na criação: o antigo
+    // tem que sobreviver aqui do mesmo jeito que no caso de horário
+    // tomado.
+    const antigo = await prisma.agendamento.findUniqueOrThrow({
+      where: { id: antigoId },
+    });
+    expect(antigo.status).toBe("confirmado");
+  });
+
+  it("com servicoIds explícito, troca o serviço e a duração muda junto", async () => {
+    const app = buildApp();
+    const barbearia = await criarBarbeariaComToken(app);
+    await abrirTodoDia(app, barbearia.token);
+    const servicoId = await criarServico(app, barbearia.token);
+    // Duração diferente do serviço antigo (45 min): é o que prova que o
+    // servicoIds explícito substituiu a lista herdada, e não foi
+    // ignorado — herdar o antigo daria 14:45, não 14:20.
+    const outroServicoId = await criarServico(app, barbearia.token, {
+      nome: "Barba",
+      duracaoMinutos: 20,
+      preco: "20.00",
+    });
+    const antigoId = await agendar({
+      app,
+      slug: barbearia.slug,
+      barbeiroId: barbearia.barbeiroId,
+      servicoId,
+      horaInicio: "10:00",
+    });
+    const { token } = await criarClienteComToken(app, barbearia.slug);
+
+    const resposta = await app.inject({
+      method: "POST",
+      url: `/clientes/me/agendamentos/${antigoId}/remarcar`,
+      headers: auth(token),
+      payload: { data: DIA, horaInicio: "14:00", servicoIds: [outroServicoId] },
+    });
+
+    expect(resposta.statusCode).toBe(201);
+    expect(resposta.json().agendamento.horaFim).toBe("14:20");
+    expect(resposta.json().agendamento.servicos[0].nome).toBe("Barba");
+  });
+
+  it("422 status_nao_permite ao remarcar um agendamento já cancelado", async () => {
+    const app = buildApp();
+    const barbearia = await criarBarbeariaComToken(app);
+    await abrirTodoDia(app, barbearia.token);
+    const servicoId = await criarServico(app, barbearia.token);
+    const antigoId = await agendar({
+      app,
+      slug: barbearia.slug,
+      barbeiroId: barbearia.barbeiroId,
+      servicoId,
+      horaInicio: "10:00",
+    });
+    const { token } = await criarClienteComToken(app, barbearia.slug);
+
+    const cancelamento = await app.inject({
+      method: "POST",
+      url: `/clientes/me/agendamentos/${antigoId}/cancelar`,
+      headers: auth(token),
+    });
+    if (cancelamento.statusCode !== 200) {
+      throw new Error(
+        `cancelamento falhou no teste: ${cancelamento.statusCode} ${cancelamento.body}`
+      );
+    }
+
+    const resposta = await app.inject({
+      method: "POST",
+      url: `/clientes/me/agendamentos/${antigoId}/remarcar`,
+      headers: auth(token),
+      payload: { data: DIA, horaInicio: "14:00" },
+    });
+
+    expect(resposta.statusCode).toBe(422);
+    expect(resposta.json().erro).toBe("status_nao_permite");
   });
 
   it("404 no agendamento de outro cliente", async () => {

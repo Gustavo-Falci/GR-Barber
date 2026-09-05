@@ -189,10 +189,26 @@ export function registrarRotasClientesMe(app: App): void {
           // E é a transação que torna isso seguro: se a criação falhar,
           // este update desfaz junto e o cliente continua com o
           // agendamento que tinha.
-          await tx.agendamento.update({
-            where: { id: antigo.id },
+          //
+          // `updateMany` com o status no WHERE — e não `update({ where:
+          // { id } })` — é o que impede um clique duplo em "remarcar" de
+          // gerar dois agendamentos novos a partir de um só: se duas
+          // transações concorrentes leem o mesmo `antigo` confirmado, a
+          // primeira a commitar já deixou o status em "cancelado", e o
+          // recheck do Postgres (EPQ) na segunda vê essa versão nova da
+          // linha — o predicado de status não bate mais e `count` volta
+          // 0. Sem o status aqui, as duas passariam, cada uma seguindo
+          // pra criar seu próprio agendamento novo.
+          const { count } = await tx.agendamento.updateMany({
+            where: { id: antigo.id, status: { in: ["pendente", "confirmado"] } },
             data: { status: "cancelado" },
           });
+          if (count === 0) {
+            throw new ErroDeNegocio(
+              "esse agendamento já foi alterado",
+              "status_nao_permite"
+            );
+          }
 
           return criarAgendamento(tx, {
             barbeariaId: antigo.barbeariaId,
