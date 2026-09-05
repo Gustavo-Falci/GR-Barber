@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import type { ErroDaApi } from "@gr-barber/api-client";
 import { normalizarTelefoneObrigatorio, TelefoneInvalido } from "@gr-barber/formato";
+import type { SessaoCliente } from "@gr-barber/types";
 import { useApi } from "../api/ProvedorDaApi";
 import { Aviso } from "../componentes/Aviso";
 import { Botao } from "../componentes/Botao";
@@ -19,6 +20,11 @@ export function Entrar() {
   const [nome, setNome] = useState("");
   const [telefone, setTelefone] = useState("");
   const [senha, setSenha] = useState("");
+  // Erro de nome é do campo, não da tentativa: sem isso, um nome em
+  // branco no primeiro acesso ia até a API, voltava 400 do AJV com a
+  // mensagem do schema em inglês, e caía no aviso genérico — no lugar
+  // reservado pra "telefone ou senha incorretos".
+  const [erroNome, setErroNome] = useState<string | undefined>();
   // Erro de telefone é do campo, não da tentativa: um DDD faltando é
   // problema de digitação, e misturar com o aviso da API faria um
   // telefone incompleto aparecer como se a senha estivesse errada.
@@ -33,6 +39,18 @@ export function Entrar() {
   // seria a sondagem que o 409 do signup já permite.
   async function submeter(acao: "entrar" | "primeiro-acesso") {
     setAviso(undefined);
+
+    // Só o primeiro acesso manda nome — o login nem tem esse campo no
+    // schema. Checar sem essa condição quebraria "entrar" pra quem
+    // nunca digitou nome nenhum.
+    const nomeAparado = nome.trim();
+    if (acao === "primeiro-acesso") {
+      if (!nomeAparado) {
+        setErroNome("Informe seu nome");
+        return;
+      }
+      setErroNome(undefined);
+    }
 
     let numero: string;
     try {
@@ -51,18 +69,17 @@ export function Entrar() {
     setErroTelefone(undefined);
 
     setEnviando(true);
+
+    let sessao: SessaoCliente | undefined;
     try {
-      const sessao =
+      sessao =
         acao === "entrar"
           ? await api.publico.loginCliente(slug, { telefone: numero, senha })
           : await api.publico.signupCliente(slug, {
-              nome,
+              nome: nomeAparado,
               telefone: numero,
               senha,
             });
-
-      sessaoDoCliente(slug).gravar(sessao.token);
-      router.push(`/${slug}/minha-conta`);
     } catch (causa) {
       const erro = causa as ErroDaApi;
 
@@ -73,8 +90,16 @@ export function Entrar() {
       } else {
         setAviso(erro.mensagem || "Não foi possível continuar agora.");
       }
-    } finally {
-      setEnviando(false);
+    }
+
+    setEnviando(false);
+
+    // Fora do try: falha ao guardar o token não é recusa da API, e
+    // mostrá-la como tal mandaria a pessoa duvidar da senha que estava
+    // certa.
+    if (sessao) {
+      sessaoDoCliente(slug).gravar(sessao.token);
+      router.push(`/${slug}/minha-conta`);
     }
   }
 
@@ -82,7 +107,15 @@ export function Entrar() {
     <main className={estilos.pagina}>
       <h1>Minha conta</h1>
 
-      <Campo rotulo="Nome (só no primeiro acesso)" valor={nome} onChange={setNome} />
+      <Campo
+        rotulo="Nome (só no primeiro acesso)"
+        valor={nome}
+        onChange={(proximo) => {
+          setNome(proximo);
+          setErroNome(undefined);
+        }}
+        erro={erroNome}
+      />
       <Campo
         rotulo="Telefone"
         formato="telefone"

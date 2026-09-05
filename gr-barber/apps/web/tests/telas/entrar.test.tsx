@@ -105,4 +105,37 @@ describe("entrar", () => {
     expect(screen.queryByText(/telefone ou senha incorretos/i)).toBeNull();
     expect(tentou).toBe(false);
   });
+
+  it("nome em branco no primeiro acesso acusa o campo, e não tenta a API", async () => {
+    // Sem essa checagem o nome em branco ia até a API, que recusa com
+    // 400 e a mensagem do AJV em inglês — no lugar reservado pro aviso
+    // de autenticação. A tela nem deveria chegar lá.
+    const falso = criarApiClientFalso();
+    let tentou = false;
+    falso.publico.signupCliente = async () => {
+      tentou = true;
+      throw new ErroDaApi(400, "requisicao_invalida", "body/nome must NOT have fewer than 2 characters");
+    };
+    montar(falso);
+    await preencher();
+
+    await userEvent.click(screen.getByRole("button", { name: /primeiro acesso/i }));
+
+    expect(await screen.findByText(/informe seu nome/i)).toBeInTheDocument();
+    expect(tentou).toBe(false);
+  });
+
+  it("login não exige nome, mesmo em branco", async () => {
+    // A checagem de nome é só do primeiro acesso: o login nem manda
+    // esse campo, e exigi-lo aqui quebraria quem nunca digitou nome.
+    montar();
+    await preencher();
+
+    await userEvent.click(screen.getByRole("button", { name: "Entrar" }));
+
+    await waitFor(() =>
+      expect(sessaoDoCliente("gr-barber").ler()).toBe("jwt-falso-cliente")
+    );
+    expect(screen.queryByText(/informe seu nome/i)).toBeNull();
+  });
 });
