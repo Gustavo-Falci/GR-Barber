@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import type { ErroDaApi } from "@gr-barber/api-client";
 import { useApi } from "../api/ProvedorDaApi";
 import { useRequisicao } from "../api/useRequisicao";
 import { Aviso } from "../componentes/Aviso";
@@ -13,6 +14,22 @@ import { formatarDataLonga } from "../formato/datas";
 import { sessaoDoCliente } from "../sessao/armazenamento";
 import estilos from "./MinhaConta.module.css";
 
+// O enum da API é vocabulário de banco, não de conversa: `no_show` e
+// `concluido` em cru numa tela em português destoam do resto, e um
+// status novo que a tela ainda não conhece cai no próprio valor cru em
+// vez de quebrar.
+const ROTULO_DO_STATUS: Record<string, string> = {
+  pendente: "pendente",
+  confirmado: "confirmado",
+  concluido: "concluído",
+  cancelado: "cancelado",
+  no_show: "não compareceu",
+};
+
+function rotuloDoStatus(status: string): string {
+  return ROTULO_DO_STATUS[status] ?? status;
+}
+
 export function MinhaConta() {
   const { slug } = useParams<{ slug: string }>();
   const router = useRouter();
@@ -23,6 +40,25 @@ export function MinhaConta() {
     async () => (temSessao ? api.cliente.meusAgendamentos() : []),
     [slug, temSessao]
   );
+  // `agendamento_passado` é exatamente o erro que quem foi travado pelo
+  // C1 vai encontrar: sem captura, a rejeição ficava sem tratamento e o
+  // botão simplesmente não fazia nada.
+  const [avisoDoCancelamento, setAvisoDoCancelamento] = useState<
+    string | undefined
+  >();
+
+  async function cancelar(id: string) {
+    setAvisoDoCancelamento(undefined);
+    try {
+      await api.cliente.cancelar(id);
+      recarregar();
+    } catch (causa) {
+      const erroDaApi = causa as ErroDaApi;
+      setAvisoDoCancelamento(
+        erroDaApi.mensagem || "Não foi possível cancelar agora."
+      );
+    }
+  }
 
   // Sem token, ou com token que a API recusou: o gancho da fundação já
   // limpou o armazenamento, e aqui só falta tirar a pessoa da tela.
@@ -56,6 +92,8 @@ export function MinhaConta() {
     <main className={estilos.pagina}>
       <h1>Meus agendamentos</h1>
 
+      {avisoDoCancelamento ? <Aviso>{avisoDoCancelamento}</Aviso> : null}
+
       {(dados ?? []).map((agendamento) => (
         <Cartao key={agendamento.id}>
           <div className={estilos.item}>
@@ -63,7 +101,7 @@ export function MinhaConta() {
               <span>{formatarDataLonga(agendamento.data)}</span>
               <span>{agendamento.horaInicio}</span>
               <Chip tom={agendamento.status === "cancelado" ? "neutro" : "acento"}>
-                {agendamento.status}
+                {rotuloDoStatus(agendamento.status)}
               </Chip>
             </div>
 
@@ -72,10 +110,7 @@ export function MinhaConta() {
               <div className={estilos.acoes}>
                 <Botao
                   variante="contorno"
-                  onClick={async () => {
-                    await api.cliente.cancelar(agendamento.id);
-                    recarregar();
-                  }}
+                  onClick={() => cancelar(agendamento.id)}
                 >
                   Cancelar
                 </Botao>

@@ -125,6 +125,65 @@ describe("entrar", () => {
     expect(tentou).toBe(false);
   });
 
+  it("I4: senha em branco acusa o campo, e não tenta a API", async () => {
+    const falso = criarApiClientFalso();
+    let tentou = false;
+    falso.publico.loginCliente = async () => {
+      tentou = true;
+      throw new ErroDaApi(401, "nao_autenticado", "");
+    };
+    montar(falso);
+    await userEvent.type(screen.getByLabelText(/telefone/i), "11999998888");
+
+    await userEvent.click(screen.getByRole("button", { name: "Entrar" }));
+
+    expect(await screen.findByText(/informe sua senha/i)).toBeInTheDocument();
+    expect(tentou).toBe(false);
+  });
+
+  it("I4: senha curta no primeiro acesso acusa o campo em vez da mensagem do AJV", async () => {
+    // Sem essa checagem, "abc123" (6 caracteres) ia até a API e voltava
+    // 400 com "body/senha must NOT have fewer than 8 characters" — em
+    // inglês, no lugar reservado pro aviso em português.
+    const falso = criarApiClientFalso();
+    let tentou = false;
+    falso.publico.signupCliente = async () => {
+      tentou = true;
+      throw new ErroDaApi(
+        400,
+        "requisicao_invalida",
+        "body/senha must NOT have fewer than 8 characters"
+      );
+    };
+    montar(falso);
+    await userEvent.type(screen.getByLabelText(/nome/i), "Maria");
+    await userEvent.type(screen.getByLabelText(/telefone/i), "11999998888");
+    await userEvent.type(screen.getByLabelText(/senha/i), "abc123");
+
+    await userEvent.click(screen.getByRole("button", { name: /primeiro acesso/i }));
+
+    expect(
+      await screen.findByText(/pelo menos 8 caracteres/i)
+    ).toBeInTheDocument();
+    expect(tentou).toBe(false);
+  });
+
+  it("M6: erro de nome não fica preso na tela ao trocar de Primeiro acesso pra Entrar", async () => {
+    montar();
+    await preencher();
+    await userEvent.click(screen.getByRole("button", { name: /primeiro acesso/i }));
+    expect(await screen.findByText(/informe seu nome/i)).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Entrar" }));
+
+    // "Entrar" nem manda o campo nome — o erro de uma tentativa
+    // anterior não pode continuar na tela embaixo de um campo que esta
+    // ação não usa.
+    await waitFor(() =>
+      expect(screen.queryByText(/informe seu nome/i)).toBeNull()
+    );
+  });
+
   it("login não exige nome, mesmo em branco", async () => {
     // A checagem de nome é só do primeiro acesso: o login nem manda
     // esse campo, e exigi-lo aqui quebraria quem nunca digitou nome.

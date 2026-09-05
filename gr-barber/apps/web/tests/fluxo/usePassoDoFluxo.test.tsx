@@ -5,9 +5,20 @@ import { useState } from "react";
 import { usePassoDoFluxo } from "../../src/fluxo/usePassoDoFluxo";
 import { navegacaoFalsa } from "../ajudantes/navegacao";
 
+// Nove da manhã do dia 9 — o "hoje" fixo que as novas asserções de data
+// passada usam. Prop, e não relógio global, pelo mesmo motivo das telas:
+// determinismo sem fake timers.
+const HOJE = new Date("2026-09-09T09:00:00-03:00");
+
 // Componente de prova que chama o hook e expõe seus valores pra assertion.
-function ProvaDoFluxo({ passo }: { passo: "servicos" | "data" | "horario" | "dados" | "confirmar" }) {
-  const resultado = usePassoDoFluxo(passo);
+function ProvaDoFluxo({
+  passo,
+  agora,
+}: {
+  passo: "servicos" | "data" | "horario" | "dados" | "confirmar";
+  agora?: Date;
+}) {
+  const resultado = usePassoDoFluxo(passo, agora);
   return (
     <div>
       <p>pronto: {resultado.pronto ? "sim" : "não"}</p>
@@ -92,5 +103,85 @@ describe("usePassoDoFluxo", () => {
     // Com o array antigo contendo `escolhas`, replace seria chamado
     // múltiplas vezes. Com primitivas, é chamado uma única vez.
     expect(navegacaoFalsa.replace).toHaveBeenCalledTimes(1);
+  });
+
+  it("data no passado redireciona pro passo de data mesmo com hora presente", async () => {
+    // C1: a barreira contra agendar no passado até agora só olhava se
+    // `data` e `hora` existiam, nunca se a data já tinha passado. Um
+    // link velho com data de ontem passava reto pelo passo de horário.
+    navegacaoFalsa.redefinir({
+      query: { servicos: "s1", data: "2026-09-08" },
+    });
+
+    render(<ProvaDoFluxo passo="horario" agora={HOJE} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("pronto: não")).toBeInTheDocument();
+    });
+    expect(navegacaoFalsa.replace).toHaveBeenCalledWith(
+      "/gr-barber/agendar/data?servicos=s1&data=2026-09-08"
+    );
+  });
+
+  it("data no passado redireciona pro passo de data também na confirmação", async () => {
+    // Mesma checagem, agora no último passo: `/confirmar?...&data=ontem
+    // &hora=09:00` pulava a tela de horário inteira sem este redirect.
+    navegacaoFalsa.redefinir({
+      query: { servicos: "s1", data: "2026-09-08", hora: "09:00" },
+    });
+
+    render(<ProvaDoFluxo passo="confirmar" agora={HOJE} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("pronto: não")).toBeInTheDocument();
+    });
+    expect(navegacaoFalsa.replace).toHaveBeenCalledWith(
+      "/gr-barber/agendar/data?servicos=s1&data=2026-09-08&hora=09%3A00"
+    );
+  });
+
+  it("hoje continua um passo válido no horário e na confirmação", async () => {
+    // A guarda não pode superagir: o dia de hoje não é "passado".
+    navegacaoFalsa.redefinir({
+      query: { servicos: "s1", data: "2026-09-09", hora: "09:00" },
+    });
+
+    render(<ProvaDoFluxo passo="confirmar" agora={HOJE} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("pronto: sim")).toBeInTheDocument();
+    });
+    expect(navegacaoFalsa.replace).not.toHaveBeenCalled();
+  });
+
+  it("amanhã continua um passo válido no horário", async () => {
+    navegacaoFalsa.redefinir({
+      query: { servicos: "s1", data: "2026-09-10" },
+    });
+
+    render(<ProvaDoFluxo passo="horario" agora={HOJE} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("pronto: sim")).toBeInTheDocument();
+    });
+    expect(navegacaoFalsa.replace).not.toHaveBeenCalled();
+  });
+
+  it("I2: confirmar só com hora redireciona pro primeiro passo que falta, não renderiza em branco", async () => {
+    // Antes desta correção os pré-requisitos eram por campo: "confirmar"
+    // só olhava `hora`, então essa URL renderizava a tela real, que por
+    // sua vez devolvia null sem redirecionar — uma página em branco sem
+    // saída. Cumulativo, a falta de serviços é o primeiro requisito não
+    // atendido, e o redirect vai pro passo de serviços.
+    navegacaoFalsa.redefinir({ query: { hora: "09:00" } });
+
+    render(<ProvaDoFluxo passo="confirmar" agora={HOJE} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("pronto: não")).toBeInTheDocument();
+    });
+    expect(navegacaoFalsa.replace).toHaveBeenCalledWith(
+      "/gr-barber/agendar?hora=09%3A00"
+    );
   });
 });

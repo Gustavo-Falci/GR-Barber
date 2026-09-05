@@ -15,7 +15,7 @@ import estilos from "./EscolhaDoHorario.module.css";
 // por parâmetro em vez de vir de um relógio congelado.
 export function EscolhaDoHorario({ agora = new Date() }: { agora?: Date }) {
   const { slug, servicoIds, data, remarcar, aviso, pronto } =
-    usePassoDoFluxo("horario");
+    usePassoDoFluxo("horario", agora);
   const router = useRouter();
   const api = useApi();
 
@@ -61,6 +61,9 @@ export function EscolhaDoHorario({ agora = new Date() }: { agora?: Date }) {
           zero, e o estado local de lá não atravessa a navegação. */}
       {aviso === "horario_ocupado" ? (
         <Aviso>Esse horário acabou de ser ocupado. Escolha outro.</Aviso>
+      ) : null}
+      {aviso === "horario_expirou" ? (
+        <Aviso>Esse horário já passou. Escolha outro.</Aviso>
       ) : null}
 
       {horarios.length === 0 ? (

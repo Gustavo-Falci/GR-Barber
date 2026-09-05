@@ -14,7 +14,7 @@ import estilos from "./EscolhaDaData.module.css";
 // API recebe o instante: é o que deixa o teste escolher o dia sem fake
 // timers.
 export function EscolhaDaData({ agora = new Date() }: { agora?: Date }) {
-  const { slug, servicoIds, remarcar, pronto } = usePassoDoFluxo("data");
+  const { slug, servicoIds, remarcar, pronto } = usePassoDoFluxo("data", agora);
   const router = useRouter();
   const api = useApi();
   const [mes, setMes] = useState(() => hojeIso(agora).slice(0, 7));

@@ -12,12 +12,21 @@ import { formatarPreco } from "../componentes/ItemDeServico";
 import { caminhoDoPasso } from "../fluxo/passos";
 import { lerDadosDoCliente, limparDadosDoCliente } from "../fluxo/dadosDoCliente";
 import { usePassoDoFluxo } from "../fluxo/usePassoDoFluxo";
-import { formatarDataLonga } from "../formato/datas";
+import { ehPassado, formatarDataLonga, horaJaPassou } from "../formato/datas";
 import estilos from "./Confirmacao.module.css";
 
-export function Confirmacao() {
-  const { slug, servicoIds, data, hora, remarcar, pronto } =
-    usePassoDoFluxo("confirmar");
+// `agora` fica opcional e sem valor padrão fixado aqui, ao contrário
+// das outras telas do fluxo: o padrão precisa nascer dentro de
+// `confirmar`, no instante do clique, não no instante do render. Esta
+// é a tela em que a pessoa pode ficar parada minutos com a página
+// aberta antes de decidir — um padrão resolvido no render (como
+// `agora = new Date()` na assinatura) ficaria congelado desde a
+// montagem e não pegaria esse intervalo.
+export function Confirmacao({ agora }: { agora?: Date } = {}) {
+  const { slug, servicoIds, data, hora, remarcar, pronto } = usePassoDoFluxo(
+    "confirmar",
+    agora ?? new Date()
+  );
   const router = useRouter();
   const api = useApi();
 
@@ -90,6 +99,27 @@ export function Confirmacao() {
   }
 
   async function confirmar() {
+    // Recalculado aqui, e não lido do `agora` capturado no render: a
+    // pessoa pode ter chegado nesta tela minutos atrás e só decidido
+    // confirmar agora — sem isso, um horário que passou enquanto a
+    // tela ficava aberta viraria um agendamento inalterável sem
+    // precisar de URL nenhuma velha, só de uma decisão lenta.
+    const instanteDoEnvio = agora ?? new Date();
+    if (
+      ehPassado(diaConfirmado, instanteDoEnvio) ||
+      horaJaPassou(diaConfirmado, horaConfirmada, instanteDoEnvio)
+    ) {
+      router.push(
+        caminhoDoPasso(slug, "horario", {
+          servicoIds,
+          data,
+          remarcar,
+          aviso: "horario_expirou",
+        })
+      );
+      return;
+    }
+
     setEnviando(true);
     setAviso(undefined);
 
@@ -102,7 +132,10 @@ export function Confirmacao() {
           })
         : await criarNovoAgendamento();
 
-      limparDadosDoCliente();
+      // Só no caminho de criação: quem remarca já tinha um rascunho de
+      // OUTRO agendamento em andamento, e apagar aqui destruiria nome e
+      // telefone de algo que essa confirmação não tem nada a ver.
+      if (!remarcar) limparDadosDoCliente();
       setCriado(agendamento);
     } catch (causa) {
       const erro = causa as ErroDaApi;

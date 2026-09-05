@@ -102,6 +102,20 @@ describe("escolha do horário", () => {
     );
   });
 
+  it("mostra o aviso de horário expirado quando ele vem na URL", async () => {
+    // A tela de confirmação manda este recado (I5) quando a pessoa
+    // demora pra confirmar e o horário escolhido vira passado enquanto
+    // a tela ficava aberta.
+    navegacaoFalsa.redefinir({
+      query: { servicos: "s1", data: "2026-09-10", aviso: "horario_expirou" },
+    });
+    montar(["09:00"]);
+
+    await waitFor(() =>
+      expect(screen.getByText(/esse horário já passou/i)).toBeInTheDocument()
+    );
+  });
+
   it("não mostra aviso nenhum quando a URL não traz um", async () => {
     navegacaoFalsa.redefinir({ query: { servicos: "s1", data: "2026-09-10" } });
     montar(["09:00"]);

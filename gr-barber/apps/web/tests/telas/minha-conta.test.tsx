@@ -53,6 +53,62 @@ describe("minha conta", () => {
     );
   });
 
+  it("I3: mostra o erro quando cancelar falha, em vez de não fazer nada", async () => {
+    // agendamento_passado é exatamente o que quem foi travado pelo C1
+    // encontra: sem captura, essa rejeição ficava sem tratamento e o
+    // clique em Cancelar simplesmente não tinha efeito nenhum.
+    const falso = await comUmAgendamento();
+    falso.cliente.cancelar = async () => {
+      throw new ErroDaApi(422, "regra_de_negocio", "esse agendamento já passou");
+    };
+    montar(falso);
+    await waitFor(() => screen.getByText("20 de setembro"));
+
+    await userEvent.click(screen.getByRole("button", { name: /cancelar/i }));
+
+    await waitFor(() =>
+      expect(screen.getByText(/esse agendamento já passou/i)).toBeInTheDocument()
+    );
+  });
+
+  it("M8: mostra os status traduzidos em vez do enum em inglês", async () => {
+    const falso = criarApiClientFalso({
+      agendamentos: [
+        {
+          id: "a1",
+          data: "2026-09-22",
+          horaInicio: "09:00",
+          horaFim: "09:30",
+          status: "no_show",
+          origem: "cliente",
+          observacoes: null,
+          servicos: [
+            { servicoId: "s1", nome: "Corte", precoNoMomento: "40.00", duracaoNoMomento: 30 },
+          ],
+        },
+        {
+          id: "a2",
+          data: "2026-09-23",
+          horaInicio: "10:00",
+          horaFim: "10:30",
+          status: "concluido",
+          origem: "cliente",
+          observacoes: null,
+          servicos: [
+            { servicoId: "s1", nome: "Corte", precoNoMomento: "40.00", duracaoNoMomento: 30 },
+          ],
+        },
+      ],
+    });
+    montar(falso);
+
+    await waitFor(() => screen.getByText(/não compareceu/i));
+    expect(screen.getByText(/concluído/i)).toBeInTheDocument();
+    // O enum cru não pode aparecer em nenhum lugar da tela.
+    expect(screen.queryByText("no_show")).not.toBeInTheDocument();
+    expect(screen.queryByText("concluido")).not.toBeInTheDocument();
+  });
+
   it("remarcar leva pro passo de data com o id na query", async () => {
     const falso = await comUmAgendamento();
     montar(falso);

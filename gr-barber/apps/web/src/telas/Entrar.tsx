@@ -29,6 +29,11 @@ export function Entrar() {
   // problema de digitação, e misturar com o aviso da API faria um
   // telefone incompleto aparecer como se a senha estivesse errada.
   const [erroTelefone, setErroTelefone] = useState<string | undefined>();
+  // Mesmo motivo do erro de nome: sem isso, senha em branco ou curta
+  // ia até a API e voltava com a mensagem do AJV em inglês — "body/senha
+  // must NOT have fewer than 8 characters" — no lugar reservado pra
+  // "telefone ou senha incorretos".
+  const [erroSenha, setErroSenha] = useState<string | undefined>();
   // Aviso é o que a API respondeu numa tentativa válida — nao_autenticado
   // no login, conflito no primeiro acesso, ou qualquer outra falha.
   const [aviso, setAviso] = useState<string | undefined>();
@@ -50,6 +55,11 @@ export function Entrar() {
         return;
       }
       setErroNome(undefined);
+    } else {
+      // "Entrar" nem manda esse campo — sem isso, o erro de um
+      // primeiro acesso em branco ficava preso na tela embaixo de um
+      // campo que esta ação não usa.
+      setErroNome(undefined);
     }
 
     let numero: string;
@@ -67,6 +77,19 @@ export function Entrar() {
       return;
     }
     setErroTelefone(undefined);
+
+    // A API só exige 8 caracteres no primeiro acesso — o login aceita
+    // qualquer senha já cadastrada e reage com nao_autenticado se ela
+    // não bater. Em branco é problema nos dois casos.
+    if (!senha) {
+      setErroSenha("Informe sua senha");
+      return;
+    }
+    if (acao === "primeiro-acesso" && senha.length < 8) {
+      setErroSenha("A senha deve ter pelo menos 8 caracteres");
+      return;
+    }
+    setErroSenha(undefined);
 
     setEnviando(true);
 
@@ -126,7 +149,16 @@ export function Entrar() {
         }}
         erro={erroTelefone}
       />
-      <Campo rotulo="Senha" type="password" valor={senha} onChange={setSenha} />
+      <Campo
+        rotulo="Senha"
+        type="password"
+        valor={senha}
+        onChange={(proximo) => {
+          setSenha(proximo);
+          setErroSenha(undefined);
+        }}
+        erro={erroSenha}
+      />
 
       {aviso ? <Aviso>{aviso}</Aviso> : null}
 

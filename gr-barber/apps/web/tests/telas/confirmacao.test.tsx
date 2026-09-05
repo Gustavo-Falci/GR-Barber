@@ -7,10 +7,10 @@ import { Confirmacao } from "../../src/telas/Confirmacao";
 import { gravarDadosDoCliente, lerDadosDoCliente } from "../../src/fluxo/dadosDoCliente";
 import { navegacaoFalsa } from "../ajudantes/navegacao";
 
-function montar(falso = criarApiClientFalso()) {
+function montar(falso = criarApiClientFalso(), agora?: Date) {
   render(
     <ProvedorDaApi valor={falso}>
-      <Confirmacao />
+      <Confirmacao agora={agora} />
     </ProvedorDaApi>
   );
   return falso;
@@ -91,6 +91,63 @@ describe("confirmação", () => {
     // faltam os dados, em vez de existir e confiar num `!` pra chamar a
     // API sem cliente.
     expect(screen.queryByRole("button", { name: /confirmar/i })).toBeNull();
+  });
+
+  it("I5: horário que expirou entre o carregar e o confirmar volta pro passo de horário", async () => {
+    // Duas da tarde do dia 10 — depois das 09:00 escolhidas no
+    // beforeEach. Sem essa checagem no clique, uma decisão lenta cria
+    // um agendamento inalterável sem precisar de URL velha nenhuma.
+    const TARDE = new Date("2026-09-10T14:00:00-03:00");
+    const falso = montar(criarApiClientFalso(), TARDE);
+    await waitFor(() => screen.getByRole("button", { name: /confirmar/i }));
+
+    await userEvent.click(screen.getByRole("button", { name: /confirmar/i }));
+
+    await waitFor(() =>
+      expect(navegacaoFalsa.push).toHaveBeenCalledWith(
+        "/gr-barber/agendar/horario?servicos=s1%2Cs2&data=2026-09-10&aviso=horario_expirou"
+      )
+    );
+    // Não chegou a criar nada: a checagem barra antes da chamada à API.
+    expect(falso.estado.agendamentos).toHaveLength(0);
+  });
+
+  it("M7: remarcar não apaga um rascunho de outro agendamento em andamento", async () => {
+    // limparDadosDoCliente() incondicional apagaria nome e telefone de
+    // uma OUTRA reserva ainda no passo de dados — remarcar nem usa
+    // esses dados (o cliente vem do token), então não tem por que
+    // mexer neles.
+    const rascunhoDeOutroAgendamento = {
+      nome: "Outra Pessoa",
+      telefone: "(11) 91111-2222",
+    };
+    const falso = criarApiClientFalso();
+    const original = await falso.publico.agendar("gr-barber", {
+      barbeiroId: "bb1",
+      servicoIds: ["s1"],
+      data: "2026-09-20",
+      horaInicio: "11:00",
+      cliente: { nome: "João", telefone: "(11) 99999-8888" },
+    });
+    sessionStorage.clear();
+    gravarDadosDoCliente(rascunhoDeOutroAgendamento);
+    navegacaoFalsa.redefinir({
+      query: {
+        servicos: "s1",
+        data: "2026-09-21",
+        hora: "10:00",
+        remarcar: original.id,
+      },
+    });
+
+    montar(falso);
+    await waitFor(() => screen.getByRole("button", { name: /confirmar/i }));
+    await userEvent.click(screen.getByRole("button", { name: /confirmar/i }));
+
+    await waitFor(() =>
+      expect(screen.getByText(/agendamento confirmado/i)).toBeInTheDocument()
+    );
+    expect(lerDadosDoCliente()).toEqual(rascunhoDeOutroAgendamento);
   });
 
   it("no remarcar chama remarcar em vez de agendar, sem pedir dados", async () => {
