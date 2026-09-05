@@ -1416,36 +1416,49 @@ describe("agoraNaBarbearia", () => {
   it("lê o fuso da barbearia, não o da máquina", () => {
     // 2026-09-04T02:30:00Z é 23:30 do dia 3 em São Paulo (UTC-3). Se a
     // função usasse UTC ou o fuso do processo, a data sairia como dia 4.
-    vi.setSystemTime(new Date("2026-09-04T02:30:00Z"));
+    // O instante entra por parâmetro justamente pra este caso não
+    // precisar de fake timers — ver o comentário na implementação.
+    const instante = new Date("2026-09-04T02:30:00Z");
 
-    expect(agoraNaBarbearia()).toEqual({ data: "2026-09-03", hora: "23:30" });
-
-    vi.useRealTimers();
+    expect(agoraNaBarbearia(instante)).toEqual({
+      data: "2026-09-03",
+      hora: "23:30",
+    });
   });
 });
 ```
 
-Acrescentar `vi` ao import do vitest nesse arquivo, e `agoraNaBarbearia`
-ao import de `../../src/lib/horas`.
+Acrescentar `agoraNaBarbearia` ao import de `../../src/lib/horas` nesse
+arquivo. **Não** use `vi.useFakeTimers` nem `vi.setSystemTime` em lugar
+nenhum desta fase: a suíte roda contra um Postgres real e nenhum dos 28
+arquivos de teste existentes mexe no relógio do processo.
 
 Criar `apps/api/tests/rotas/clientes-me-cancelar.test.ts`:
 
 ```ts
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { prisma } from "@gr-barber/database";
 import { buildApp } from "../../src/app";
 import { dataParaDate, horaParaDate } from "../../src/lib/horas";
 import { auth, criarBarbeariaComToken } from "../helpers/barbearia";
 import { criarClienteComToken } from "../helpers/cliente";
 
-// Relógio fixo em toda a suíte: "passado" e "futuro" precisam significar
-// a mesma coisa daqui a um ano, senão os casos abaixo começam a falhar
-// sozinhos quando as datas fixas ficarem para trás.
-const HOJE = new Date("2026-09-04T12:00:00Z");
+// Datas relativas ao dia de hoje, nunca fixas: "passado" e "futuro"
+// precisam continuar significando isso daqui a um ano, e a alternativa
+// (fixar o relógio com vi.setSystemTime) mexeria nos timeouts do pool
+// do Postgres, que esta suíte usa de verdade.
+//
+// A margem de 30 dias é o que faz a diferença de fuso entre este UTC e o
+// America/Sao_Paulo da API não importar: nenhuma das duas pontas chega
+// perto de virar o dia.
+function diaRelativo(dias: number): string {
+  const dia = new Date();
+  dia.setUTCDate(dia.getUTCDate() + dias);
+  return dia.toISOString().slice(0, 10);
+}
 
-afterEach(() => {
-  vi.useRealTimers();
-});
+const FUTURO = diaRelativo(30);
+const PASSADO = diaRelativo(-30);
 
 async function semear(params: {
   barbeariaId: string;
@@ -1483,7 +1496,6 @@ async function semear(params: {
 
 describe("POST /clientes/me/agendamentos/:id/cancelar", () => {
   it("cancela um agendamento futuro", async () => {
-    vi.setSystemTime(HOJE);
     const app = buildApp();
     const { slug, barbeariaId, barbeiroId } = await criarBarbeariaComToken(app);
     const { token, clienteId } = await criarClienteComToken(app, slug);
@@ -1491,7 +1503,7 @@ describe("POST /clientes/me/agendamentos/:id/cancelar", () => {
       barbeariaId,
       barbeiroId,
       clienteId,
-      data: "2026-09-20",
+      data: FUTURO,
     });
 
     const resposta = await app.inject({
@@ -1505,7 +1517,6 @@ describe("POST /clientes/me/agendamentos/:id/cancelar", () => {
   });
 
   it("422 num agendamento que já passou", async () => {
-    vi.setSystemTime(HOJE);
     const app = buildApp();
     const { slug, barbeariaId, barbeiroId } = await criarBarbeariaComToken(app);
     const { token, clienteId } = await criarClienteComToken(app, slug);
@@ -1513,7 +1524,7 @@ describe("POST /clientes/me/agendamentos/:id/cancelar", () => {
       barbeariaId,
       barbeiroId,
       clienteId,
-      data: "2026-08-20",
+      data: PASSADO,
     });
 
     const resposta = await app.inject({
@@ -1527,7 +1538,6 @@ describe("POST /clientes/me/agendamentos/:id/cancelar", () => {
   });
 
   it("422 num agendamento já concluído", async () => {
-    vi.setSystemTime(HOJE);
     const app = buildApp();
     const { slug, barbeariaId, barbeiroId } = await criarBarbeariaComToken(app);
     const { token, clienteId } = await criarClienteComToken(app, slug);
@@ -1535,7 +1545,7 @@ describe("POST /clientes/me/agendamentos/:id/cancelar", () => {
       barbeariaId,
       barbeiroId,
       clienteId,
-      data: "2026-09-20",
+      data: FUTURO,
       status: "concluido",
     });
 
@@ -1550,7 +1560,6 @@ describe("POST /clientes/me/agendamentos/:id/cancelar", () => {
   });
 
   it("404 no agendamento de outro cliente", async () => {
-    vi.setSystemTime(HOJE);
     const app = buildApp();
     const { slug, barbeariaId, barbeiroId } = await criarBarbeariaComToken(app);
     const meu = await criarClienteComToken(app, slug, "11999998888");
@@ -1559,7 +1568,7 @@ describe("POST /clientes/me/agendamentos/:id/cancelar", () => {
       barbeariaId,
       barbeiroId,
       clienteId: outro.clienteId,
-      data: "2026-09-20",
+      data: FUTURO,
     });
 
     const resposta = await app.inject({
@@ -1592,10 +1601,18 @@ Acrescentar em `apps/api/src/lib/horas.ts`:
 // máquina onde a API estiver rodando.
 export const FUSO_DA_BARBEARIA = "America/Sao_Paulo";
 
-// Devolve o instante atual já nos formatos do contrato HTTP, para poder
+// Devolve o instante já nos formatos do contrato HTTP, para poder
 // comparar com string: "YYYY-MM-DD" e "HH:mm" ordenam
 // lexicograficamente na mesma ordem que cronologicamente.
-export function agoraNaBarbearia(): { data: string; hora: string } {
+//
+// O instante entra por parâmetro, com `new Date()` como padrão, e é o
+// que torna a conversão de fuso testável sem fake timers: a suíte roda
+// contra um Postgres real, e mockar o relógio do processo mexeria nos
+// timeouts do pool de conexão junto.
+export function agoraNaBarbearia(instante: Date = new Date()): {
+  data: string;
+  hora: string;
+} {
   // Locale "sv-SE" porque o sueco formata data e hora em ISO
   // ("2026-09-04 23:30"), o que evita montar a string peça por peça a
   // partir de formatToParts.
@@ -1607,7 +1624,7 @@ export function agoraNaBarbearia(): { data: string; hora: string } {
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
-  }).format(new Date());
+  }).format(instante);
 
   const [data, hora] = formatado.split(" ");
   return { data, hora };
@@ -1728,25 +1745,25 @@ ela funcionar, e o rollback é o que a torna segura.
 Criar `apps/api/tests/rotas/clientes-me-remarcar.test.ts`:
 
 ```ts
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { prisma } from "@gr-barber/database";
 import { buildApp } from "../../src/app";
 import { auth, criarBarbeariaComToken } from "../helpers/barbearia";
 import { criarClienteComToken } from "../helpers/cliente";
 import type { App } from "../../src/tipos";
 
-const HOJE = new Date("2026-09-04T12:00:00Z");
-// 2026-09-21 é uma segunda-feira; o horário de funcionamento abaixo
-// abre todos os dias, então o dia da semana não muda o resultado.
-const DIA = "2026-09-21";
+// Trinta dias à frente, calculado a cada rodada: uma data fixa começaria
+// a falhar sozinha quando ficasse no passado, e fixar o relógio com
+// vi.setSystemTime mexeria nos timeouts do pool do Postgres — que esta
+// suíte usa de verdade. O `abrirTodoDia` abaixo abre os sete dias, então
+// o dia da semana que calhar não muda o resultado.
+function diaRelativo(dias: number): string {
+  const dia = new Date();
+  dia.setUTCDate(dia.getUTCDate() + dias);
+  return dia.toISOString().slice(0, 10);
+}
 
-beforeEach(() => {
-  vi.setSystemTime(HOJE);
-});
-
-afterEach(() => {
-  vi.useRealTimers();
-});
+const DIA = diaRelativo(30);
 
 // A barbearia precisa de horário de funcionamento gravado, senão o
 // motor de disponibilidade trata todo dia como fechado e nenhum
