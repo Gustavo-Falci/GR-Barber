@@ -5,16 +5,21 @@ import { formatarTelefoneParcial } from "@gr-barber/formato";
 import estilos from "./Campo.module.css";
 
 interface Props
-  extends Omit<InputHTMLAttributes<HTMLInputElement>, "onChange"> {
+  extends Omit<InputHTMLAttributes<HTMLInputElement>, "onChange" | "value"> {
   rotulo: string;
   erro?: string;
   formato?: "telefone";
+  valor?: string;
   onChange?: (valor: string) => void;
 }
 
-export function Campo({ rotulo, erro, formato, onChange, ...resto }: Props) {
+export function Campo({ rotulo, erro, formato, valor, onChange, ...resto }: Props) {
   const id = useId();
-  const [valor, setValor] = useState("");
+  const [interno, setInterno] = useState("");
+  // Controlado quando o pai manda `valor`; senão o campo cuida de si.
+  // Sem isso não haveria como preencher nome e telefone a partir da
+  // sessão do cliente.
+  const atual = valor ?? interno;
 
   return (
     <div className={estilos.campo}>
@@ -26,7 +31,7 @@ export function Campo({ rotulo, erro, formato, onChange, ...resto }: Props) {
         className={estilos.entrada}
         aria-invalid={erro ? "true" : undefined}
         aria-describedby={erro ? `${id}-erro` : undefined}
-        value={valor}
+        value={atual}
         onChange={(evento) => {
           // A API guarda um formato só e recusa os outros com 400.
           // Formatar aqui é o que evita o erro no envio; a validação
@@ -35,7 +40,7 @@ export function Campo({ rotulo, erro, formato, onChange, ...resto }: Props) {
             formato === "telefone"
               ? formatarTelefoneParcial(evento.target.value)
               : evento.target.value;
-          setValor(proximo);
+          setInterno(proximo);
           onChange?.(proximo);
         }}
         {...resto}
