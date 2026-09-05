@@ -4,25 +4,25 @@ import type { JsonSchemaToTsProvider } from "@fastify/type-provider-json-schema-
 import { prisma } from "@gr-barber/database";
 import { registrarTratamentoDeErros } from "./plugins/erros";
 import { autenticar, autenticarCliente, registrarAuth } from "./plugins/auth";
-import { registrarRotasAuth } from "./rotas/auth";
-import { registrarRotasAuthCliente } from "./rotas/auth-cliente";
+import { registrarRotasAuth } from "./routers/auth";
+import { registrarRotasAuthCliente } from "./routers/auth-cliente";
 import {
   registrarRotasAgendamentos,
   registrarRotasAgendamentosPublicas,
-} from "./rotas/agendamentos";
-import { registrarRotasClientes } from "./rotas/clientes";
-import { registrarRotasClientesMe } from "./rotas/clientes-me";
-import { registrarRotasDisponibilidade } from "./rotas/disponibilidade";
+} from "./routers/agendamentos";
+import { registrarRotasClientes } from "./routers/clientes";
+import { registrarRotasClientesMe } from "./routers/clientes-me";
+import { registrarRotasDisponibilidade } from "./routers/disponibilidade";
 import {
   registrarRotasBarbeariasProtegidas,
   registrarRotasBarbeariasPublicas,
-} from "./rotas/barbearias";
-import { registrarRotasHorarios } from "./rotas/horarios";
-import { registrarRotasMe } from "./rotas/me";
+} from "./routers/barbearias";
+import { registrarRotasHorarios } from "./routers/horarios";
+import { registrarRotasMe } from "./routers/me";
 import {
   registrarRotasServicos,
   registrarRotasServicosPublicas,
-} from "./rotas/servicos";
+} from "./routers/servicos";
 import type { App } from "./tipos";
 
 // Monta a instância sem escutar em porta nenhuma. É o que permite os
