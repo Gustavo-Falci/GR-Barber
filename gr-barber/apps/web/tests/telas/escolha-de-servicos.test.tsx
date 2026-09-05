@@ -1,14 +1,14 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it } from "vitest";
-import { criarApiClientFalso } from "@gr-barber/api-client";
+import { criarApiClientFalso, ErroDaApi } from "@gr-barber/api-client";
 import { ProvedorDaApi } from "../../src/api/ProvedorDaApi";
 import { EscolhaDeServicos } from "../../src/telas/EscolhaDeServicos";
 import { navegacaoFalsa } from "../ajudantes/navegacao";
 
-function montar() {
+function montar(apiClient = criarApiClientFalso()) {
   render(
-    <ProvedorDaApi valor={criarApiClientFalso()}>
+    <ProvedorDaApi valor={apiClient}>
       <EscolhaDeServicos />
     </ProvedorDaApi>
   );
@@ -63,5 +63,31 @@ describe("escolha dos serviços", () => {
 
     await waitFor(() => screen.getByText("Barba"));
     expect(screen.getByRole("checkbox", { name: /Barba/ })).toBeChecked();
+  });
+
+  it("não leva id inexistente pro próximo passo", async () => {
+    // um id que a lista não traz é serviço desativado, e levá-lo adiante o faria chegar ao POST.
+    navegacaoFalsa.redefinir({ query: { servicos: "s1,inexistente" } });
+    montar();
+
+    await waitFor(() => screen.getByText("Corte"));
+    await userEvent.click(screen.getByRole("button", { name: /continuar/i }));
+
+    expect(navegacaoFalsa.push).toHaveBeenCalledWith(
+      "/gr-barber/agendar/data?servicos=s1"
+    );
+  });
+
+  it("exibe erro quando falha carregar os serviços", async () => {
+    const falso = criarApiClientFalso();
+    falso.publico.servicos = async () => {
+      throw new ErroDaApi(500, "erro_interno", "");
+    };
+    montar(falso);
+
+    await waitFor(() =>
+      screen.getByText("Não foi possível carregar os serviços")
+    );
+    expect(screen.getByText("Não foi possível carregar os serviços")).toBeInTheDocument();
   });
 });
