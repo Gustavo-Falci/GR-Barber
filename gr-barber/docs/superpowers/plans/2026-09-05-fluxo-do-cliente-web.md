@@ -41,13 +41,13 @@
 ### Task 1: provider da API, `useRequisicao` e o dublê de navegação
 
 **Files:**
-- Create: `apps/web/src/api/ProvedorDaApi.tsx`, `apps/web/src/api/useRequisicao.ts`, `apps/web/app/(publico)/[slug]/layout.tsx`, `apps/web/tests/ajudantes/navegacao.ts`, `apps/web/tests/ajudantes/renderizar.tsx`
+- Create: `apps/web/src/api/ProvedorDaApi.tsx`, `apps/web/src/api/useRequisicao.ts`, `apps/web/app/(publico)/[slug]/layout.tsx`, `apps/web/tests/ajudantes/navegacao.ts`
 - Modify: `apps/web/tests/setup.ts`
 - Test: `apps/web/tests/api/useRequisicao.test.tsx`
 
 **Interfaces:**
 - Consumes: `criarApiClientFalso`, `ApiClient`, `ErroDaApi` de `@gr-barber/api-client`; `apiDoCliente` de `src/sessao/cliente-da-api`.
-- Produces: `<ProvedorDaApi valor?={ApiDoFluxo}>`, `useApi(): ApiDoFluxo`, `useRequisicao<T>(chamada: () => Promise<T>, deps: unknown[]): { dados: T | null; carregando: boolean; erro: ErroDaApi | null; recarregar: () => void }`, e os ajudantes de teste `renderizarNaRota(ui, { slug?, query? })` e `navegacaoFalsa` (com `push`, `replace`, `rota`, `query`).
+- Produces: `<ProvedorDaApi valor?={ApiDoFluxo}>`, `useApi(): ApiDoFluxo`, `useRequisicao<T>(chamada: () => Promise<T>, deps: unknown[]): { dados: T | null; carregando: boolean; erro: ErroDaApi | null; recarregar: () => void }`, e o ajudante de teste `navegacaoFalsa` (com `slug`, `query`, `push`, `replace`, `redefinir`).
 
 - [ ] **Step 1: Dublê de navegação, com estado que o teste controla**
 
