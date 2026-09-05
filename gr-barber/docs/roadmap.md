@@ -50,9 +50,42 @@ O que falta pro GR Barber sair do papel, mais ou menos em ordem:
   do agendamento público, ou pelo barbeiro no walk-in. Sem verificar
   posse do número, a API não distingue o dono do telefone de quem só o
   conhece, e quem chegar primeiro passa a ver o histórico daquela
-  pessoa naquela barbearia. Mitigado, não resolvido: definir senha só é
-  permitido em cadastro que ainda não tem uma. Fecha junto com o canal
-  de mensagem do passo 4, que traz o código de verificação.
+  pessoa naquela barbearia. A defesa de "definir senha só é permitido
+  em cadastro que ainda não tem uma" é mais fraca do que parece, por
+  dois motivos. Primeiro, ninguém normaliza telefone: `PADRAO_TELEFONE`
+  aceita `11999998888`, `(11) 99999-8888` e `+55 11 99999-8888`, a API
+  guarda o que recebeu, e nenhum dos escritores (`auth-cliente.ts`,
+  `agendamentos.ts`, `clientes.ts`) normaliza antes de gravar ou
+  buscar — com `@@unique([barbeariaId, telefone])` como está, a mesma
+  pessoa cabe em várias linhas, e o `409` se contorna reformatando o
+  número. Segundo, dois signups concorrentes no mesmo cadastro sem
+  senha passam os dois: ambos leem `senhaHash` nulo, ambos gravam,
+  o último grava por cima e os dois chamadores saem com token válido.
+  O que não quebra: uma linha variante é um `clienteId` diferente, com
+  histórico próprio (vazio) — a fronteira de privacidade entre clientes
+  se mantém, só a alegação de que definir senha primeiro protege o
+  cadastro é que não se sustenta. O fechamento de verdade é normalizar
+  telefone, do jeito que `lib/email.ts` já faz com email; mais barato
+  decidir isso antes das 23 telas do passo 3 fixarem um formato — depois
+  disso, mudar o formato também exigiria decidir o que fazer com as
+  linhas já gravadas.
 - **O `409` do signup de cliente diz que aquele telefone já tem conta**,
   exatamente como o do barbeiro diz do email. Mesma dívida, mesmo
   fechamento.
+- **Nenhuma das duas rotas que criam ou movem um agendamento recusa uma
+  data no passado.** `POST /barbearias/:slug/agendamentos` e
+  `POST /clientes/me/agendamentos/:id/remarcar` passam pelo mesmo
+  `horariosLivres`, que não tem noção de "agora" — só recebe a janela
+  de funcionamento e os horários já ocupados. O único relógio do fluxo
+  é o `agoraNaBarbearia`, usado pelo `garantirAlteravel` em
+  `lib/agendamento-alteravel.ts`, e essa guarda olha pro agendamento
+  de origem, o que está sendo alterado, nunca pro destino da mudança.
+  Na prática, um cliente que remarca pra uma data passada tranca a
+  própria conta: o agendamento resultante é exatamente o que o
+  `garantirAlteravel` recusa cancelar ou remarcar depois, e só o
+  barbeiro consegue desfazer. O fechamento tem a forma de um
+  `garantirFuturo(data, horaInicio)` ao lado do `garantirAlteravel`,
+  chamado pelas rotas que criam ou movem um agendamento — isso não
+  quer dizer que já está na fila pra ser feito. Empurrar a checagem
+  pra dentro do `criarAgendamento` mudaria comportamento da fase 4,
+  que já tem testes escritos sem essa regra.
