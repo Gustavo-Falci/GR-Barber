@@ -1,7 +1,11 @@
 import { prisma } from "@gr-barber/database";
 import { conflito } from "../lib/erro-http";
 import { PADRAO_TELEFONE } from "../lib/padroes";
-import { conferirSenha, gerarHashSenha } from "../lib/senha";
+import {
+  conferirSenha,
+  gerarHashSenha,
+  obterHashDescartavel,
+} from "../lib/senha";
 import { serializarCliente } from "../lib/serializar";
 import type { App } from "../tipos";
 
@@ -32,18 +36,6 @@ const corpoLogin = {
     senha: { type: "string", minLength: 1, maxLength: 200 },
   },
 } as const;
-
-// Nada de `const HASH = await gerarHashSenha(...)` no topo do módulo: a
-// API compila pra CJS via tsup, onde top-level await não existe. O hash
-// é calculado na primeira recusa e reaproveitado — o custo que interessa
-// é o do conferirSenha, que roda sempre.
-let hashDescartavel: string | null = null;
-
-async function custoDeSenhaInvalida(senha: string): Promise<false> {
-  hashDescartavel ??= await gerarHashSenha("senha-que-nao-existe");
-  await conferirSenha(senha, hashDescartavel);
-  return false;
-}
 
 // Públicas: são as telas de criar conta e entrar, abertas pelo link do
 // WhatsApp. Ficam fora dos dois escopos protegidos do app.ts.
@@ -117,27 +109,33 @@ export function registrarRotasAuthCliente(app: App): void {
         },
       });
 
-      // Telefone inexistente, cadastro sem senha e senha errada dão
-      // exatamente a mesma resposta — e custam o mesmo. Pular o
+      // Telefone inexistente e cadastro sem senha (walk-in feito pelo
+      // barbeiro) são tratados como "sem conta pra entrar": mesma
+      // resposta, mesmo custo de uma senha errada.
+      const autorizado = cliente?.senhaHash ? cliente : null;
+
+      // Resolver o hash pra conferir num valor só, e chamar
+      // conferirSenha exatamente uma vez pra qualquer ramo, é o que
+      // garante que os três casos custem o mesmo: pular o
       // conferirSenha quando não há cliente faria essa resposta voltar
-      // muito mais rápido, porque o scrypt é lento de propósito: o
+      // muito mais rápido, porque o scrypt é lento de propósito, e o
       // relógio entregaria o que o corpo esconde. Mesmo raciocínio do
       // login do barbeiro, em rotas/auth.ts.
-      const autorizado = cliente?.senhaHash
-        ? await conferirSenha(senha, cliente.senhaHash)
-        : await custoDeSenhaInvalida(senha);
+      const hashParaConferir =
+        autorizado?.senhaHash ?? (await obterHashDescartavel());
+      const senhaConfere = await conferirSenha(senha, hashParaConferir);
 
-      if (!autorizado || !cliente) {
+      if (!autorizado || !senhaConfere) {
         return reply.code(401).send({ erro: "nao_autenticado" });
       }
 
       const token = app.jwt.sign({
         tipo: "cliente",
-        clienteId: cliente.id,
+        clienteId: autorizado.id,
         barbeariaId: barbearia.id,
       });
 
-      return reply.send({ token, cliente: serializarCliente(cliente) });
+      return reply.send({ token, cliente: serializarCliente(autorizado) });
     }
   );
 }

@@ -1,8 +1,10 @@
-import { randomUUID } from "node:crypto";
-
 import { prisma } from "@gr-barber/database";
 import { PADRAO_EMAIL } from "../lib/padroes";
-import { conferirSenha, gerarHashSenha } from "../lib/senha";
+import {
+  conferirSenha,
+  gerarHashSenha,
+  obterHashDescartavel,
+} from "../lib/senha";
 import type { App } from "../tipos";
 
 // A coluna é VARCHAR com índice único simples — sem citext e sem índice
@@ -12,22 +14,6 @@ import type { App } from "../tipos";
 // e na busca, senão a busca nunca acha o que a gravação guardou.
 function normalizarEmail(email: string): string {
   return email.trim().toLowerCase();
-}
-
-// Hash de uma senha aleatória, no mesmo formato e tamanho de um real.
-// Serve só pra dar ao login sem barbeiro o mesmo custo de derivação do
-// login com barbeiro — ver o comentário na rota. Tem que ser bem
-// formado: um valor malformado sairia pelo atalho do conferirSenha sem
-// derivar nada, que é justamente o vazamento que ele existe pra fechar.
-//
-// Calculado sob demanda e guardado: derivar a cada requisição seria
-// desperdício, e no topo do módulo exigiria await de nível superior,
-// que o bundle CJS do tsup não tem.
-let hashDescartavel: Promise<string> | null = null;
-
-export function obterHashDescartavel(): Promise<string> {
-  hashDescartavel ??= gerarHashSenha(randomUUID());
-  return hashDescartavel;
 }
 
 const corpoSignup = {

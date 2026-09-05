@@ -1,9 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { prisma } from "@gr-barber/database";
 import { buildApp } from "../../src/app";
-import { conferirSenha } from "../../src/lib/senha";
+import { conferirSenha, obterHashDescartavel } from "../../src/lib/senha";
 import { decodificarPayload } from "../helpers/decodificar-token";
-import { obterHashDescartavel } from "../../src/rotas/auth";
 import type { App } from "../../src/tipos";
 
 const CADASTRO = {

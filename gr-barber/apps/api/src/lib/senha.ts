@@ -1,4 +1,4 @@
-import { randomBytes, scrypt, timingSafeEqual } from "node:crypto";
+import { randomBytes, randomUUID, scrypt, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
 
 // scrypt do node:crypto, sem dependência externa e sem node-gyp. O
@@ -35,4 +35,31 @@ export async function conferirSenha(
 
   const calculado = await scryptAsync(senha, salt, TAMANHO_HASH);
   return timingSafeEqual(calculado, esperado);
+}
+
+// Hash de uma senha aleatória, no mesmo formato e tamanho de um real.
+// Serve só pra dar a um login sem conta o mesmo custo de derivação do
+// login com conta — ver o comentário na rota que usa isto. Tem que ser
+// bem formado: um valor malformado sairia pelo atalho do conferirSenha
+// sem derivar nada, que é justamente o vazamento que ele existe pra
+// fechar.
+//
+// Calculado sob demanda e guardado como a Promise, não o valor: assim,
+// chamadas concorrentes que chegam antes da primeira resolução recebem
+// a mesma promise em vez de cada uma disparar seu próprio scrypt — o
+// `??=` some antes de qualquer `await`, então a checagem e a gravação
+// são atômicas. Guardar o valor já resolvido (com `await` dentro do
+// `??=`) deixaria uma janela no cold start em que pedidos concorrentes
+// se veem com o cache ainda vazio e recalculam o hash cada um, e um
+// deles pagaria dois scrypts (este mais o conferirSenha) contra o um
+// do caminho de senha certa — o mesmo vazamento de tempo que a função
+// existe pra fechar, só que restrito a essa janela.
+//
+// No topo do módulo exigiria await de nível superior, que o bundle CJS
+// do tsup não tem.
+let hashDescartavel: Promise<string> | null = null;
+
+export function obterHashDescartavel(): Promise<string> {
+  hashDescartavel ??= gerarHashSenha(randomUUID());
+  return hashDescartavel;
 }
