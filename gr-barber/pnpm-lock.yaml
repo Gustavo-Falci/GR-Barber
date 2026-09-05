@@ -29,6 +29,9 @@ importers:
       '@gr-barber/database':
         specifier: workspace:*
         version: link:../../packages/database
+      '@gr-barber/formato':
+        specifier: workspace:*
+        version: link:../../packages/formato
       '@gr-barber/scheduling':
         specifier: workspace:*
         version: link:../../packages/scheduling
@@ -142,6 +145,21 @@ importers:
         version: 5.22.0
 
   packages/design-tokens: {}
+
+  packages/formato:
+    devDependencies:
+      '@gr-barber/config':
+        specifier: workspace:*
+        version: link:../config
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.20.1
+      typescript:
+        specifier: ^5.5.0
+        version: 5.9.3
+      vitest:
+        specifier: ^4.1.11
+        version: 4.1.11(@types/node@22.20.1)(vite@8.2.2(@types/node@22.20.1)(esbuild@0.28.2)(terser@5.51.2)(tsx@4.23.12)(yaml@2.9.0))
 
   packages/scheduling:
     dependencies:

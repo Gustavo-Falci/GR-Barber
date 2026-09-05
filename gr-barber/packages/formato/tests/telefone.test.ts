@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { ErroDeNegocio } from "../../src/lib/erro-negocio";
-import { normalizarTelefone } from "../../src/lib/telefone";
+import {
+  apenasDigitos,
+  formatarTelefoneParcial,
+  normalizarTelefone,
+  normalizarTelefoneObrigatorio,
+  TelefoneInvalido,
+} from "../src/index";
 
 describe("normalizarTelefone", () => {
   it("guarda celular com DDD no formato do cadastro", () => {
@@ -48,11 +53,47 @@ describe("normalizarTelefone", () => {
     // O schema barra antes, com 400. Esta é a rede de baixo: se algum
     // caminho futuro chamar sem passar pelo pattern, o pedido morre
     // aqui em vez de gravar um formato que a chave única não reconhece.
-    expect(() => normalizarTelefone("99999-8888")).toThrow(ErroDeNegocio);
+    expect(() => normalizarTelefone("99999-8888")).toThrow(TelefoneInvalido);
   });
 
   it("recusa contagem de dígitos que não é telefone brasileiro", () => {
-    expect(() => normalizarTelefone("12345")).toThrow(ErroDeNegocio);
-    expect(() => normalizarTelefone("119999988889")).toThrow(ErroDeNegocio);
+    expect(() => normalizarTelefone("12345")).toThrow(TelefoneInvalido);
+    expect(() => normalizarTelefone("119999988889")).toThrow(TelefoneInvalido);
+  });
+
+  it("recusa telefone ausente quando ele é obrigatório", () => {
+    expect(() => normalizarTelefoneObrigatorio("")).toThrow(TelefoneInvalido);
+  });
+});
+
+describe("formatarTelefoneParcial", () => {
+  // A tela chama isto a cada tecla. Lançar no meio da digitação
+  // apagaria o campo do usuário antes de ele terminar de digitar — por
+  // isso esta função nunca lança, e quem valida é o normalizar.
+  it("formata enquanto o número ainda está incompleto", () => {
+    expect(formatarTelefoneParcial("")).toBe("");
+    expect(formatarTelefoneParcial("1")).toBe("(1");
+    expect(formatarTelefoneParcial("11")).toBe("(11)");
+    expect(formatarTelefoneParcial("119")).toBe("(11) 9");
+    expect(formatarTelefoneParcial("1199999")).toBe("(11) 99999");
+    expect(formatarTelefoneParcial("11999998")).toBe("(11) 99999-8");
+  });
+
+  it("chega no formato guardado quando o número fica completo", () => {
+    expect(formatarTelefoneParcial("11999998888")).toBe("(11) 99999-8888");
+    expect(formatarTelefoneParcial("1133334444")).toBe("(11) 3333-4444");
+  });
+
+  it("ignora o que não é dígito e o excedente", () => {
+    expect(formatarTelefoneParcial("+55 (11) 99999-8888")).toBe(
+      "(11) 99999-8888"
+    );
+    expect(formatarTelefoneParcial("119999988881234")).toBe("(11) 99999-8888");
+  });
+});
+
+describe("apenasDigitos", () => {
+  it("tira a pontuação pra comparação dígito a dígito", () => {
+    expect(apenasDigitos("(11) 99999-8888")).toBe("11999998888");
   });
 });

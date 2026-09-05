@@ -349,14 +349,19 @@ export function formatarTelefoneParcial(valor: string): string {
   const ddd = digitos.slice(0, 2);
   const assinante = digitos.slice(2);
 
-  // Só há como saber se é fixo (8) ou celular (9) quando o número
-  // fecha. Até lá o corte fica em 4 pro fim, que é o que produz
-  // "(11) 99999-8" e não "(11) 9999-98".
-  const corte = assinante.length > 8 ? 5 : 4;
+  // Onde cai o traço depende de o número ser fixo (8 dígitos, 4+4) ou
+  // celular (9, 5+4), e no meio da digitação não dá pra saber qual dos
+  // dois está sendo digitado. A regra: até 5 dígitos não há traço,
+  // porque nenhum dos dois formatos tem traço aí; com exatamente 8 o
+  // número é um fixo completo e ganha 4+4; qualquer outra contagem é
+  // tratada como celular, que é a esmagadora maioria do que os clientes
+  // digitam. O efeito colateral é um fixo pela metade aparecer como
+  // "(11) 33334-44" até o oitavo dígito — transitório, e o alternativo
+  // seria assumir fixo e piscar o traço no celular, que é o caso comum.
+  if (assinante.length <= 5) return `(${ddd}) ${assinante}`;
 
-  return assinante.length <= corte
-    ? `(${ddd}) ${assinante}`
-    : `(${ddd}) ${assinante.slice(0, corte)}-${assinante.slice(corte)}`;
+  const corte = assinante.length === 8 ? 4 : 5;
+  return `(${ddd}) ${assinante.slice(0, corte)}-${assinante.slice(corte)}`;
 }
 
 // Só os dígitos, pra comparar com o que o barbeiro digitou na busca. A
