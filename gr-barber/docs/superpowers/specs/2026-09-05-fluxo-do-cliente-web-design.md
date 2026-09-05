@@ -50,8 +50,18 @@ Quatro perguntas fechadas com o dono do projeto:
    primeiro acesso, que define a senha de um cadastro que ainda não tem
    uma. Sem o primeiro acesso ninguém jamais teria senha, e a conta
    seria inalcançável — a API já expõe as duas rotas
-   (`/auth/cliente/login` e `/auth/cliente/signup`), e é o `temConta`
-   do cadastro que diz qual das duas a tela oferece.
+   (`/auth/cliente/login` e `/auth/cliente/signup`).
+
+   **Quem escolhe entre as duas é a pessoa, não a tela.** Não existe
+   rota pública que responda se um telefone já tem senha, e é de
+   propósito: seria exatamente a sondagem que o `409` do signup já é
+   criticado por permitir. Então a tela tem duas ações explícitas —
+   "Entrar" e "Primeiro acesso" — e cada uma reage ao que a API
+   responder: `nao_autenticado` no login vira "telefone ou senha
+   incorretos", e `conflito` no primeiro acesso vira "esse telefone já
+   tem senha, use Entrar". O `temConta` que o cadastro devolve depois do
+   login serve pra outra coisa: preencher a tela de dados de quem já
+   está autenticado.
 4. **Tudo é buscado no navegador, por um caminho de dados só.** Todas as
    telas são client components falando com o `api-client`. A alternativa
    híbrida — perfil e serviços em Server Components — traria um segundo
@@ -213,8 +223,9 @@ instalou. Um teste por comportamento que pode quebrar em produção:
   a lista
 - telefone formata enquanto digita, e o envio manda `(11) 99999-8888`
 - dados preenchidos quando existe sessão daquela barbearia
-- `/entrar` oferece primeiro acesso quando o cadastro não tem senha, e
-  login quando tem
+- `/entrar` traduz `nao_autenticado` do login em "telefone ou senha
+  incorretos", e `conflito` do primeiro acesso em "esse telefone já tem
+  senha"
 - o caminho de remarcar vai do horário direto pra confirmação, sem
   passar pelo passo de dados
 - `/minha-conta` com 401 manda pra `/entrar`
