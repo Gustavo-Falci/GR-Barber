@@ -23,7 +23,8 @@ const rotadorFalso = {
 };
 
 vi.mock("next/navigation", () => ({
-  useParams: () => ({ slug: navegacaoFalsa.slug }),
+  useParams: () => ({ slug: navegacaoFalsa.slug, ...navegacaoFalsa.params }),
   useSearchParams: () => navegacaoFalsa.query,
+  usePathname: () => navegacaoFalsa.pathname,
   useRouter: () => rotadorFalso,
 }));

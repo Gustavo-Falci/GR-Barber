@@ -33,3 +33,18 @@ export function apiDoCliente(
     fetch: fetchInjetado,
   });
 }
+
+// Dois escopos, e não só `.barbeiro`: a disponibilidade é rota pública
+// por slug e não tem gêmea no escopo do barbeiro, mas a tela de novo
+// agendamento precisa dela. Montar um segundo client dentro da tela
+// duplicaria baseUrl e aoExpirarSessao. O `apiDoBarbeiro` acima
+// continua para quem só quer o escopo protegido.
+export function apiDoPainel(fetchInjetado?: typeof globalThis.fetch) {
+  const client = criarApiClient({
+    baseUrl: BASE_URL,
+    obterToken: () => sessaoDoBarbeiro.ler(),
+    aoExpirarSessao: () => sessaoDoBarbeiro.limpar(),
+    fetch: fetchInjetado,
+  });
+  return { barbeiro: client.barbeiro, publico: client.publico };
+}

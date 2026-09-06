@@ -6,11 +6,24 @@ import { vi } from "vitest";
 // módulo, e um helper importado não seria içado junto.
 export const navegacaoFalsa = {
   slug: "gr-barber",
+  // As rotas do painel têm [id]; o slug continua separado porque as
+  // telas do cliente o leem por nome.
+  params: {} as Record<string, string>,
+  pathname: "/",
   query: new URLSearchParams(),
-  push: vi.fn(),
-  replace: vi.fn(),
-  redefinir(entrada: { slug?: string; query?: Record<string, string> } = {}) {
+  push: vi.fn((_destino: string) => {}),
+  replace: vi.fn((_destino: string) => {}),
+  redefinir(
+    entrada: {
+      slug?: string;
+      params?: Record<string, string>;
+      pathname?: string;
+      query?: Record<string, string>;
+    } = {}
+  ) {
     this.slug = entrada.slug ?? "gr-barber";
+    this.params = entrada.params ?? {};
+    this.pathname = entrada.pathname ?? "/";
     this.query = new URLSearchParams(entrada.query ?? {});
     this.push.mockClear();
     this.replace.mockClear();
