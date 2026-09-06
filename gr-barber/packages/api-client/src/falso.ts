@@ -14,6 +14,7 @@ import type {
   EdicaoDoCliente,
   EdicaoDoPerfil,
   EdicaoDoServico,
+  NovaBarbearia,
   NovoCliente,
   NovoServico,
 } from "./barbeiro";
@@ -31,8 +32,16 @@ export interface EstadoFalso {
   servicos: ServicoSerializado[];
   horariosLivres: string[];
   diasComVaga: Record<string, boolean>;
-  agendamentos: AgendamentoSerializado[];
+  // O `clienteId` é do dublê, não da API: AgendamentoSerializado não o
+  // tem, e sem ele `comCliente` não sabe qual dos clientes da lista
+  // pertence a cada agendamento. Opcional para não quebrar as sementes
+  // do sub-projeto B, que não o informam.
+  agendamentos: (AgendamentoSerializado & { clienteId?: string })[];
+  // O cliente logado, que o escopo `clientes-me` usa.
   cliente: ClienteSerializado;
+  // Os clientes que o barbeiro enxerga. Lista separada porque as duas
+  // perguntas são diferentes: "quem sou eu" e "quem são os meus".
+  clientes: ClienteSerializado[];
 }
 
 const PERFIL_PADRAO: PerfilPublicoBarbearia = {
@@ -80,6 +89,7 @@ export function criarApiClientFalso(semente: Partial<EstadoFalso> = {}) {
     diasComVaga: { ...(semente.diasComVaga ?? {}) },
     agendamentos: [...(semente.agendamentos ?? [])],
     cliente: semente.cliente ?? CLIENTE_PADRAO,
+    clientes: [...(semente.clientes ?? [CLIENTE_PADRAO])],
   };
 
   function exigirSlug(slug: string): void {
@@ -110,7 +120,8 @@ export function criarApiClientFalso(semente: Partial<EstadoFalso> = {}) {
     servicoIds: string[];
     origem: string;
     observacoes?: string;
-  }): AgendamentoSerializado {
+    clienteId?: string;
+  }): AgendamentoSerializado & { clienteId?: string } {
     // A trava do banco não deixa dois ativos no mesmo horário; o dublê
     // reproduz isso porque a tela precisa saber tratar horario_ocupado
     // mesmo tendo acabado de ver o horário como livre.
@@ -128,7 +139,7 @@ export function criarApiClientFalso(semente: Partial<EstadoFalso> = {}) {
       );
     }
 
-    const agendamento: AgendamentoSerializado = {
+    const agendamento: AgendamentoSerializado & { clienteId?: string } = {
       id: `a${estado.agendamentos.length + 1}`,
       data: entrada.data,
       horaInicio: entrada.horaInicio,
@@ -136,6 +147,7 @@ export function criarApiClientFalso(semente: Partial<EstadoFalso> = {}) {
       status: "pendente",
       origem: entrada.origem,
       observacoes: entrada.observacoes ?? null,
+      clienteId: entrada.clienteId,
       servicos: entrada.servicoIds.map((servicoId) => {
         const servico = estado.servicos.find((s) => s.id === servicoId);
         return {
@@ -152,9 +164,12 @@ export function criarApiClientFalso(semente: Partial<EstadoFalso> = {}) {
   }
 
   function comCliente(
-    agendamento: AgendamentoSerializado
+    agendamento: AgendamentoSerializado & { clienteId?: string }
   ): AgendamentoComCliente {
-    return { ...agendamento, cliente: estado.cliente };
+    const dono =
+      estado.clientes.find((c) => c.id === agendamento.clienteId) ??
+      estado.cliente;
+    return { ...agendamento, cliente: dono };
   }
 
   // Ajudantes que dois métodos chamam ficam aqui fora, e não como
@@ -170,6 +185,24 @@ export function criarApiClientFalso(semente: Partial<EstadoFalso> = {}) {
     }
     estado.servicos[indice] = { ...estado.servicos[indice], ...edicao };
     return estado.servicos[indice];
+  }
+
+  // Nome sem acento e sem caixa; telefone dígito a dígito. É o que a
+  // busca de clientes da API faz em SQL cru com regexp_replace.
+  function combina(cliente: ClienteSerializado, busca: string): boolean {
+    const alvo = busca.trim();
+    if (!alvo) return true;
+
+    const semAcento = (texto: string) =>
+      texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
+    if (semAcento(cliente.nome).includes(semAcento(alvo))) return true;
+
+    const digitos = alvo.replace(/\D/g, "");
+    return (
+      digitos.length > 0 &&
+      cliente.telefone.replace(/\D/g, "").includes(digitos)
+    );
   }
 
   function cancelarAgendamento(id: string): AgendamentoSerializado {
@@ -241,8 +274,20 @@ export function criarApiClientFalso(semente: Partial<EstadoFalso> = {}) {
     },
 
     barbeiro: {
-      async signup() {
-        return sessaoDoBarbeiro;
+      async signup(nova: NovaBarbearia) {
+        return {
+          token: "jwt-falso-barbeiro",
+          barbeiro: {
+            id: "bb1",
+            nome: nova.barbeiro.nome,
+            email: nova.barbeiro.email,
+          },
+          barbearia: {
+            id: estado.perfil.id,
+            nome: nova.barbearia.nome,
+            slug: nova.barbearia.slug,
+          },
+        };
       },
       async login() {
         return sessaoDoBarbeiro;
@@ -294,25 +339,43 @@ export function criarApiClientFalso(semente: Partial<EstadoFalso> = {}) {
       async desativarServico(id: string) {
         return editarServico(id, { ativo: false });
       },
-      async clientes() {
-        return [estado.cliente];
+      async clientes(busca?: string) {
+        return estado.clientes.filter((c) => combina(c, busca ?? ""));
       },
       async criarCliente(novo: NovoCliente) {
-        estado.cliente = { ...estado.cliente, ...novo };
-        return estado.cliente;
+        const repetido = estado.clientes.some(
+          (c) => c.telefone.replace(/\D/g, "") === novo.telefone.replace(/\D/g, "")
+        );
+        if (repetido) {
+          throw new ErroDaApi(409, "conflito", "esse telefone já tem cadastro");
+        }
+        const cliente: ClienteSerializado = {
+          id: `c${estado.clientes.length + 1}`,
+          nome: novo.nome,
+          telefone: novo.telefone,
+          email: novo.email ?? null,
+          temConta: false,
+        };
+        estado.clientes.push(cliente);
+        return cliente;
       },
       async cliente(id: string) {
-        if (id !== estado.cliente.id) {
+        const achado = estado.clientes.find((c) => c.id === id);
+        if (!achado) {
           throw new ErroDaApi(404, "nao_encontrado", "cliente não encontrado");
         }
-        return { ...estado.cliente, agendamentos: estado.agendamentos };
+        return {
+          ...achado,
+          agendamentos: estado.agendamentos.filter((a) => a.clienteId === id),
+        };
       },
       async atualizarCliente(id: string, edicao: EdicaoDoCliente) {
-        if (id !== estado.cliente.id) {
+        const indice = estado.clientes.findIndex((c) => c.id === id);
+        if (indice < 0) {
           throw new ErroDaApi(404, "nao_encontrado", "cliente não encontrado");
         }
-        estado.cliente = { ...estado.cliente, ...edicao };
-        return estado.cliente;
+        estado.clientes[indice] = { ...estado.clientes[indice], ...edicao };
+        return estado.clientes[indice];
       },
       async agendamentosDoDia(data: string) {
         return estado.agendamentos
