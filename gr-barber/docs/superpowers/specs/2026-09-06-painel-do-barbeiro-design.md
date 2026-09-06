@@ -452,6 +452,13 @@ que o falso pode se afastar da API real sem teste de contrato.
   novo na mesma hora — mas uma aba antiga aberta em outro lugar segue
   com o velho até recarregar. Fecha de vez quando `GET /me` devolver a
   barbearia inteira, o que é mudança de API.
+- **O painel lê a própria barbearia pela rota pública.** A API tem
+  `PATCH /barbearias/me` e nenhum `GET`: a única leitura dos dados da
+  barbearia é `GET /barbearias/:slug`, a mesma que o cliente usa. Serve,
+  porque o painel já tem o slug, mas quer dizer que a tela de
+  configurações depende de uma rota pública para exibir o que ela
+  própria escreve. Fecha com um `GET /barbearias/me`, que é mudança de
+  API.
 - **O prefixo `/painel` protege as rotas de hoje, não as de amanhã.** A
   API continua sem lista de slugs reservados; qualquer rota nova na
   raiz do `apps/web` volta a criar a colisão. A proteção de verdade é
