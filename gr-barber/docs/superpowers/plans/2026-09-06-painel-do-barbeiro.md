@@ -1,3 +1,4 @@
+
 # Painel web do barbeiro — plano de implementação
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use
@@ -66,56 +67,56 @@ repositório.
 
 **Pacote `api-client` (Tarefa 1)**
 
-| Arquivo | Responsabilidade |
-|---|---|
-| `packages/api-client/src/falso.ts` | passa a guardar **lista** de clientes, `clienteId` por agendamento, e `signup` que respeita a entrada |
-| `packages/api-client/tests/falso.test.ts` | cobre os três reparos |
+| Arquivo                                     | Responsabilidade                                                                                               |
+| ------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `packages/api-client/src/falso.ts`        | passa a guardar**lista** de clientes, `clienteId` por agendamento, e `signup` que respeita a entrada |
+| `packages/api-client/tests/falso.test.ts` | cobre os três reparos                                                                                         |
 
 **Sessão e tema (Tarefas 2 e 3)**
 
-| Arquivo | Responsabilidade |
-|---|---|
-| `apps/web/src/sessao/armazenamento.ts` | ganha `sessaoDaBarbearia` e `encerrarSessaoDoBarbeiro()` |
-| `apps/web/src/painel/tema.ts` | chave, leitura, aplicação e o script inline |
-| `apps/web/app/tokens-css.ts` | três blocos de tema em vez de dois |
-| `apps/web/app/layout.tsx` | script de tema no `<head>` |
-| `apps/web/app/(publico)/layout.tsx` | perde a `<div data-theme>` |
+| Arquivo                                  | Responsabilidade                                            |
+| ---------------------------------------- | ----------------------------------------------------------- |
+| `apps/web/src/sessao/armazenamento.ts` | ganha`sessaoDaBarbearia` e `encerrarSessaoDoBarbeiro()` |
+| `apps/web/src/painel/tema.ts`          | chave, leitura, aplicação e o script inline               |
+| `apps/web/app/tokens-css.ts`           | três blocos de tema em vez de dois                         |
+| `apps/web/app/layout.tsx`              | script de tema no`<head>`                                 |
+| `apps/web/app/(publico)/layout.tsx`    | perde a`<div data-theme>`                                 |
 
 **Shell do painel (Tarefa 4)**
 
-| Arquivo | Responsabilidade |
-|---|---|
-| `apps/web/src/painel/ProvedorDoPainel.tsx` | o `api.barbeiro` em contexto; aceita dublê no teste |
-| `apps/web/src/painel/SessaoDoPainel.tsx` | guarda, perfil em contexto, `sair()` |
-| `apps/web/src/painel/NavegacaoDoPainel.tsx` | barra superior, links, botão de tema |
-| `apps/web/app/(painel)/painel/(guardado)/layout.tsx` | monta os três acima |
-| `apps/web/tests/ajudantes/navegacao.ts` | passa a carregar `params` e `pathname` |
+| Arquivo                                                | Responsabilidade                                      |
+| ------------------------------------------------------ | ----------------------------------------------------- |
+| `apps/web/src/painel/ProvedorDoPainel.tsx`           | o`api.barbeiro` em contexto; aceita dublê no teste |
+| `apps/web/src/painel/SessaoDoPainel.tsx`             | guarda, perfil em contexto,`sair()`                 |
+| `apps/web/src/painel/NavegacaoDoPainel.tsx`          | barra superior, links, botão de tema                 |
+| `apps/web/app/(painel)/painel/(guardado)/layout.tsx` | monta os três acima                                  |
+| `apps/web/tests/ajudantes/navegacao.ts`              | passa a carregar`params` e `pathname`             |
 
 **Componentes novos (nas tarefas que os usam)**
 
-| Arquivo | Tarefa |
-|---|---|
-| `apps/web/src/componentes/Estatistica.tsx` | 6 |
-| `apps/web/src/componentes/GradeDeAgenda.tsx` | 7 |
-| `apps/web/src/componentes/Tabela.tsx` | 10 |
+| Arquivo                                        | Tarefa |
+| ---------------------------------------------- | ------ |
+| `apps/web/src/componentes/Estatistica.tsx`   | 6      |
+| `apps/web/src/componentes/GradeDeAgenda.tsx` | 7      |
+| `apps/web/src/componentes/Tabela.tsx`        | 10     |
 
 **Telas** — todas em `apps/web/src/telas/painel/`, com a `page.tsx`
 correspondente em `apps/web/app/(painel)/painel/…` servindo só de
 casca. Uma tela por arquivo, um teste por tela.
 
-| Tela | Rota | Tarefa |
-|---|---|---|
-| `EntrarNoPainel.tsx` | `/painel/entrar` | 5 |
-| `DashboardDoDia.tsx` | `/painel` | 6 |
-| `AgendaDoDia.tsx` | `/painel/agenda` | 7 |
-| `NovoAgendamento.tsx` | `/painel/agendamentos/novo` | 8 |
-| `DetalheDoAgendamento.tsx` | `/painel/agendamentos/[id]` | 9 |
-| `ListaDeClientes.tsx` | `/painel/clientes` | 10 |
-| `CadastroDeCliente.tsx` | `/painel/clientes/novo` | 10 |
-| `DetalheDoCliente.tsx` | `/painel/clientes/[id]` | 10 |
-| `ListaDeServicos.tsx` | `/painel/servicos` | 11 |
-| `CadastroDeServico.tsx` | `/painel/servicos/novo` e `/[id]` | 11 |
-| `ConfiguracoesDaBarbearia.tsx` | `/painel/configuracoes` | 12 |
+| Tela                             | Rota                                  | Tarefa |
+| -------------------------------- | ------------------------------------- | ------ |
+| `EntrarNoPainel.tsx`           | `/painel/entrar`                    | 5      |
+| `DashboardDoDia.tsx`           | `/painel`                           | 6      |
+| `AgendaDoDia.tsx`              | `/painel/agenda`                    | 7      |
+| `NovoAgendamento.tsx`          | `/painel/agendamentos/novo`         | 8      |
+| `DetalheDoAgendamento.tsx`     | `/painel/agendamentos/[id]`         | 9      |
+| `ListaDeClientes.tsx`          | `/painel/clientes`                  | 10     |
+| `CadastroDeCliente.tsx`        | `/painel/clientes/novo`             | 10     |
+| `DetalheDoCliente.tsx`         | `/painel/clientes/[id]`             | 10     |
+| `ListaDeServicos.tsx`          | `/painel/servicos`                  | 11     |
+| `CadastroDeServico.tsx`        | `/painel/servicos/novo` e `/[id]` | 11     |
+| `ConfiguracoesDaBarbearia.tsx` | `/painel/configuracoes`             | 12     |
 
 **Limpeza (Tarefa 13):** `apps/web/app/primitivos/` sai;
 `docs/screens.md` e `docs/roadmap.md` registram as doze rotas.
@@ -136,10 +137,12 @@ escopo `clientes-me` usa, e as oito telas do sub-projeto B dependem
 dele. O que entra é `estado.clientes`, a lista que o barbeiro enxerga.
 
 **Files:**
+
 - Modify: `packages/api-client/src/falso.ts`
 - Test: `packages/api-client/tests/falso.test.ts`
 
 **Interfaces:**
+
 - Consumes: nada de tarefas anteriores.
 - Produces:
   - `EstadoFalso.clientes: ClienteSerializado[]` — semeável, padrão
@@ -460,10 +463,12 @@ slug e a tela de novo agendamento depende dela. Ele chega uma vez só, no
 `SessaoBarbeiro` do login e do signup.
 
 **Files:**
+
 - Modify: `apps/web/src/sessao/armazenamento.ts`
 - Test: `apps/web/tests/sessao/armazenamento.test.ts`
 
 **Interfaces:**
+
 - Consumes: `Sessao`, `sessaoNaChave`, `sessaoDoBarbeiro` (já existem).
 - Produces:
   - `sessaoDaBarbearia: Sessao` na chave `sessao.barbearia`.
@@ -550,6 +555,7 @@ cliente escurece num celular no modo escuro, contra o que a spec do
 sub-projeto B decidiu.
 
 **Files:**
+
 - Create: `apps/web/src/painel/tema.ts`
 - Create: `apps/web/tests/painel/tema.test.ts`
 - Modify: `apps/web/app/tokens-css.ts`
@@ -558,6 +564,7 @@ sub-projeto B decidiu.
 - Test: `apps/web/tests/app/tokens-css.test.ts`
 
 **Interfaces:**
+
 - Consumes: `cssDeTokens` (já existe).
 - Produces:
   - `type Tema = "claro" | "escuro"`
@@ -788,6 +795,7 @@ subgrupo guardado — dentro dele, a guarda redirecionaria a tela para ela
 mesma.
 
 **Files:**
+
 - Create: `apps/web/src/painel/ProvedorDoPainel.tsx`
 - Create: `apps/web/src/painel/SessaoDoPainel.tsx`
 - Create: `apps/web/src/painel/NavegacaoDoPainel.tsx`
@@ -798,6 +806,7 @@ mesma.
 - Test: `apps/web/tests/painel/sessao-do-painel.test.tsx`
 
 **Interfaces:**
+
 - Consumes: `apiDoBarbeiro` (`src/sessao/cliente-da-api.ts`),
   `sessaoDoBarbeiro`, `sessaoDaBarbearia`, `encerrarSessaoDoBarbeiro`
   (Tarefa 2), `lerTema`, `gravarTema`, `aplicarTema`, `temaDoSistema`
@@ -1269,12 +1278,14 @@ D, entre o fim deste sub-projeto e o do próximo o painel é o único
 caminho pelo qual uma barbearia pode existir.
 
 **Files:**
+
 - Create: `apps/web/src/telas/painel/EntrarNoPainel.tsx`
 - Create: `apps/web/src/telas/painel/EntrarNoPainel.module.css`
 - Create: `apps/web/app/(painel)/painel/entrar/page.tsx`
 - Test: `apps/web/tests/telas/painel/entrar-no-painel.test.tsx`
 
 **Interfaces:**
+
 - Consumes: `ProvedorDoPainel`, `useApiDoBarbeiro` (Tarefa 4),
   `sessaoDoBarbeiro`, `sessaoDaBarbearia` (Tarefa 2), `Botao`, `Campo`,
   `Aviso`.
@@ -1583,5 +1594,919 @@ on its field instead of a 400 in English."
 
 ---
 
-O plano continua nas tarefas 6 a 13 — dashboard, agenda, novo
-agendamento, detalhe, clientes, serviços, configurações e limpeza.
+### Task 6: `/painel` — dashboard do dia
+
+Três números e a lista do dia. Tudo sai do que a API já devolve: nenhuma
+rota nova.
+
+**Files:**
+- Create: `apps/web/src/componentes/Estatistica.tsx`
+- Create: `apps/web/src/componentes/Estatistica.module.css`
+- Create: `apps/web/src/painel/metricas.ts`
+- Create: `apps/web/src/telas/painel/DashboardDoDia.tsx`
+- Create: `apps/web/src/telas/painel/DashboardDoDia.module.css`
+- Create: `apps/web/app/(painel)/painel/(guardado)/page.tsx`
+- Test: `apps/web/tests/painel/metricas.test.ts`
+- Test: `apps/web/tests/telas/painel/dashboard.test.tsx`
+
+**Interfaces:**
+- Consumes: `usePainel` (Tarefa 4), `useApiDoBarbeiro` (Tarefa 4),
+  `useRequisicao`, `hojeIso` (`src/formato/datas.ts`), `formatarPreco`
+  (`src/componentes/ItemDeServico.tsx`).
+- Produces:
+  - `Estatistica({ numero, legenda }: { numero: string; legenda: string })`
+  - `CONTAM: readonly string[]` — os status que entram nas contas
+  - `minutosOcupados(agendamentos: AgendamentoComCliente[]): number`
+  - `minutosDeFuncionamento(horario: HorarioSerializado | undefined): number`
+  - `ocupacao(agendamentos, horario): number | null` — `null` em dia fechado
+  - `previstoDoDia(agendamentos: AgendamentoComCliente[]): string`
+  - `DashboardDoDia({ agora }: { agora?: Date })`
+
+- [ ] **Step 1: Escrever o teste das métricas**
+
+`apps/web/tests/painel/metricas.test.ts`:
+
+```ts
+import { describe, expect, it } from "vitest";
+import type { AgendamentoComCliente, HorarioSerializado } from "@gr-barber/types";
+import {
+  minutosOcupados,
+  ocupacao,
+  previstoDoDia,
+} from "../../src/painel/metricas";
+
+const CLIENTE = {
+  id: "c1",
+  nome: "João Silva",
+  telefone: "(11) 99999-0001",
+  email: null,
+  temConta: false,
+};
+
+function agendamento(
+  status: string,
+  minutos: number,
+  preco: string
+): AgendamentoComCliente {
+  return {
+    id: `a-${status}-${minutos}`,
+    data: "2026-09-08",
+    horaInicio: "09:00",
+    horaFim: "09:30",
+    status,
+    origem: "barbeiro",
+    observacoes: null,
+    servicos: [
+      {
+        servicoId: "s1",
+        nome: "Corte",
+        precoNoMomento: preco,
+        duracaoNoMomento: minutos,
+      },
+    ],
+    cliente: CLIENTE,
+  };
+}
+
+const ABERTO: HorarioSerializado = {
+  diaSemana: 2,
+  horaAbertura: "09:00",
+  horaFechamento: "18:00",
+  fechado: false,
+};
+
+const FECHADO: HorarioSerializado = {
+  diaSemana: 0,
+  horaAbertura: null,
+  horaFechamento: null,
+  fechado: true,
+};
+
+describe("métricas do dia", () => {
+  it("soma minutos de pendente, confirmado e concluído", () => {
+    const lista = [
+      agendamento("pendente", 30, "40.00"),
+      agendamento("confirmado", 20, "25.00"),
+      agendamento("concluido", 45, "60.00"),
+    ];
+
+    expect(minutosOcupados(lista)).toBe(95);
+  });
+
+  it("ignora cancelado e no_show", () => {
+    // Horário que voltou a ficar livre não ocupa a agenda nem promete
+    // dinheiro.
+    const lista = [
+      agendamento("pendente", 30, "40.00"),
+      agendamento("cancelado", 30, "40.00"),
+      agendamento("no_show", 30, "40.00"),
+    ];
+
+    expect(minutosOcupados(lista)).toBe(30);
+    expect(previstoDoDia(lista)).toBe("40.00");
+  });
+
+  it("a ocupação é minutos agendados sobre minutos de funcionamento", () => {
+    // 09:00 às 18:00 são 540 minutos; 135 deles ocupados dão 25%.
+    const lista = [
+      agendamento("pendente", 90, "40.00"),
+      agendamento("confirmado", 45, "60.00"),
+    ];
+
+    expect(ocupacao(lista, ABERTO)).toBe(25);
+  });
+
+  it("dia fechado não tem ocupação, e não é zero", () => {
+    // Zero por cento diria "aberto e vazio". Dividir por zero seria o
+    // outro erro.
+    expect(ocupacao([], FECHADO)).toBeNull();
+    expect(ocupacao([], undefined)).toBeNull();
+  });
+
+  it("o previsto soma o preço congelado, não o de hoje", () => {
+    const lista = [
+      agendamento("pendente", 30, "40.00"),
+      agendamento("confirmado", 20, "25.50"),
+    ];
+
+    expect(previstoDoDia(lista)).toBe("65.50");
+  });
+});
+```
+
+- [ ] **Step 2: Rodar e ver falhar**
+
+Run: `pnpm --filter @gr-barber/web exec vitest run tests/painel/metricas.test.ts`
+Expected: FAIL — `src/painel/metricas.ts` não existe.
+
+- [ ] **Step 3: Implementar as métricas**
+
+`apps/web/src/painel/metricas.ts`:
+
+```ts
+import type { AgendamentoComCliente, HorarioSerializado } from "@gr-barber/types";
+
+// Previsto do dia, não caixa: com dinheiro contando só o concluído, o
+// número ficaria zerado até o barbeiro marcar as conclusões, e ele só
+// marca se o número servir pra alguma coisa. Cancelado e no_show ficam
+// de fora porque o horário voltou a ficar livre.
+export const CONTAM = ["pendente", "confirmado", "concluido"] as const;
+
+function valem(agendamentos: AgendamentoComCliente[]): AgendamentoComCliente[] {
+  return agendamentos.filter((a) => (CONTAM as readonly string[]).includes(a.status));
+}
+
+export function minutosOcupados(agendamentos: AgendamentoComCliente[]): number {
+  return valem(agendamentos).reduce(
+    (total, a) =>
+      total + a.servicos.reduce((soma, s) => soma + s.duracaoNoMomento, 0),
+    0
+  );
+}
+
+export function minutosDeFuncionamento(
+  horario: HorarioSerializado | undefined
+): number {
+  if (!horario || horario.fechado || !horario.horaAbertura || !horario.horaFechamento) {
+    return 0;
+  }
+  const emMinutos = (hora: string) => {
+    const [h, m] = hora.split(":").map(Number);
+    return h * 60 + m;
+  };
+  return emMinutos(horario.horaFechamento) - emMinutos(horario.horaAbertura);
+}
+
+// `null`, e não zero: zero por cento diria "aberto e vazio", e dia
+// fechado não é isso. Dividir por zero seria o outro erro.
+export function ocupacao(
+  agendamentos: AgendamentoComCliente[],
+  horario: HorarioSerializado | undefined
+): number | null {
+  const janela = minutosDeFuncionamento(horario);
+  if (janela <= 0) return null;
+  return Math.round((minutosOcupados(agendamentos) / janela) * 100);
+}
+
+// String de ponta a ponta: o preço é Decimal no banco e passar por
+// float perderia centavo. A soma acontece em centavos inteiros.
+export function previstoDoDia(agendamentos: AgendamentoComCliente[]): string {
+  const centavos = valem(agendamentos).reduce(
+    (total, a) =>
+      total +
+      a.servicos.reduce((soma, s) => soma + Math.round(Number(s.precoNoMomento) * 100), 0),
+    0
+  );
+  return (centavos / 100).toFixed(2);
+}
+```
+
+- [ ] **Step 4: Rodar e ver passar**
+
+Run: `pnpm --filter @gr-barber/web exec vitest run tests/painel/metricas.test.ts`
+Expected: PASS
+
+- [ ] **Step 5: Escrever o teste da tela**
+
+`apps/web/tests/telas/painel/dashboard.test.tsx`:
+
+```tsx
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { beforeEach, describe, expect, it } from "vitest";
+import { criarApiClientFalso } from "@gr-barber/api-client";
+import { DashboardDoDia } from "../../../src/telas/painel/DashboardDoDia";
+import { navegacaoFalsa } from "../../ajudantes/navegacao";
+import { montarPainel } from "../../ajudantes/painel";
+
+// Data fixa e instante fixo: teste que compara data fixa com o relógio
+// real passa hoje e falha sozinho depois.
+const AGORA = new Date("2026-09-08T10:00:00-03:00");
+const HOJE = "2026-09-08";
+
+function semear() {
+  return criarApiClientFalso({
+    clientes: [
+      { id: "c1", nome: "João Silva", telefone: "(11) 99999-0001", email: null, temConta: false },
+    ],
+    agendamentos: [
+      {
+        id: "a1",
+        clienteId: "c1",
+        data: HOJE,
+        horaInicio: "09:00",
+        horaFim: "09:30",
+        status: "confirmado",
+        origem: "cliente",
+        observacoes: null,
+        servicos: [
+          { servicoId: "s1", nome: "Corte", precoNoMomento: "40.00", duracaoNoMomento: 30 },
+        ],
+      },
+    ],
+  });
+}
+
+describe("dashboard do dia", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    navegacaoFalsa.redefinir({ pathname: "/painel" });
+  });
+
+  it("mostra a contagem, a ocupação e o previsto", async () => {
+    montarPainel(<DashboardDoDia agora={AGORA} />, semear());
+
+    expect(await screen.findByText("1")).toBeInTheDocument();
+    // 30 dos 540 minutos entre 09:00 e 18:00.
+    expect(screen.getByText("6%")).toBeInTheDocument();
+    expect(screen.getByText("R$ 40,00")).toBeInTheDocument();
+    // "Previsto", não "faturamento": o número é promessa, não caixa.
+    expect(screen.getByText(/previsto/i)).toBeInTheDocument();
+  });
+
+  it("lista os agendamentos de hoje e leva ao detalhe", async () => {
+    montarPainel(<DashboardDoDia agora={AGORA} />, semear());
+
+    await userEvent.click(await screen.findByRole("button", { name: /João Silva/ }));
+
+    expect(navegacaoFalsa.push).toHaveBeenCalledWith("/painel/agendamentos/a1");
+  });
+
+  it("num dia sem agendamento diz isso em vez de mostrar tabela vazia", async () => {
+    montarPainel(<DashboardDoDia agora={AGORA} />, criarApiClientFalso({ agendamentos: [] }));
+
+    expect(await screen.findByText(/nenhum agendamento hoje/i)).toBeInTheDocument();
+  });
+});
+```
+
+Este teste usa um ajudante novo, `montarPainel`, que monta provedor e
+contexto de uma vez — quinze arquivos de teste repetiriam o mesmo
+aninhamento. Crie `apps/web/tests/ajudantes/painel.tsx`:
+
+```tsx
+import { render } from "@testing-library/react";
+import type { ReactElement } from "react";
+import { criarApiClientFalso } from "@gr-barber/api-client";
+import { ProvedorDoPainel } from "../../src/painel/ProvedorDoPainel";
+import { SessaoDoPainel } from "../../src/painel/SessaoDoPainel";
+import { sessaoDaBarbearia, sessaoDoBarbeiro } from "../../src/sessao/armazenamento";
+
+// Grava a sessão antes de renderizar: sem token o SessaoDoPainel
+// redireciona e não renderiza filho nenhum, e todo teste de tela do
+// painel morreria na primeira asserção.
+export function montarPainel(
+  tela: ReactElement,
+  falso = criarApiClientFalso()
+) {
+  sessaoDoBarbeiro.gravar("jwt-falso-barbeiro");
+  sessaoDaBarbearia.gravar("gr-barber");
+
+  render(
+    <ProvedorDoPainel valor={falso.barbeiro}>
+      <SessaoDoPainel>{tela}</SessaoDoPainel>
+    </ProvedorDoPainel>
+  );
+
+  return falso;
+}
+```
+
+- [ ] **Step 6: Rodar e ver falhar**
+
+Run: `pnpm --filter @gr-barber/web exec vitest run tests/telas/painel/dashboard.test.tsx`
+Expected: FAIL — `DashboardDoDia` não existe.
+
+- [ ] **Step 7: Implementar `Estatistica` e a tela**
+
+`apps/web/src/componentes/Estatistica.tsx`:
+
+```tsx
+import estilos from "./Estatistica.module.css";
+
+export function Estatistica({
+  numero,
+  legenda,
+}: {
+  numero: string;
+  legenda: string;
+}) {
+  return (
+    <div className={estilos.bloco}>
+      <span className={estilos.numero}>{numero}</span>
+      <span className={estilos.legenda}>{legenda}</span>
+    </div>
+  );
+}
+```
+
+`apps/web/src/telas/painel/DashboardDoDia.tsx`:
+
+```tsx
+"use client";
+
+import { useRouter } from "next/navigation";
+import { Aviso } from "../../componentes/Aviso";
+import { Botao } from "../../componentes/Botao";
+import { Estatistica } from "../../componentes/Estatistica";
+import { formatarPreco } from "../../componentes/ItemDeServico";
+import { useRequisicao } from "../../api/useRequisicao";
+import { hojeIso } from "../../formato/datas";
+import { ocupacao, previstoDoDia } from "../../painel/metricas";
+import { useApiDoBarbeiro } from "../../painel/ProvedorDoPainel";
+import { usePainel } from "../../painel/SessaoDoPainel";
+import estilos from "./DashboardDoDia.module.css";
+
+// `agora` por parâmetro, como toda tela que olhe relógio: fake timers
+// não entram nesta suíte, e teste que compara data fixa com o relógio
+// real falha sozinho depois.
+export function DashboardDoDia({ agora = new Date() }: { agora?: Date }) {
+  const router = useRouter();
+  const api = useApiDoBarbeiro();
+  const { perfil } = usePainel();
+  const hoje = hojeIso(agora);
+
+  const agendamentos = useRequisicao(() => api.agendamentosDoDia(hoje), [hoje]);
+  const horarios = useRequisicao(() => api.horarios(), []);
+
+  if (agendamentos.erro) return <Aviso>{agendamentos.erro.mensagem}</Aviso>;
+  if (!agendamentos.dados || !horarios.dados) return <p>Carregando…</p>;
+
+  const doDia = agendamentos.dados;
+  const horarioDeHoje = horarios.dados.find(
+    (h) => h.diaSemana === new Date(`${hoje}T12:00:00`).getDay()
+  );
+  const percentual = ocupacao(doDia, horarioDeHoje);
+
+  return (
+    <div className={estilos.pagina}>
+      <h1>Hoje, {perfil.nome}</h1>
+
+      <div className={estilos.numeros}>
+        <Estatistica numero={String(doDia.length)} legenda="agendamentos hoje" />
+        <Estatistica
+          numero={percentual === null ? "—" : `${percentual}%`}
+          legenda="ocupação"
+        />
+        <Estatistica
+          numero={formatarPreco(previstoDoDia(doDia))}
+          legenda="previsto hoje"
+        />
+      </div>
+
+      {doDia.length === 0 ? (
+        <p>Nenhum agendamento hoje.</p>
+      ) : (
+        <ul className={estilos.lista}>
+          {doDia.map((agendamento) => (
+            <li key={agendamento.id}>
+              <button
+                type="button"
+                onClick={() => router.push(`/painel/agendamentos/${agendamento.id}`)}
+              >
+                {agendamento.horaInicio} {agendamento.cliente.nome} ·{" "}
+                {agendamento.servicos.map((s) => s.nome).join(" + ")}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <Botao onClick={() => router.push("/painel/agendamentos/novo")}>
+        Novo agendamento
+      </Botao>
+    </div>
+  );
+}
+```
+
+`apps/web/app/(painel)/painel/(guardado)/page.tsx`:
+
+```tsx
+"use client";
+
+import { DashboardDoDia } from "../../../../src/telas/painel/DashboardDoDia";
+
+export default function Pagina() {
+  return <DashboardDoDia />;
+}
+```
+
+Os CSS Modules seguem o padrão das telas do sub-projeto B.
+
+- [ ] **Step 8: Rodar e ver passar**
+
+Run: `pnpm --filter @gr-barber/web exec vitest run tests/telas/painel/dashboard.test.tsx tests/painel/metricas.test.ts`
+Expected: PASS
+
+- [ ] **Step 9: Commit**
+
+```bash
+git add apps/web/src/painel/metricas.ts apps/web/src/componentes/Estatistica.tsx apps/web/src/componentes/Estatistica.module.css apps/web/src/telas/painel/DashboardDoDia.tsx apps/web/src/telas/painel/DashboardDoDia.module.css "apps/web/app/(painel)/painel/(guardado)/page.tsx" apps/web/tests/ajudantes/painel.tsx apps/web/tests/painel/metricas.test.ts apps/web/tests/telas/painel/dashboard.test.tsx
+git commit -m "feat(web): show the day's three numbers on the panel
+
+Count, occupancy and expected revenue all come from what the API already
+returns: precoNoMomento and duracaoNoMomento on each appointment, plus
+the week from horarios(). All three count pending, confirmed and
+completed and ignore cancelled and no-show — counting money only when
+completed would leave the number at zero all day, and the barber only
+marks completions if the number is worth something. A closed day has no
+occupancy rather than zero percent."
+```
+
+---
+
+### Task 7: `/painel/agenda` — o dia, com a semana em cima
+
+A grade **não** chama a disponibilidade: `FiltroDoDia` exige
+`servicoIds`, e na agenda não há serviço escolhido. Ela desenha a janela
+de funcionamento marcada com o que ocupa cada faixa.
+
+**Files:**
+- Create: `apps/web/src/painel/grade.ts`
+- Create: `apps/web/src/componentes/GradeDeAgenda.tsx`
+- Create: `apps/web/src/componentes/GradeDeAgenda.module.css`
+- Create: `apps/web/src/telas/painel/AgendaDoDia.tsx`
+- Create: `apps/web/src/telas/painel/AgendaDoDia.module.css`
+- Create: `apps/web/app/(painel)/painel/(guardado)/agenda/page.tsx`
+- Test: `apps/web/tests/painel/grade.test.ts`
+- Test: `apps/web/tests/telas/painel/agenda.test.tsx`
+
+**Interfaces:**
+- Consumes: `usePainel`, `useApiDoBarbeiro`, `useRequisicao`, `hojeIso`,
+  `horaJaPassou` (`src/formato/datas.ts`).
+- Produces:
+  - `interface Faixa { hora: string; agendamento: AgendamentoComCliente | null; passada: boolean }`
+  - `faixasDoDia(entrada: { data: string; horario: HorarioSerializado | undefined; agendamentos: AgendamentoComCliente[]; agora: Date; passo?: number }): Faixa[]`
+  - `diasDaSemana(data: string): string[]` — os sete dias, domingo a sábado
+  - `GradeDeAgenda({ faixas, aoAbrir, aoCriar })`
+  - `AgendaDoDia({ agora }: { agora?: Date })`
+
+- [ ] **Step 1: Escrever o teste das faixas**
+
+`apps/web/tests/painel/grade.test.ts`:
+
+```ts
+import { describe, expect, it } from "vitest";
+import type { AgendamentoComCliente, HorarioSerializado } from "@gr-barber/types";
+import { diasDaSemana, faixasDoDia } from "../../src/painel/grade";
+
+const ABERTO: HorarioSerializado = {
+  diaSemana: 2,
+  horaAbertura: "09:00",
+  horaFechamento: "11:00",
+  fechado: false,
+};
+
+const AGENDAMENTO: AgendamentoComCliente = {
+  id: "a1",
+  data: "2026-09-08",
+  horaInicio: "09:30",
+  horaFim: "10:00",
+  status: "confirmado",
+  origem: "cliente",
+  observacoes: null,
+  servicos: [
+    { servicoId: "s1", nome: "Corte", precoNoMomento: "40.00", duracaoNoMomento: 30 },
+  ],
+  cliente: {
+    id: "c1",
+    nome: "João Silva",
+    telefone: "(11) 99999-0001",
+    email: null,
+    temConta: false,
+  },
+};
+
+describe("faixas do dia", () => {
+  it("cobre a janela de funcionamento de meia em meia hora", () => {
+    const faixas = faixasDoDia({
+      data: "2026-09-08",
+      horario: ABERTO,
+      agendamentos: [],
+      agora: new Date("2026-09-01T10:00:00-03:00"),
+    });
+
+    expect(faixas.map((f) => f.hora)).toEqual(["09:00", "09:30", "10:00", "10:30"]);
+  });
+
+  it("dia fechado não tem faixa nenhuma", () => {
+    const faixas = faixasDoDia({
+      data: "2026-09-06",
+      horario: { diaSemana: 0, horaAbertura: null, horaFechamento: null, fechado: true },
+      agendamentos: [],
+      agora: new Date("2026-09-01T10:00:00-03:00"),
+    });
+
+    expect(faixas).toEqual([]);
+  });
+
+  it("põe o agendamento na faixa em que ele começa", () => {
+    const faixas = faixasDoDia({
+      data: "2026-09-08",
+      horario: ABERTO,
+      agendamentos: [AGENDAMENTO],
+      agora: new Date("2026-09-01T10:00:00-03:00"),
+    });
+
+    expect(faixas[1].agendamento?.cliente.nome).toBe("João Silva");
+    expect(faixas[0].agendamento).toBeNull();
+  });
+
+  it("marca como passada a faixa de hoje que já passou", () => {
+    // Oferecer 09:00 às 10h é ruído, não recurso. A barreira é da tela
+    // porque garantirFuturo não existe na API.
+    const faixas = faixasDoDia({
+      data: "2026-09-08",
+      horario: ABERTO,
+      agendamentos: [],
+      agora: new Date("2026-09-08T10:00:00-03:00"),
+    });
+
+    expect(faixas.find((f) => f.hora === "09:00")?.passada).toBe(true);
+    expect(faixas.find((f) => f.hora === "10:30")?.passada).toBe(false);
+  });
+
+  it("num dia futuro nenhuma faixa é passada", () => {
+    const faixas = faixasDoDia({
+      data: "2026-09-09",
+      horario: ABERTO,
+      agendamentos: [],
+      agora: new Date("2026-09-08T23:00:00-03:00"),
+    });
+
+    expect(faixas.every((f) => !f.passada)).toBe(true);
+  });
+
+  it("a semana vai de domingo a sábado contendo o dia", () => {
+    // 2026-09-08 é uma terça; o domingo daquela semana é 2026-09-06.
+    expect(diasDaSemana("2026-09-08")[0]).toBe("2026-09-06");
+    expect(diasDaSemana("2026-09-08")).toHaveLength(7);
+  });
+});
+```
+
+- [ ] **Step 2: Rodar e ver falhar**
+
+Run: `pnpm --filter @gr-barber/web exec vitest run tests/painel/grade.test.ts`
+Expected: FAIL — `src/painel/grade.ts` não existe.
+
+- [ ] **Step 3: Implementar `src/painel/grade.ts`**
+
+```ts
+import type { AgendamentoComCliente, HorarioSerializado } from "@gr-barber/types";
+import { horaJaPassou } from "../formato/datas";
+
+export interface Faixa {
+  hora: string;
+  agendamento: AgendamentoComCliente | null;
+  passada: boolean;
+}
+
+function emMinutos(hora: string): number {
+  const [h, m] = hora.split(":").map(Number);
+  return h * 60 + m;
+}
+
+function emHora(minutos: number): string {
+  const h = String(Math.floor(minutos / 60)).padStart(2, "0");
+  const m = String(minutos % 60).padStart(2, "0");
+  return `${h}:${m}`;
+}
+
+// Isto é desenho de slot, não cálculo de disponibilidade: não decide se
+// algo cabe, só mostra o que está lá. Quem responde "onde cabe um
+// atendimento de duração D" é /disponibilidade, que exige servicoIds —
+// e na agenda não há serviço escolhido.
+export function faixasDoDia(entrada: {
+  data: string;
+  horario: HorarioSerializado | undefined;
+  agendamentos: AgendamentoComCliente[];
+  agora: Date;
+  passo?: number;
+}): Faixa[] {
+  const { data, horario, agendamentos, agora, passo = 30 } = entrada;
+  if (!horario || horario.fechado || !horario.horaAbertura || !horario.horaFechamento) {
+    return [];
+  }
+
+  const inicio = emMinutos(horario.horaAbertura);
+  const fim = emMinutos(horario.horaFechamento);
+  const faixas: Faixa[] = [];
+
+  for (let minuto = inicio; minuto < fim; minuto += passo) {
+    const hora = emHora(minuto);
+    faixas.push({
+      hora,
+      agendamento:
+        agendamentos.find(
+          (a) => a.horaInicio === hora && a.status !== "cancelado"
+        ) ?? null,
+      passada: horaJaPassou(data, hora, agora),
+    });
+  }
+
+  return faixas;
+}
+
+// Domingo a sábado, como a grade do design system e como o Calendario
+// do fluxo do cliente.
+export function diasDaSemana(data: string): string[] {
+  const referencia = new Date(`${data}T00:00:00Z`);
+  const domingo = new Date(referencia);
+  domingo.setUTCDate(referencia.getUTCDate() - referencia.getUTCDay());
+
+  return Array.from({ length: 7 }, (_, indice) => {
+    const dia = new Date(domingo);
+    dia.setUTCDate(domingo.getUTCDate() + indice);
+    return dia.toISOString().slice(0, 10);
+  });
+}
+```
+
+- [ ] **Step 4: Rodar e ver passar**
+
+Run: `pnpm --filter @gr-barber/web exec vitest run tests/painel/grade.test.ts`
+Expected: PASS
+
+- [ ] **Step 5: Escrever o teste da tela**
+
+`apps/web/tests/telas/painel/agenda.test.tsx`:
+
+```tsx
+import { screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { beforeEach, describe, expect, it } from "vitest";
+import { criarApiClientFalso } from "@gr-barber/api-client";
+import { AgendaDoDia } from "../../../src/telas/painel/AgendaDoDia";
+import { navegacaoFalsa } from "../../ajudantes/navegacao";
+import { montarPainel } from "../../ajudantes/painel";
+
+const AGORA = new Date("2026-09-08T10:00:00-03:00");
+
+function semear() {
+  return criarApiClientFalso({
+    clientes: [
+      { id: "c1", nome: "João Silva", telefone: "(11) 99999-0001", email: null, temConta: false },
+    ],
+    agendamentos: [
+      {
+        id: "a1",
+        clienteId: "c1",
+        data: "2026-09-08",
+        horaInicio: "11:00",
+        horaFim: "11:30",
+        status: "confirmado",
+        origem: "cliente",
+        observacoes: null,
+        servicos: [
+          { servicoId: "s1", nome: "Corte", precoNoMomento: "40.00", duracaoNoMomento: 30 },
+        ],
+      },
+    ],
+  });
+}
+
+describe("agenda do dia", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    navegacaoFalsa.redefinir({
+      pathname: "/painel/agenda",
+      query: { data: "2026-09-08" },
+    });
+  });
+
+  it("mostra o agendamento na faixa em que ele começa", async () => {
+    montarPainel(<AgendaDoDia agora={AGORA} />, semear());
+
+    expect(await screen.findByText(/João Silva/)).toBeInTheDocument();
+  });
+
+  it("faixa livre no futuro leva ao novo agendamento com data e hora", async () => {
+    montarPainel(<AgendaDoDia agora={AGORA} />, semear());
+
+    await userEvent.click(await screen.findByRole("button", { name: /11:30/ }));
+
+    expect(navegacaoFalsa.push).toHaveBeenCalledWith(
+      "/painel/agendamentos/novo?data=2026-09-08&hora=11%3A30"
+    );
+  });
+
+  it("faixa de hoje que já passou não oferece criar", async () => {
+    montarPainel(<AgendaDoDia agora={AGORA} />, semear());
+
+    await screen.findByText(/João Silva/);
+    expect(screen.queryByRole("button", { name: /09:00/ })).not.toBeInTheDocument();
+    expect(screen.getByText("09:00")).toBeInTheDocument();
+  });
+
+  it("clicar num dia da faixa de semana troca a data na URL", async () => {
+    montarPainel(<AgendaDoDia agora={AGORA} />, semear());
+
+    await userEvent.click(await screen.findByRole("button", { name: /quarta/i }));
+
+    expect(navegacaoFalsa.push).toHaveBeenCalledWith("/painel/agenda?data=2026-09-09");
+  });
+
+  it("sem ?data= na URL, mostra hoje", async () => {
+    navegacaoFalsa.redefinir({ pathname: "/painel/agenda" });
+    montarPainel(<AgendaDoDia agora={AGORA} />, semear());
+
+    expect(await screen.findByText(/João Silva/)).toBeInTheDocument();
+  });
+});
+```
+
+- [ ] **Step 6: Rodar e ver falhar**
+
+Run: `pnpm --filter @gr-barber/web exec vitest run tests/telas/painel/agenda.test.tsx`
+Expected: FAIL — `AgendaDoDia` não existe.
+
+- [ ] **Step 7: Implementar a grade e a tela**
+
+`apps/web/src/componentes/GradeDeAgenda.tsx`:
+
+```tsx
+import type { Faixa } from "../painel/grade";
+import estilos from "./GradeDeAgenda.module.css";
+
+export function GradeDeAgenda({
+  faixas,
+  aoAbrir,
+  aoCriar,
+}: {
+  faixas: Faixa[];
+  aoAbrir: (id: string) => void;
+  aoCriar: (hora: string) => void;
+}) {
+  if (faixas.length === 0) return <p>Fechado neste dia.</p>;
+
+  return (
+    <ul className={estilos.grade}>
+      {faixas.map((faixa) => (
+        <li key={faixa.hora} className={estilos.faixa}>
+          {faixa.agendamento ? (
+            <button type="button" onClick={() => aoAbrir(faixa.agendamento!.id)}>
+              {faixa.hora} {faixa.agendamento.cliente.nome} ·{" "}
+              {faixa.agendamento.servicos.map((s) => s.nome).join(" + ")}
+            </button>
+          ) : faixa.passada ? (
+            // Sem botão: oferecer 09:00 às 10h é ruído. A hora continua
+            // visível pra grade não ganhar buraco.
+            <span className={estilos.passada}>{faixa.hora}</span>
+          ) : (
+            <button type="button" onClick={() => aoCriar(faixa.hora)}>
+              {faixa.hora} livre
+            </button>
+          )}
+        </li>
+      ))}
+    </ul>
+  );
+}
+```
+
+`apps/web/src/telas/painel/AgendaDoDia.tsx`:
+
+```tsx
+"use client";
+
+import { useRouter, useSearchParams } from "next/navigation";
+import { Aviso } from "../../componentes/Aviso";
+import { GradeDeAgenda } from "../../componentes/GradeDeAgenda";
+import { useRequisicao } from "../../api/useRequisicao";
+import { formatarDataLonga, hojeIso } from "../../formato/datas";
+import { diasDaSemana, faixasDoDia } from "../../painel/grade";
+import { useApiDoBarbeiro } from "../../painel/ProvedorDoPainel";
+import estilos from "./AgendaDoDia.module.css";
+
+const NOMES = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"];
+
+export function AgendaDoDia({ agora = new Date() }: { agora?: Date }) {
+  const router = useRouter();
+  const query = useSearchParams();
+  const api = useApiDoBarbeiro();
+
+  const data = query.get("data") ?? hojeIso(agora);
+  const semana = diasDaSemana(data);
+
+  const doDia = useRequisicao(() => api.agendamentosDoDia(data), [data]);
+  const daSemana = useRequisicao(
+    () => api.agendamentosDoIntervalo(semana[0], semana[6]),
+    [semana[0]]
+  );
+  const horarios = useRequisicao(() => api.horarios(), []);
+
+  if (doDia.erro) return <Aviso>{doDia.erro.mensagem}</Aviso>;
+  if (!doDia.dados || !horarios.dados) return <p>Carregando…</p>;
+
+  const diaDaSemana = new Date(`${data}T12:00:00`).getDay();
+  const faixas = faixasDoDia({
+    data,
+    horario: horarios.dados.find((h) => h.diaSemana === diaDaSemana),
+    agendamentos: doDia.dados,
+    agora,
+  });
+
+  return (
+    <div className={estilos.pagina}>
+      <h1>{formatarDataLonga(data)}</h1>
+
+      <ul className={estilos.semana}>
+        {semana.map((dia, indice) => (
+          <li key={dia}>
+            <button
+              type="button"
+              aria-current={dia === data ? "date" : undefined}
+              onClick={() => router.push(`/painel/agenda?data=${dia}`)}
+            >
+              {NOMES[indice]} {dia.slice(8)}
+              {/* O ponto diz que aquele dia tem algo, sem obrigar a
+                  abrir um por um. */}
+              {daSemana.dados?.some((a) => a.data === dia) ? " ·" : ""}
+            </button>
+          </li>
+        ))}
+      </ul>
+
+      <GradeDeAgenda
+        faixas={faixas}
+        aoAbrir={(id) => router.push(`/painel/agendamentos/${id}`)}
+        aoCriar={(hora) =>
+          router.push(
+            `/painel/agendamentos/novo?data=${data}&hora=${encodeURIComponent(hora)}`
+          )
+        }
+      />
+    </div>
+  );
+}
+```
+
+`apps/web/app/(painel)/painel/(guardado)/agenda/page.tsx` segue a forma
+da `page.tsx` do dashboard.
+
+- [ ] **Step 8: Rodar e ver passar**
+
+Run: `pnpm --filter @gr-barber/web exec vitest run tests/telas/painel/agenda.test.tsx`
+Expected: PASS
+
+- [ ] **Step 9: Commit**
+
+```bash
+git add apps/web/src/painel/grade.ts apps/web/src/componentes/GradeDeAgenda.tsx apps/web/src/componentes/GradeDeAgenda.module.css apps/web/src/telas/painel/AgendaDoDia.tsx apps/web/src/telas/painel/AgendaDoDia.module.css "apps/web/app/(painel)/painel/(guardado)/agenda" apps/web/tests/painel/grade.test.ts apps/web/tests/telas/painel/agenda.test.tsx
+git commit -m "feat(web): draw the day's agenda from the opening window
+
+The grid cannot ask /disponibilidade: FiltroDoDia requires servicoIds,
+and no service is chosen when you are only looking at a day — which is
+why the client flow's time step is only reachable with ?servicos= in the
+URL. So the grid draws the slots between opening and closing and marks
+what agendamentosDoDia occupies. Today's already-passed slots render as
+passed and offer no create link; the API still has no garantirFuturo, so
+that barrier is the screen's."
+```
+
+---
+
+O plano continua nas tarefas 8 a 13 — novo agendamento, detalhe do
+agendamento, clientes, serviços, configurações e limpeza.
