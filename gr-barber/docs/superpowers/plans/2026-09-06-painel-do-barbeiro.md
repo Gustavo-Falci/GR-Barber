@@ -807,14 +807,15 @@ mesma.
 
 **Interfaces:**
 
-- Consumes: `apiDoBarbeiro` (`src/sessao/cliente-da-api.ts`),
-  `sessaoDoBarbeiro`, `sessaoDaBarbearia`, `encerrarSessaoDoBarbeiro`
-  (Tarefa 2), `lerTema`, `gravarTema`, `aplicarTema`, `temaDoSistema`
-  (Tarefa 3).
+- Consumes: `criarApiClient`, `sessaoDoBarbeiro`, `sessaoDaBarbearia`,
+  `encerrarSessaoDoBarbeiro` (Tarefa 2), `lerTema`, `gravarTema`,
+  `aplicarTema`, `temaDoSistema` (Tarefa 3).
 - Produces:
-  - `type ApiDoBarbeiro = ReturnType<typeof apiDoBarbeiro>`
-  - `ProvedorDoPainel({ children, valor? }: { children: ReactNode; valor?: ApiDoBarbeiro })`
-  - `useApiDoBarbeiro(): ApiDoBarbeiro`
+  - `apiDoPainel(fetchInjetado?)` em `src/sessao/cliente-da-api.ts`,
+    devolvendo `{ barbeiro, publico }`
+  - `type ApiDoPainel = ReturnType<typeof apiDoPainel>`
+  - `ProvedorDoPainel({ children, valor? }: { children: ReactNode; valor?: ApiDoPainel })`
+  - `useApiDoPainel(): ApiDoPainel`
   - `SessaoDoPainel({ children })` — guarda e provê o contexto
   - `usePainel(): { perfil: PerfilBarbeiro; slug: string; sair: () => void }`
   - `NavegacaoDoPainel()` — barra superior
@@ -902,7 +903,7 @@ function Espiao() {
 
 function montar(falso = criarApiClientFalso()) {
   render(
-    <ProvedorDoPainel valor={falso.barbeiro}>
+    <ProvedorDoPainel valor={{ barbeiro: falso.barbeiro, publico: falso.publico }}>
       <SessaoDoPainel>
         <Espiao />
       </SessaoDoPainel>
@@ -973,22 +974,42 @@ Run: `pnpm --filter @gr-barber/web exec vitest run tests/painel/sessao-do-painel
 Expected: FAIL — os módulos `ProvedorDoPainel` e `SessaoDoPainel` não
 existem.
 
-- [ ] **Step 4: Escrever `src/painel/ProvedorDoPainel.tsx`**
+- [ ] **Step 4: Escrever a fábrica e `src/painel/ProvedorDoPainel.tsx`**
 
-Espelha o `ProvedorDaApi` do fluxo do cliente, mas sem slug de rota — o
-painel não tem `[slug]` na URL.
+Primeiro a fábrica, em `src/sessao/cliente-da-api.ts`, ao lado das duas
+que já existem:
+
+```ts
+// Dois escopos, e não só `.barbeiro`: a disponibilidade é rota pública
+// por slug e não tem gêmea no escopo do barbeiro, mas a tela de novo
+// agendamento precisa dela. Montar um segundo client dentro da tela
+// duplicaria baseUrl e aoExpirarSessao. O `apiDoBarbeiro` acima
+// continua para quem só quer o escopo protegido.
+export function apiDoPainel(fetchInjetado?: typeof globalThis.fetch) {
+  const client = criarApiClient({
+    baseUrl: BASE_URL,
+    obterToken: () => sessaoDoBarbeiro.ler(),
+    aoExpirarSessao: () => sessaoDoBarbeiro.limpar(),
+    fetch: fetchInjetado,
+  });
+  return { barbeiro: client.barbeiro, publico: client.publico };
+}
+```
+
+Depois o provedor, que espelha o `ProvedorDaApi` do fluxo do cliente
+mas sem slug de rota — o painel não tem `[slug]` na URL:
 
 ```tsx
 "use client";
 
 import { createContext, useContext, useMemo, type ReactNode } from "react";
-import { apiDoBarbeiro } from "../sessao/cliente-da-api";
+import { apiDoPainel } from "../sessao/cliente-da-api";
 
-// Só o escopo do barbeiro: o painel nunca chama rota de cliente logado,
-// e expor o client inteiro convidaria a isso.
-export type ApiDoBarbeiro = ReturnType<typeof apiDoBarbeiro>;
+// O escopo do cliente logado fica de fora: o painel nunca chama rota de
+// `clientes-me`, e expor o client inteiro convidaria a isso.
+export type ApiDoPainel = ReturnType<typeof apiDoPainel>;
 
-const Contexto = createContext<ApiDoBarbeiro | null>(null);
+const Contexto = createContext<ApiDoPainel | null>(null);
 
 // `valor` existe pro teste passar o dublê. Em produção ninguém informa,
 // e o provedor monta o client de verdade uma vez só — senão cada render
@@ -998,17 +1019,17 @@ export function ProvedorDoPainel({
   valor,
 }: {
   children: ReactNode;
-  valor?: ApiDoBarbeiro;
+  valor?: ApiDoPainel;
 }) {
-  const api = useMemo(() => valor ?? apiDoBarbeiro(), [valor]);
+  const api = useMemo(() => valor ?? apiDoPainel(), [valor]);
 
   return <Contexto.Provider value={api}>{children}</Contexto.Provider>;
 }
 
-export function useApiDoBarbeiro(): ApiDoBarbeiro {
+export function useApiDoPainel(): ApiDoPainel {
   const api = useContext(Contexto);
   if (!api) {
-    throw new Error("useApiDoBarbeiro precisa estar dentro de um ProvedorDoPainel");
+    throw new Error("useApiDoPainel precisa estar dentro de um ProvedorDoPainel");
   }
   return api;
 }
@@ -1035,7 +1056,7 @@ import {
   sessaoDaBarbearia,
   sessaoDoBarbeiro,
 } from "../sessao/armazenamento";
-import { useApiDoBarbeiro } from "./ProvedorDoPainel";
+import { useApiDoPainel } from "./ProvedorDoPainel";
 
 interface Painel {
   perfil: PerfilBarbeiro;
@@ -1051,7 +1072,7 @@ const Contexto = createContext<Painel | null>(null);
 // com onRequest em vez de pendurar o hook rota a rota.
 export function SessaoDoPainel({ children }: { children: ReactNode }) {
   const router = useRouter();
-  const api = useApiDoBarbeiro();
+  const api = useApiDoPainel();
   const [perfil, setPerfil] = useState<PerfilBarbeiro | null>(null);
 
   const sair = useCallback(() => {
@@ -1286,7 +1307,7 @@ caminho pelo qual uma barbearia pode existir.
 
 **Interfaces:**
 
-- Consumes: `ProvedorDoPainel`, `useApiDoBarbeiro` (Tarefa 4),
+- Consumes: `ProvedorDoPainel`, `useApiDoPainel` (Tarefa 4),
   `sessaoDoBarbeiro`, `sessaoDaBarbearia` (Tarefa 2), `Botao`, `Campo`,
   `Aviso`.
 - Produces: `EntrarNoPainel()`.
@@ -1308,7 +1329,7 @@ import { navegacaoFalsa } from "../../ajudantes/navegacao";
 
 function montar(falso = criarApiClientFalso()) {
   render(
-    <ProvedorDoPainel valor={falso.barbeiro}>
+    <ProvedorDoPainel valor={{ barbeiro: falso.barbeiro, publico: falso.publico }}>
       <EntrarNoPainel />
     </ProvedorDoPainel>
   );
@@ -1430,7 +1451,7 @@ import type { SessaoBarbeiro } from "@gr-barber/types";
 import { Aviso } from "../../componentes/Aviso";
 import { Botao } from "../../componentes/Botao";
 import { Campo } from "../../componentes/Campo";
-import { useApiDoBarbeiro } from "../../painel/ProvedorDoPainel";
+import { useApiDoPainel } from "../../painel/ProvedorDoPainel";
 import {
   sessaoDaBarbearia,
   sessaoDoBarbeiro,
@@ -1443,7 +1464,7 @@ const PADRAO_SLUG = /^[a-z0-9-]{3,80}$/;
 
 export function EntrarNoPainel() {
   const router = useRouter();
-  const api = useApiDoBarbeiro();
+  const api = useApiDoPainel();
 
   const [criando, setCriando] = useState(false);
   const [nomeDaBarbearia, setNomeDaBarbearia] = useState("");
@@ -1469,11 +1490,11 @@ export function EntrarNoPainel() {
     let sessao: SessaoBarbeiro | undefined;
     try {
       sessao = criando
-        ? await api.signup({
+        ? await api.barbeiro.signup({
             barbearia: { nome: nomeDaBarbearia.trim(), slug },
             barbeiro: { nome: nome.trim(), email, senha },
           })
-        : await api.login({ email, senha });
+        : await api.barbeiro.login({ email, senha });
     } catch (causa) {
       const erro = causa as ErroDaApi;
       if (erro.codigo === "nao_autenticado") {
@@ -1610,7 +1631,7 @@ rota nova.
 - Test: `apps/web/tests/telas/painel/dashboard.test.tsx`
 
 **Interfaces:**
-- Consumes: `usePainel` (Tarefa 4), `useApiDoBarbeiro` (Tarefa 4),
+- Consumes: `usePainel` (Tarefa 4), `useApiDoPainel` (Tarefa 4),
   `useRequisicao`, `hojeIso` (`src/formato/datas.ts`), `formatarPreco`
   (`src/componentes/ItemDeServico.tsx`).
 - Produces:
@@ -1903,7 +1924,7 @@ export function montarPainel(
   sessaoDaBarbearia.gravar("gr-barber");
 
   render(
-    <ProvedorDoPainel valor={falso.barbeiro}>
+    <ProvedorDoPainel valor={{ barbeiro: falso.barbeiro, publico: falso.publico }}>
       <SessaoDoPainel>{tela}</SessaoDoPainel>
     </ProvedorDoPainel>
   );
@@ -1953,7 +1974,7 @@ import { formatarPreco } from "../../componentes/ItemDeServico";
 import { useRequisicao } from "../../api/useRequisicao";
 import { hojeIso } from "../../formato/datas";
 import { ocupacao, previstoDoDia } from "../../painel/metricas";
-import { useApiDoBarbeiro } from "../../painel/ProvedorDoPainel";
+import { useApiDoPainel } from "../../painel/ProvedorDoPainel";
 import { usePainel } from "../../painel/SessaoDoPainel";
 import estilos from "./DashboardDoDia.module.css";
 
@@ -1962,12 +1983,12 @@ import estilos from "./DashboardDoDia.module.css";
 // real falha sozinho depois.
 export function DashboardDoDia({ agora = new Date() }: { agora?: Date }) {
   const router = useRouter();
-  const api = useApiDoBarbeiro();
+  const api = useApiDoPainel();
   const { perfil } = usePainel();
   const hoje = hojeIso(agora);
 
-  const agendamentos = useRequisicao(() => api.agendamentosDoDia(hoje), [hoje]);
-  const horarios = useRequisicao(() => api.horarios(), []);
+  const agendamentos = useRequisicao(() => api.barbeiro.agendamentosDoDia(hoje), [hoje]);
+  const horarios = useRequisicao(() => api.barbeiro.horarios(), []);
 
   if (agendamentos.erro) return <Aviso>{agendamentos.erro.mensagem}</Aviso>;
   if (!agendamentos.dados || !horarios.dados) return <p>Carregando…</p>;
@@ -2073,7 +2094,7 @@ de funcionamento marcada com o que ocupa cada faixa.
 - Test: `apps/web/tests/telas/painel/agenda.test.tsx`
 
 **Interfaces:**
-- Consumes: `usePainel`, `useApiDoBarbeiro`, `useRequisicao`, `hojeIso`,
+- Consumes: `usePainel`, `useApiDoPainel`, `useRequisicao`, `hojeIso`,
   `horaJaPassou` (`src/formato/datas.ts`).
 - Produces:
   - `interface Faixa { hora: string; agendamento: AgendamentoComCliente | null; passada: boolean }`
@@ -2417,7 +2438,7 @@ import { GradeDeAgenda } from "../../componentes/GradeDeAgenda";
 import { useRequisicao } from "../../api/useRequisicao";
 import { formatarDataLonga, hojeIso } from "../../formato/datas";
 import { diasDaSemana, faixasDoDia } from "../../painel/grade";
-import { useApiDoBarbeiro } from "../../painel/ProvedorDoPainel";
+import { useApiDoPainel } from "../../painel/ProvedorDoPainel";
 import estilos from "./AgendaDoDia.module.css";
 
 const NOMES = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"];
@@ -2425,17 +2446,17 @@ const NOMES = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sá
 export function AgendaDoDia({ agora = new Date() }: { agora?: Date }) {
   const router = useRouter();
   const query = useSearchParams();
-  const api = useApiDoBarbeiro();
+  const api = useApiDoPainel();
 
   const data = query.get("data") ?? hojeIso(agora);
   const semana = diasDaSemana(data);
 
-  const doDia = useRequisicao(() => api.agendamentosDoDia(data), [data]);
+  const doDia = useRequisicao(() => api.barbeiro.agendamentosDoDia(data), [data]);
   const daSemana = useRequisicao(
-    () => api.agendamentosDoIntervalo(semana[0], semana[6]),
+    () => api.barbeiro.agendamentosDoIntervalo(semana[0], semana[6]),
     [semana[0]]
   );
-  const horarios = useRequisicao(() => api.horarios(), []);
+  const horarios = useRequisicao(() => api.barbeiro.horarios(), []);
 
   if (doDia.erro) return <Aviso>{doDia.erro.mensagem}</Aviso>;
   if (!doDia.dados || !horarios.dados) return <p>Carregando…</p>;
@@ -2525,7 +2546,7 @@ porque é aqui que existem serviços selecionados.
 
 **Interfaces:**
 - Consumes: `usePainel` (dá `perfil.id`, que é o `barbeiroId`, e `slug`),
-  `useApiDoBarbeiro`, `useRequisicao`, `Calendario`, `ListaDeHorarios`,
+  `useApiDoPainel`, `useRequisicao`, `Calendario`, `ListaDeHorarios`,
   `ItemDeServico`, `formatarPreco`, `ehPassado`, `hojeIso`,
   `normalizarTelefoneObrigatorio`, `TelefoneInvalido`.
 - Produces:
@@ -2533,59 +2554,13 @@ porque é aqui que existem serviços selecionados.
     cadastro embutido
   - `NovoAgendamento({ agora }: { agora?: Date })`
 
-**Nota sobre a disponibilidade:** o client de barbeiro não tem método de
-disponibilidade — ela é rota pública. A tela usa
-`criarApiClient({...}).publico.disponibilidadeDoDia(slug, filtro)`. Para
-não montar um segundo client na tela, `ProvedorDoPainel` passa a expor
-também o escopo público. **Faça esta mudança no início desta tarefa:**
-em `src/painel/ProvedorDoPainel.tsx`, troque o tipo e a fábrica para
-devolver `{ barbeiro, publico }`, e ajuste `montarPainel` e os testes
-das tarefas 4 a 7 que passam `falso.barbeiro` para passarem
-`{ barbeiro: falso.barbeiro, publico: falso.publico }`. Rode `pnpm test`
-depois do ajuste e antes de seguir.
+**Nota sobre a disponibilidade:** o escopo do barbeiro não tem método de
+disponibilidade — ela é rota pública por slug. É por isso que o
+`ProvedorDoPainel` da Tarefa 4 já expõe `{ barbeiro, publico }`: aqui a
+tela chama `api.publico.disponibilidadeDoDia(slug, filtro)` com o slug
+que `usePainel()` entrega e o `barbeiroId` que é o `perfil.id`.
 
-- [ ] **Step 1: Ajustar o provedor para expor os dois escopos**
-
-Em `src/sessao/cliente-da-api.ts`, acrescente:
-
-```ts
-// O painel precisa do escopo público porque a disponibilidade é rota
-// pública por slug — não existe versão dela no escopo do barbeiro. O
-// token do barbeiro continua indo junto: rota pública ignora, e montar
-// um segundo client só pra isso duplicaria baseUrl e aoExpirarSessao.
-export function apiDoPainel(fetchInjetado?: typeof globalThis.fetch) {
-  const client = criarApiClient({
-    baseUrl: BASE_URL,
-    obterToken: () => sessaoDoBarbeiro.ler(),
-    aoExpirarSessao: () => sessaoDoBarbeiro.limpar(),
-    fetch: fetchInjetado,
-  });
-  return { barbeiro: client.barbeiro, publico: client.publico };
-}
-```
-
-Em `src/painel/ProvedorDoPainel.tsx`, troque `apiDoBarbeiro` por
-`apiDoPainel`, e o tipo por
-`export type ApiDoPainel = ReturnType<typeof apiDoPainel>`. O hook passa
-a se chamar `useApiDoPainel`. Atualize os consumidores: `SessaoDoPainel`
-(`api.barbeiro.meuPerfil()`), `DashboardDoDia`, `AgendaDoDia`,
-`EntrarNoPainel`, `montarPainel` e os testes que injetam o dublê.
-
-Run: `pnpm test`
-Expected: PASS — a suíte inteira, incluindo as tarefas 4 a 7.
-
-Commit este passo sozinho:
-
-```bash
-git commit -am "refactor(web): give the panel both API scopes
-
-Availability is a public route addressed by slug and has no barber-scope
-twin, so the new-appointment screen needs publico alongside barbeiro.
-Building a second client inside the screen would duplicate baseUrl and
-aoExpirarSessao."
-```
-
-- [ ] **Step 2: Escrever o teste da tela**
+- [ ] **Step 1: Escrever o teste da tela**
 
 `apps/web/tests/telas/painel/novo-agendamento.test.tsx`:
 
@@ -2722,12 +2697,12 @@ describe("novo agendamento no painel", () => {
 });
 ```
 
-- [ ] **Step 3: Rodar e ver falhar**
+- [ ] **Step 2: Rodar e ver falhar**
 
 Run: `pnpm --filter @gr-barber/web exec vitest run tests/telas/painel/novo-agendamento.test.tsx`
 Expected: FAIL — `NovoAgendamento` não existe.
 
-- [ ] **Step 4: Implementar a busca de cliente**
+- [ ] **Step 3: Implementar a busca de cliente**
 
 `apps/web/src/telas/painel/BuscaDeCliente.tsx`:
 
@@ -2844,7 +2819,7 @@ export function BuscaDeCliente({
 }
 ```
 
-- [ ] **Step 5: Implementar a tela**
+- [ ] **Step 4: Implementar a tela**
 
 `apps/web/src/telas/painel/NovoAgendamento.tsx`:
 
@@ -3035,12 +3010,12 @@ export function NovoAgendamento({ agora = new Date() }: { agora?: Date }) {
 
 Acrescente `import { BuscaDeCliente } from "./BuscaDeCliente";` no topo.
 
-- [ ] **Step 6: Rodar e ver passar**
+- [ ] **Step 5: Rodar e ver passar**
 
 Run: `pnpm --filter @gr-barber/web exec vitest run tests/telas/painel/novo-agendamento.test.tsx`
 Expected: PASS
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
 git add apps/web/src/telas/painel/NovoAgendamento.tsx apps/web/src/telas/painel/NovoAgendamento.module.css apps/web/src/telas/painel/BuscaDeCliente.tsx apps/web/src/telas/painel/BuscaDeCliente.module.css "apps/web/app/(painel)/painel/(guardado)/agendamentos" apps/web/tests/telas/painel/novo-agendamento.test.tsx
@@ -3630,16 +3605,221 @@ export function ListaDeClientes() {
 }
 ```
 
-`CadastroDeCliente.tsx` — nome, telefone e email opcional, com a
-normalização antes de enviar e o `conflito` tratado como na Tarefa 8.
-`DetalheDoCliente.tsx` — os mesmos campos preenchidos por
-`api.barbeiro.cliente(id)`, mais a lista de `agendamentos` que essa
-chamada devolve junto, cada linha levando a
-`/painel/agendamentos/<id>`.
+`CadastroDeCliente.tsx`:
 
-Nos dois, telefone entra com `formato="telefone"` no `Campo` e sai por
-`normalizarTelefoneObrigatorio`; `TelefoneInvalido` vira "Informe o DDD
-e o número, como (11) 99999-8888" no próprio campo.
+```tsx
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import type { ErroDaApi } from "@gr-barber/api-client";
+import { normalizarTelefoneObrigatorio, TelefoneInvalido } from "@gr-barber/formato";
+import { Aviso } from "../../componentes/Aviso";
+import { Botao } from "../../componentes/Botao";
+import { Campo } from "../../componentes/Campo";
+import { useApiDoPainel } from "../../painel/ProvedorDoPainel";
+import estilos from "./CadastroDeCliente.module.css";
+
+export function CadastroDeCliente() {
+  const router = useRouter();
+  const api = useApiDoPainel();
+
+  const [nome, setNome] = useState("");
+  const [telefone, setTelefone] = useState("");
+  const [email, setEmail] = useState("");
+  const [erroTelefone, setErroTelefone] = useState<string | undefined>();
+  const [aviso, setAviso] = useState<string | undefined>();
+  const [salvando, setSalvando] = useState(false);
+
+  async function cadastrar() {
+    setAviso(undefined);
+    setErroTelefone(undefined);
+
+    let numero: string;
+    try {
+      // A mesma função que a API usa pra guardar. Barrar aqui evita a
+      // ida e volta que voltaria 400 do pattern sem dizer o que fazer.
+      numero = normalizarTelefoneObrigatorio(telefone);
+    } catch (causa) {
+      setErroTelefone(
+        causa instanceof TelefoneInvalido
+          ? "Informe o DDD e o número, como (11) 99999-8888"
+          : "Telefone inválido"
+      );
+      return;
+    }
+
+    setSalvando(true);
+    try {
+      const criado = await api.barbeiro.criarCliente({
+        nome: nome.trim(),
+        telefone: numero,
+        email: email.trim() || null,
+      });
+      router.push(`/painel/clientes/${criado.id}`);
+    } catch (causa) {
+      const erro = causa as ErroDaApi;
+      // Telefone repetido é o caso comum, não o raro: o cadastro pode
+      // ter nascido do upsert do agendamento público.
+      setAviso(
+        erro.codigo === "conflito"
+          ? "Esse telefone já tem cadastro. Procure por ele na lista."
+          : erro.mensagem || "Não foi possível cadastrar agora."
+      );
+    }
+    setSalvando(false);
+  }
+
+  return (
+    <div className={estilos.pagina}>
+      <h1>Novo cliente</h1>
+
+      <Campo rotulo="Nome" valor={nome} onChange={setNome} />
+      <Campo
+        rotulo="Telefone"
+        formato="telefone"
+        valor={telefone}
+        onChange={(proximo) => {
+          setTelefone(proximo);
+          setErroTelefone(undefined);
+        }}
+        erro={erroTelefone}
+      />
+      <Campo rotulo="E-mail (opcional)" type="email" valor={email} onChange={setEmail} />
+
+      {aviso ? <Aviso>{aviso}</Aviso> : null}
+
+      <Botao carregando={salvando} onClick={cadastrar}>
+        Cadastrar
+      </Botao>
+    </div>
+  );
+}
+```
+
+`DetalheDoCliente.tsx`:
+
+```tsx
+"use client";
+
+import { useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import type { ErroDaApi } from "@gr-barber/api-client";
+import { normalizarTelefoneObrigatorio, TelefoneInvalido } from "@gr-barber/formato";
+import { Aviso } from "../../componentes/Aviso";
+import { Botao } from "../../componentes/Botao";
+import { Campo } from "../../componentes/Campo";
+import { Tabela } from "../../componentes/Tabela";
+import { useRequisicao } from "../../api/useRequisicao";
+import { formatarDataLonga } from "../../formato/datas";
+import { useApiDoPainel } from "../../painel/ProvedorDoPainel";
+import estilos from "./DetalheDoCliente.module.css";
+
+export function DetalheDoCliente() {
+  const { id } = useParams<{ id: string }>();
+  const router = useRouter();
+  const api = useApiDoPainel();
+
+  // A mesma chamada traz o cadastro e o histórico: ClienteComHistorico.
+  const cliente = useRequisicao(() => api.barbeiro.cliente(id), [id]);
+
+  const [nome, setNome] = useState("");
+  const [telefone, setTelefone] = useState("");
+  const [email, setEmail] = useState("");
+  const [erroTelefone, setErroTelefone] = useState<string | undefined>();
+  const [aviso, setAviso] = useState<string | undefined>();
+  const [salvando, setSalvando] = useState(false);
+
+  useEffect(() => {
+    if (!cliente.dados) return;
+    setNome(cliente.dados.nome);
+    setTelefone(cliente.dados.telefone);
+    setEmail(cliente.dados.email ?? "");
+  }, [cliente.dados]);
+
+  if (cliente.erro) {
+    return (
+      <Aviso>
+        {cliente.erro.codigo === "nao_encontrado"
+          ? "Cliente não encontrado."
+          : cliente.erro.mensagem}
+      </Aviso>
+    );
+  }
+  if (!cliente.dados) return <p>Carregando…</p>;
+
+  async function salvar() {
+    setAviso(undefined);
+    setErroTelefone(undefined);
+
+    let numero: string;
+    try {
+      numero = normalizarTelefoneObrigatorio(telefone);
+    } catch (causa) {
+      setErroTelefone(
+        causa instanceof TelefoneInvalido
+          ? "Informe o DDD e o número, como (11) 99999-8888"
+          : "Telefone inválido"
+      );
+      return;
+    }
+
+    setSalvando(true);
+    try {
+      await api.barbeiro.atualizarCliente(id, {
+        nome: nome.trim(),
+        telefone: numero,
+        email: email.trim() || null,
+      });
+      cliente.recarregar();
+    } catch (causa) {
+      setAviso((causa as ErroDaApi).mensagem || "Não foi possível salvar agora.");
+    }
+    setSalvando(false);
+  }
+
+  return (
+    <div className={estilos.pagina}>
+      <h1>{cliente.dados.nome}</h1>
+
+      <Campo rotulo="Nome" valor={nome} onChange={setNome} />
+      <Campo
+        rotulo="Telefone"
+        formato="telefone"
+        valor={telefone}
+        onChange={(proximo) => {
+          setTelefone(proximo);
+          setErroTelefone(undefined);
+        }}
+        erro={erroTelefone}
+      />
+      <Campo rotulo="E-mail (opcional)" type="email" valor={email} onChange={setEmail} />
+
+      {aviso ? <Aviso>{aviso}</Aviso> : null}
+
+      <Botao carregando={salvando} onClick={salvar}>
+        Salvar
+      </Botao>
+
+      <h2>Histórico</h2>
+      <Tabela
+        cabecalho={["Data", "Horário", "Serviços", "Status"]}
+        vazio="Esse cliente ainda não tem agendamento."
+        aoAbrir={(agendamentoId) => router.push(`/painel/agendamentos/${agendamentoId}`)}
+        linhas={cliente.dados.agendamentos.map((agendamento) => ({
+          id: agendamento.id,
+          celulas: [
+            formatarDataLonga(agendamento.data),
+            agendamento.horaInicio,
+            agendamento.servicos.map((s) => s.nome).join(" + "),
+            agendamento.status,
+          ],
+        }))}
+      />
+    </div>
+  );
+}
+```
 
 - [ ] **Step 5: Rodar e ver passar**
 
@@ -3791,8 +3971,55 @@ Expected: FAIL — as duas telas não existem.
 
 - [ ] **Step 3: Implementar**
 
-`ListaDeServicos.tsx` usa a `Tabela` com colunas Nome, Duração, Preço e
-uma coluna de estado onde o inativo ganha `<Chip tom="neutro">inativo</Chip>`.
+`ListaDeServicos.tsx`:
+
+```tsx
+"use client";
+
+import { useRouter } from "next/navigation";
+import { Aviso } from "../../componentes/Aviso";
+import { Botao } from "../../componentes/Botao";
+import { Chip } from "../../componentes/Chip";
+import { formatarPreco } from "../../componentes/ItemDeServico";
+import { Tabela } from "../../componentes/Tabela";
+import { useRequisicao } from "../../api/useRequisicao";
+import { useApiDoPainel } from "../../painel/ProvedorDoPainel";
+import estilos from "./ListaDeServicos.module.css";
+
+export function ListaDeServicos() {
+  const router = useRouter();
+  const api = useApiDoPainel();
+  // Inclui os inativos: é desta tela que o barbeiro reativa o que
+  // desativou, e um inativo que sumisse seria irrecuperável.
+  const servicos = useRequisicao(() => api.barbeiro.servicos(), []);
+
+  if (servicos.erro) return <Aviso>{servicos.erro.mensagem}</Aviso>;
+
+  return (
+    <div className={estilos.pagina}>
+      <div className={estilos.topo}>
+        <h1>Serviços</h1>
+        <Botao onClick={() => router.push("/painel/servicos/novo")}>+ Novo</Botao>
+      </div>
+
+      <Tabela
+        cabecalho={["Nome", "Duração", "Preço", ""]}
+        vazio="Nenhum serviço cadastrado ainda."
+        aoAbrir={(id) => router.push(`/painel/servicos/${id}`)}
+        linhas={(servicos.dados ?? []).map((servico) => ({
+          id: servico.id,
+          celulas: [
+            servico.nome,
+            `${servico.duracaoMinutos} min`,
+            formatarPreco(servico.preco),
+            servico.ativo ? null : <Chip tom="neutro">inativo</Chip>,
+          ],
+        }))}
+      />
+    </div>
+  );
+}
+```
 
 `CadastroDeServico.tsx`:
 
@@ -4053,20 +4280,207 @@ Expected: FAIL — a tela não existe.
 
 - [ ] **Step 3: Implementar**
 
-A tela mantém três estados independentes, um por bloco, cada um com seu
-botão de salvar — um salvar único mandaria três requisições e deixaria
-metade aplicada quando uma falhasse.
+Três estados independentes, um por bloco, cada um com seu botão — um
+salvar único mandaria três requisições e deixaria metade aplicada quando
+uma falhasse.
 
-O bloco de horários guarda a semana como
-`HorarioSerializado[]` de sete posições, indexada por `diaSemana`, e
-envia sempre as sete. Fechar um dia grava
-`{ fechado: true, horaAbertura: null, horaFechamento: null }` — deixar a
-hora antiga junto de `fechado: true` guardaria um estado que a API não
-usa e que a próxima leitura reexibiria.
+```tsx
+"use client";
 
-O telefone da barbearia e o do barbeiro passam os dois por
-`normalizarTelefoneObrigatorio` quando preenchidos; vazio vira `null`,
-que é o que a API aceita para limpar o campo.
+import { useEffect, useState } from "react";
+import type { ErroDaApi } from "@gr-barber/api-client";
+import { normalizarTelefoneObrigatorio, TelefoneInvalido } from "@gr-barber/formato";
+import type { HorarioSerializado } from "@gr-barber/types";
+import { Aviso } from "../../componentes/Aviso";
+import { Botao } from "../../componentes/Botao";
+import { Campo } from "../../componentes/Campo";
+import { useRequisicao } from "../../api/useRequisicao";
+import { useApiDoPainel } from "../../painel/ProvedorDoPainel";
+import { usePainel } from "../../painel/SessaoDoPainel";
+import estilos from "./ConfiguracoesDaBarbearia.module.css";
+
+const DIAS = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"];
+
+// Vazio vira null, que é o que a API aceita pra limpar o campo; string
+// vazia seria 400 do pattern.
+function telefoneOuNulo(digitado: string): string | null {
+  return digitado.trim() ? normalizarTelefoneObrigatorio(digitado) : null;
+}
+
+export function ConfiguracoesDaBarbearia() {
+  const api = useApiDoPainel();
+  const { perfil, slug } = usePainel();
+
+  const horariosSalvos = useRequisicao(() => api.barbeiro.horarios(), []);
+
+  const [nomeDaBarbearia, setNomeDaBarbearia] = useState("");
+  const [telefoneDaBarbearia, setTelefoneDaBarbearia] = useState("");
+  const [endereco, setEndereco] = useState("");
+  const [semana, setSemana] = useState<HorarioSerializado[]>([]);
+  const [nome, setNome] = useState(perfil.nome);
+  const [telefone, setTelefone] = useState(perfil.telefone ?? "");
+  const [erro, setErro] = useState<Record<string, string | undefined>>({});
+  const [aviso, setAviso] = useState<string | undefined>();
+
+  // A API tem PATCH /barbearias/me e nenhum GET: a única leitura dos
+  // dados da própria barbearia é a rota pública por slug. Daí o painel
+  // precisar do escopo publico também aqui, e não só na
+  // disponibilidade.
+  const barbearia = useRequisicao(() => api.publico.perfilDaBarbearia(slug), [slug]);
+
+  useEffect(() => {
+    if (!barbearia.dados) return;
+    setNomeDaBarbearia(barbearia.dados.nome);
+    setTelefoneDaBarbearia(barbearia.dados.telefone ?? "");
+    setEndereco(barbearia.dados.endereco ?? "");
+  }, [barbearia.dados]);
+
+  useEffect(() => {
+    if (horariosSalvos.dados) setSemana(horariosSalvos.dados);
+  }, [horariosSalvos.dados]);
+
+  async function salvarDados() {
+    setAviso(undefined);
+    setErro({});
+    try {
+      await api.barbeiro.atualizarMinhaBarbearia({
+        nome: nomeDaBarbearia.trim(),
+        telefone: telefoneOuNulo(telefoneDaBarbearia),
+        endereco: endereco.trim() || null,
+      });
+    } catch (causa) {
+      if (causa instanceof TelefoneInvalido) {
+        setErro({ telefoneDaBarbearia: "Informe o DDD e o número, como (11) 99999-8888" });
+        return;
+      }
+      setAviso((causa as ErroDaApi).mensagem || "Não foi possível salvar agora.");
+    }
+  }
+
+  async function salvarHorarios() {
+    setAviso(undefined);
+    try {
+      // A semana inteira, sempre: dia ausente do corpo vira fechado na
+      // API, de propósito — "sem linha" e "fechado" são estados
+      // diferentes pro cálculo de disponibilidade.
+      await api.barbeiro.salvarHorarios(semana);
+      horariosSalvos.recarregar();
+    } catch (causa) {
+      setAviso((causa as ErroDaApi).mensagem || "Não foi possível salvar agora.");
+    }
+  }
+
+  async function salvarPerfil() {
+    setAviso(undefined);
+    setErro({});
+    try {
+      await api.barbeiro.atualizarMeuPerfil({
+        nome: nome.trim(),
+        telefone: telefoneOuNulo(telefone),
+      });
+    } catch (causa) {
+      if (causa instanceof TelefoneInvalido) {
+        setErro({ telefone: "Informe o DDD e o número, como (11) 99999-8888" });
+        return;
+      }
+      setAviso((causa as ErroDaApi).mensagem || "Não foi possível salvar agora.");
+    }
+  }
+
+  function trocarDia(diaSemana: number, mudanca: Partial<HorarioSerializado>) {
+    setSemana((atual) =>
+      atual.map((dia) => (dia.diaSemana === diaSemana ? { ...dia, ...mudanca } : dia))
+    );
+  }
+
+  return (
+    <div className={estilos.pagina}>
+      <h1>Configurações</h1>
+      {aviso ? <Aviso>{aviso}</Aviso> : null}
+
+      <section>
+        <h2>Barbearia</h2>
+        <Campo rotulo="Nome da barbearia" valor={nomeDaBarbearia} onChange={setNomeDaBarbearia} />
+        <Campo
+          rotulo="Telefone da barbearia"
+          formato="telefone"
+          valor={telefoneDaBarbearia}
+          onChange={setTelefoneDaBarbearia}
+          erro={erro.telefoneDaBarbearia}
+        />
+        <Campo rotulo="Endereço" valor={endereco} onChange={setEndereco} />
+        <Botao onClick={salvarDados}>Salvar dados</Botao>
+      </section>
+
+      <section>
+        <h2>Horário de funcionamento</h2>
+        {semana.map((dia) => (
+          <div key={dia.diaSemana} className={estilos.dia}>
+            <span>{DIAS[dia.diaSemana]}</span>
+            <label>
+              <input
+                type="checkbox"
+                aria-label={`Fechado na ${DIAS[dia.diaSemana]}`}
+                checked={dia.fechado}
+                onChange={(evento) =>
+                  // Fechar limpa as horas: deixar a hora antiga junto de
+                  // fechado guardaria um estado que a API não usa e que
+                  // a próxima leitura reexibiria.
+                  trocarDia(
+                    dia.diaSemana,
+                    evento.target.checked
+                      ? { fechado: true, horaAbertura: null, horaFechamento: null }
+                      : { fechado: false, horaAbertura: "09:00", horaFechamento: "18:00" }
+                  )
+                }
+              />
+              fechado
+            </label>
+            {dia.fechado ? null : (
+              <>
+                <Campo
+                  rotulo={`Abre na ${DIAS[dia.diaSemana]}`}
+                  valor={dia.horaAbertura ?? ""}
+                  onChange={(valor) => trocarDia(dia.diaSemana, { horaAbertura: valor })}
+                />
+                <Campo
+                  rotulo={`Fecha na ${DIAS[dia.diaSemana]}`}
+                  valor={dia.horaFechamento ?? ""}
+                  onChange={(valor) => trocarDia(dia.diaSemana, { horaFechamento: valor })}
+                />
+              </>
+            )}
+          </div>
+        ))}
+        <Botao onClick={salvarHorarios}>Salvar horários</Botao>
+      </section>
+
+      <section>
+        <h2>Seu perfil</h2>
+        <Campo rotulo="Seu nome" valor={nome} onChange={setNome} />
+        <Campo
+          rotulo="Seu telefone"
+          formato="telefone"
+          valor={telefone}
+          onChange={setTelefone}
+          erro={erro.telefone}
+        />
+        <Botao onClick={salvarPerfil}>Salvar perfil</Botao>
+      </section>
+    </div>
+  );
+}
+```
+
+**A assimetria que este arquivo esbarra, já verificada:** a API tem
+`PATCH /barbearias/me` (`apps/api/src/routers/barbearias.ts:38`) e
+**nenhum `GET`**. A única leitura dos dados da própria barbearia é a
+rota pública `GET /barbearias/:slug`, que devolve
+`PerfilPublicoBarbearia`. É o mesmo tipo de buraco que a Tarefa 11
+encontrou com o `servico(id)` ausente, e a saída é a mesma: usar o que
+existe, com o comentário dizendo por quê. Fechar de verdade seria um
+`GET /barbearias/me` na API, que é mudança de API e está fora do escopo
+deste sub-projeto — registre nas dívidas do roadmap na Tarefa 13.
 
 - [ ] **Step 4: Rodar e ver passar**
 
