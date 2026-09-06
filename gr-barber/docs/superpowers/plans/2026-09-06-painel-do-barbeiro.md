@@ -2115,6 +2115,14 @@ de funcionamento marcada com o que ocupa cada faixa.
 - Produces:
   - `interface Faixa { hora: string; agendamento: AgendamentoComCliente | null; passada: boolean }`
   - `faixasDoDia(entrada: { data: string; horario: HorarioSerializado | undefined; agendamentos: AgendamentoComCliente[]; agora: Date; passo?: number }): Faixa[]`
+
+  **O `passo` e 15, nao 30.** `packages/scheduling/src/index.ts:49` usa
+  `intervaloMinutos = 15` por padrao, `horariosLivres` nao passa outro
+  valor, e `agendamento.ts:101` valida o `horaInicio` contra essa lista —
+  entao a API oferece e aceita 09:15. Com passo 30 um agendamento nessa
+  hora nao casaria com faixa nenhuma e sumiria da agenda, e o painel so
+  criaria em :00 e :30. O mockup do design system desenha meia hora; o
+  pacote scheduling e a autoridade.
   - `diasDaSemana(data: string): string[]` — os sete dias, domingo a sábado
   - `GradeDeAgenda({ faixas, aoAbrir, aoCriar })`
   - `AgendaDoDia({ agora }: { agora?: Date })`
@@ -2164,7 +2172,10 @@ describe("faixas do dia", () => {
       agora: new Date("2026-09-01T10:00:00-03:00"),
     });
 
-    expect(faixas.map((f) => f.hora)).toEqual(["09:00", "09:30", "10:00", "10:30"]);
+    expect(faixas.map((f) => f.hora)).toEqual([
+      "09:00", "09:15", "09:30", "09:45",
+      "10:00", "10:15", "10:30", "10:45",
+    ]);
   });
 
   it("dia fechado não tem faixa nenhuma", () => {
@@ -2262,7 +2273,7 @@ export function faixasDoDia(entrada: {
   agora: Date;
   passo?: number;
 }): Faixa[] {
-  const { data, horario, agendamentos, agora, passo = 30 } = entrada;
+  const { data, horario, agendamentos, agora, passo = 15 } = entrada;
   if (!horario || horario.fechado || !horario.horaAbertura || !horario.horaFechamento) {
     return [];
   }
