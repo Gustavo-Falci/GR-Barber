@@ -1,3 +1,4 @@
+* [ ] 
 
 # Painel web do barbeiro — plano de implementação
 
@@ -354,7 +355,7 @@ Um ajudante de busca, junto dos outros (`duracaoDe`, `editarServico`):
     if (!alvo) return true;
 
     const semAcento = (texto: string) =>
-      texto.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+      texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
     if (semAcento(cliente.nome).includes(semAcento(alvo))) return true;
 
@@ -1621,6 +1622,7 @@ Três números e a lista do dia. Tudo sai do que a API já devolve: nenhuma
 rota nova.
 
 **Files:**
+
 - Create: `apps/web/src/componentes/Estatistica.tsx`
 - Create: `apps/web/src/componentes/Estatistica.module.css`
 - Create: `apps/web/src/painel/metricas.ts`
@@ -1631,6 +1633,7 @@ rota nova.
 - Test: `apps/web/tests/telas/painel/dashboard.test.tsx`
 
 **Interfaces:**
+
 - Consumes: `usePainel` (Tarefa 4), `useApiDoPainel` (Tarefa 4),
   `useRequisicao`, `hojeIso` (`src/formato/datas.ts`), `formatarPreco`
   (`src/componentes/ItemDeServico.tsx`).
@@ -2084,6 +2087,7 @@ A grade **não** chama a disponibilidade: `FiltroDoDia` exige
 de funcionamento marcada com o que ocupa cada faixa.
 
 **Files:**
+
 - Create: `apps/web/src/painel/grade.ts`
 - Create: `apps/web/src/componentes/GradeDeAgenda.tsx`
 - Create: `apps/web/src/componentes/GradeDeAgenda.module.css`
@@ -2094,6 +2098,7 @@ de funcionamento marcada com o que ocupa cada faixa.
 - Test: `apps/web/tests/telas/painel/agenda.test.tsx`
 
 **Interfaces:**
+
 - Consumes: `usePainel`, `useApiDoPainel`, `useRequisicao`, `hojeIso`,
   `horaJaPassou` (`src/formato/datas.ts`).
 - Produces:
@@ -2537,6 +2542,7 @@ monitor comporta. É aqui — e só aqui — que a disponibilidade é chamada,
 porque é aqui que existem serviços selecionados.
 
 **Files:**
+
 - Create: `apps/web/src/telas/painel/NovoAgendamento.tsx`
 - Create: `apps/web/src/telas/painel/NovoAgendamento.module.css`
 - Create: `apps/web/src/telas/painel/BuscaDeCliente.tsx`
@@ -2545,6 +2551,7 @@ porque é aqui que existem serviços selecionados.
 - Test: `apps/web/tests/telas/painel/novo-agendamento.test.tsx`
 
 **Interfaces:**
+
 - Consumes: `usePainel` (dá `perfil.id`, que é o `barbeiroId`, e `slug`),
   `useApiDoPainel`, `useRequisicao`, `Calendario`, `ListaDeHorarios`,
   `ItemDeServico`, `formatarPreco`, `ehPassado`, `hojeIso`,
@@ -3041,12 +3048,14 @@ aceita apenas esses dois campos, e o comentário em
 hora ali pularia a checagem de disponibilidade inteira.
 
 **Files:**
+
 - Create: `apps/web/src/telas/painel/DetalheDoAgendamento.tsx`
 - Create: `apps/web/src/telas/painel/DetalheDoAgendamento.module.css`
 - Create: `apps/web/app/(painel)/painel/(guardado)/agendamentos/[id]/page.tsx`
 - Test: `apps/web/tests/telas/painel/detalhe-do-agendamento.test.tsx`
 
 **Interfaces:**
+
 - Consumes: `useApiDoPainel`, `useRequisicao`, `useParams`,
   `formatarPreco`, `formatarDataLonga`, `Chip`, `Botao`, `Campo`,
   `Aviso`.
@@ -3307,6 +3316,7 @@ and create instead of offering a button the API would refuse."
 Três rotas e o componente `Tabela`, que serviços também usa.
 
 **Files:**
+
 - Create: `apps/web/src/componentes/Tabela.tsx`
 - Create: `apps/web/src/componentes/Tabela.module.css`
 - Create: `apps/web/src/telas/painel/ListaDeClientes.tsx`
@@ -3319,6 +3329,7 @@ Três rotas e o componente `Tabela`, que serviços também usa.
 - Test: `apps/web/tests/telas/painel/clientes.test.tsx`
 
 **Interfaces:**
+
 - Consumes: `useApiDoPainel`, `useRequisicao`, `useSearchParams`,
   `useParams`, `formatarTelefoneParcial`,
   `normalizarTelefoneObrigatorio`, `TelefoneInvalido`,
@@ -3546,6 +3557,7 @@ export function Tabela({
 ```tsx
 "use client";
 
+import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Aviso } from "../../componentes/Aviso";
 import { Botao } from "../../componentes/Botao";
@@ -3562,6 +3574,12 @@ export function ListaDeClientes({ agora = new Date() }: { agora?: Date }) {
   const query = useSearchParams();
   const api = useApiDoPainel();
   const busca = query.get("busca") ?? "";
+  // Estado local, e nao o valor da URL direto no campo: o router.push do
+  // Next e assincrono, e um campo cujo valor so volta pela URL trava
+  // enquanto a navegacao nao acontece - a pessoa digita e nao ve letra.
+  // O filtro continua saindo da URL, entao recarregar e o link valem.
+  const [digitado, setDigitado] = useState(busca);
+  useEffect(() => setDigitado(busca), [busca]);
 
   const clientes = useRequisicao(() => api.barbeiro.clientes(busca), [busca]);
 
@@ -3599,12 +3617,13 @@ export function ListaDeClientes({ agora = new Date() }: { agora?: Date }) {
 
       <Campo
         rotulo="Buscar por nome ou telefone"
-        valor={busca}
-        onChange={(proximo) =>
+        valor={digitado}
+        onChange={(proximo) => {
+          setDigitado(proximo);
           router.push(
             proximo ? `/painel/clientes?busca=${encodeURIComponent(proximo)}` : "/painel/clientes"
-          )
-        }
+          );
+        }}
       />
 
       <Tabela
@@ -3864,6 +3883,7 @@ irrecuperável pela interface. Não existe `servico(id)` no client — a
 tela de edição acha na lista.
 
 **Files:**
+
 - Create: `apps/web/src/telas/painel/ListaDeServicos.tsx`
 - Create: `apps/web/src/telas/painel/CadastroDeServico.tsx`
 - Create: os `.module.css` correspondentes
@@ -3873,6 +3893,7 @@ tela de edição acha na lista.
 - Test: `apps/web/tests/telas/painel/servicos.test.tsx`
 
 **Interfaces:**
+
 - Consumes: `useApiDoPainel`, `useRequisicao`, `Tabela` (Tarefa 10),
   `formatarPreco`, `Chip`.
 - Produces:
@@ -4189,12 +4210,14 @@ barbeiro. O bloco de horários manda a semana inteira num `PUT` — dia
 ausente do corpo vira fechado na API, de propósito.
 
 **Files:**
+
 - Create: `apps/web/src/telas/painel/ConfiguracoesDaBarbearia.tsx`
 - Create: `apps/web/src/telas/painel/ConfiguracoesDaBarbearia.module.css`
 - Create: `apps/web/app/(painel)/painel/(guardado)/configuracoes/page.tsx`
 - Test: `apps/web/tests/telas/painel/configuracoes.test.tsx`
 
 **Interfaces:**
+
 - Consumes: `useApiDoPainel`, `usePainel`, `useRequisicao`, `Campo`,
   `Botao`, `Aviso`, `normalizarTelefoneObrigatorio`, `TelefoneInvalido`.
 - Produces: `ConfiguracoesDaBarbearia()`.
@@ -4524,6 +4547,7 @@ Fecha o critério 4 da spec da fundação e registra a divergência do mapa,
 como o sub-projeto B fez com a oitava tela.
 
 **Files:**
+
 - Delete: `apps/web/app/primitivos/page.tsx`
 - Delete: `apps/web/app/primitivos/page.module.css`
 - Modify: `docs/screens.md`
@@ -4623,4 +4647,3 @@ creating a barbershop, it has nowhere — first access lived on the app's
 login, and the panel shipped first. The primitives showcase goes away,
 closing the foundation spec's fourth completion criterion."
 ```
-
