@@ -2109,8 +2109,9 @@ de funcionamento marcada com o que ocupa cada faixa.
 
 **Interfaces:**
 
-- Consumes: `usePainel`, `useApiDoPainel`, `useRequisicao`, `hojeIso`,
-  `horaJaPassou` (`src/formato/datas.ts`).
+- Consumes: `useApiDoPainel`, `useRequisicao`, `formatarDataLonga` e
+  `hojeIso` (`src/formato/datas.ts`) na tela; `horaJaPassou` no
+  `grade.ts`, não na tela.
 - Produces:
   - `interface Faixa { hora: string; agendamento: AgendamentoComCliente | null; passada: boolean }`
   - `faixasDoDia(entrada: { data: string; horario: HorarioSerializado | undefined; agendamentos: AgendamentoComCliente[]; agora: Date; passo?: number }): Faixa[]`
