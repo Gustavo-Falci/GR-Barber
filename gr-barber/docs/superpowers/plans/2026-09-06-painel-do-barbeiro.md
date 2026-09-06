@@ -1088,7 +1088,7 @@ export function SessaoDoPainel({ children }: { children: ReactNode }) {
     }
 
     let vivo = true;
-    api
+    api.barbeiro
       .meuPerfil()
       .then((resposta) => {
         if (vivo) setPerfil(resposta);
