@@ -3327,5 +3327,870 @@ and create instead of offering a button the API would refuse."
 
 ---
 
-O plano continua nas tarefas 10 a 13 — clientes, serviços,
-configurações e limpeza.
+### Task 10: Clientes — lista, cadastro e detalhe
+
+Três rotas e o componente `Tabela`, que serviços também usa.
+
+**Files:**
+- Create: `apps/web/src/componentes/Tabela.tsx`
+- Create: `apps/web/src/componentes/Tabela.module.css`
+- Create: `apps/web/src/telas/painel/ListaDeClientes.tsx`
+- Create: `apps/web/src/telas/painel/CadastroDeCliente.tsx`
+- Create: `apps/web/src/telas/painel/DetalheDoCliente.tsx`
+- Create: os três `.module.css` correspondentes
+- Create: `apps/web/app/(painel)/painel/(guardado)/clientes/page.tsx`
+- Create: `apps/web/app/(painel)/painel/(guardado)/clientes/novo/page.tsx`
+- Create: `apps/web/app/(painel)/painel/(guardado)/clientes/[id]/page.tsx`
+- Test: `apps/web/tests/telas/painel/clientes.test.tsx`
+
+**Interfaces:**
+- Consumes: `useApiDoPainel`, `useRequisicao`, `useSearchParams`,
+  `useParams`, `formatarTelefoneParcial`,
+  `normalizarTelefoneObrigatorio`, `TelefoneInvalido`,
+  `formatarDataLonga`.
+- Produces:
+  - `Tabela({ cabecalho, linhas })` onde
+    `linhas: { id: string; celulas: ReactNode[] }[]` e
+    `cabecalho: string[]`; a linha inteira é clicável via `aoAbrir?`
+  - `ListaDeClientes()`
+  - `CadastroDeCliente()`
+  - `DetalheDoCliente()`
+
+- [ ] **Step 1: Escrever o teste que falha**
+
+```tsx
+import { screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { criarApiClientFalso, ErroDaApi } from "@gr-barber/api-client";
+import { CadastroDeCliente } from "../../../src/telas/painel/CadastroDeCliente";
+import { DetalheDoCliente } from "../../../src/telas/painel/DetalheDoCliente";
+import { ListaDeClientes } from "../../../src/telas/painel/ListaDeClientes";
+import { navegacaoFalsa } from "../../ajudantes/navegacao";
+import { montarPainel } from "../../ajudantes/painel";
+
+function semear() {
+  return criarApiClientFalso({
+    clientes: [
+      { id: "c1", nome: "João Silva", telefone: "(11) 99999-0001", email: null, temConta: false },
+      { id: "c2", nome: "Marcos Reis", telefone: "(11) 99999-0002", email: null, temConta: false },
+    ],
+    agendamentos: [
+      {
+        id: "a1",
+        clienteId: "c1",
+        data: "2026-08-30",
+        horaInicio: "09:00",
+        horaFim: "09:30",
+        status: "concluido",
+        origem: "cliente",
+        observacoes: null,
+        servicos: [
+          { servicoId: "s1", nome: "Corte", precoNoMomento: "40.00", duracaoNoMomento: 30 },
+        ],
+      },
+    ],
+  });
+}
+
+describe("clientes no painel", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    navegacaoFalsa.redefinir({ pathname: "/painel/clientes" });
+  });
+
+  it("lista os clientes com nome e telefone", async () => {
+    montarPainel(<ListaDeClientes />, semear());
+
+    expect(await screen.findByText("João Silva")).toBeInTheDocument();
+    expect(screen.getByText("Marcos Reis")).toBeInTheDocument();
+  });
+
+  it("a busca da URL chega na chamada", async () => {
+    navegacaoFalsa.redefinir({ pathname: "/painel/clientes", query: { busca: "marcos" } });
+    montarPainel(<ListaDeClientes />, semear());
+
+    expect(await screen.findByText("Marcos Reis")).toBeInTheDocument();
+    expect(screen.queryByText("João Silva")).not.toBeInTheDocument();
+  });
+
+  it("digitar na busca põe o termo na URL", async () => {
+    // ?busca= na URL: recarregar não perde o filtro, e o resultado é
+    // linkável — a mesma razão que fez o fluxo do cliente pôr o passo
+    // na rota.
+    montarPainel(<ListaDeClientes />, semear());
+
+    await userEvent.type(await screen.findByLabelText(/buscar/i), "marcos");
+
+    await waitFor(() =>
+      expect(navegacaoFalsa.push).toHaveBeenCalledWith("/painel/clientes?busca=marcos")
+    );
+  });
+
+  it("abrir uma linha vai pro detalhe", async () => {
+    montarPainel(<ListaDeClientes />, semear());
+
+    await userEvent.click(await screen.findByRole("button", { name: /João Silva/ }));
+
+    expect(navegacaoFalsa.push).toHaveBeenCalledWith("/painel/clientes/c1");
+  });
+
+  it("cadastra cliente e vai pro detalhe dele", async () => {
+    navegacaoFalsa.redefinir({ pathname: "/painel/clientes/novo" });
+    montarPainel(<CadastroDeCliente />, criarApiClientFalso({ clientes: [] }));
+
+    await userEvent.type(screen.getByLabelText(/nome/i), "Ana Souza");
+    await userEvent.type(screen.getByLabelText(/telefone/i), "11988887777");
+    await userEvent.click(screen.getByRole("button", { name: /cadastrar/i }));
+
+    await waitFor(() =>
+      expect(navegacaoFalsa.push).toHaveBeenCalledWith("/painel/clientes/c1")
+    );
+  });
+
+  it("telefone sem DDD para no campo, sem ir à API", async () => {
+    // A API responde 400 do pattern; barrar aqui mantém o erro no campo.
+    navegacaoFalsa.redefinir({ pathname: "/painel/clientes/novo" });
+    const falso = criarApiClientFalso({ clientes: [] });
+    let chamou = false;
+    falso.barbeiro.criarCliente = async () => {
+      chamou = true;
+      throw new ErroDaApi(400, "requisicao_invalida", "");
+    };
+    montarPainel(<CadastroDeCliente />, falso);
+
+    await userEvent.type(screen.getByLabelText(/nome/i), "Ana Souza");
+    await userEvent.type(screen.getByLabelText(/telefone/i), "988887777");
+    await userEvent.click(screen.getByRole("button", { name: /cadastrar/i }));
+
+    expect(await screen.findByText(/informe o DDD/i)).toBeInTheDocument();
+    expect(chamou).toBe(false);
+  });
+
+  it("o detalhe mostra os dados e o histórico", async () => {
+    navegacaoFalsa.redefinir({ pathname: "/painel/clientes/c1", params: { id: "c1" } });
+    montarPainel(<DetalheDoCliente />, semear());
+
+    expect(await screen.findByDisplayValue("João Silva")).toBeInTheDocument();
+    expect(screen.getByText(/30 de agosto/i)).toBeInTheDocument();
+  });
+
+  it("o detalhe salva a edição", async () => {
+    navegacaoFalsa.redefinir({ pathname: "/painel/clientes/c1", params: { id: "c1" } });
+    const falso = semear();
+    const atualizar = vi.fn(
+      async (id: string, edicao: { nome?: string; telefone?: string }) =>
+        falso.barbeiro.atualizarCliente(id, edicao)
+    );
+    falso.barbeiro.atualizarCliente = atualizar;
+
+    montarPainel(<DetalheDoCliente />, falso);
+
+    const campo = await screen.findByLabelText(/nome/i);
+    await userEvent.clear(campo);
+    await userEvent.type(campo, "João da Silva");
+    await userEvent.click(screen.getByRole("button", { name: /salvar/i }));
+
+    await waitFor(() =>
+      expect(atualizar).toHaveBeenCalledWith("c1", expect.objectContaining({ nome: "João da Silva" }))
+    );
+  });
+});
+```
+
+- [ ] **Step 2: Rodar e ver falhar**
+
+Run: `pnpm --filter @gr-barber/web exec vitest run tests/telas/painel/clientes.test.tsx`
+Expected: FAIL — as três telas não existem.
+
+- [ ] **Step 3: Implementar a `Tabela`**
+
+```tsx
+import type { ReactNode } from "react";
+import estilos from "./Tabela.module.css";
+
+export interface Linha {
+  id: string;
+  celulas: ReactNode[];
+}
+
+export function Tabela({
+  cabecalho,
+  linhas,
+  aoAbrir,
+  vazio,
+}: {
+  cabecalho: string[];
+  linhas: Linha[];
+  aoAbrir?: (id: string) => void;
+  vazio: string;
+}) {
+  if (linhas.length === 0) return <p>{vazio}</p>;
+
+  return (
+    <table className={estilos.tabela}>
+      <thead>
+        <tr>
+          {cabecalho.map((titulo) => (
+            <th key={titulo}>{titulo}</th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {linhas.map((linha) => (
+          <tr key={linha.id}>
+            {linha.celulas.map((celula, indice) => (
+              <td key={indice}>
+                {/* O botão fica na primeira célula, e não na <tr>: linha
+                    clicável sem elemento focável não chega pelo teclado. */}
+                {indice === 0 && aoAbrir ? (
+                  <button type="button" onClick={() => aoAbrir(linha.id)}>
+                    {celula}
+                  </button>
+                ) : (
+                  celula
+                )}
+              </td>
+            ))}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+```
+
+- [ ] **Step 4: Implementar as três telas**
+
+`ListaDeClientes.tsx` — busca na URL, tabela, botão de novo:
+
+```tsx
+"use client";
+
+import { useRouter, useSearchParams } from "next/navigation";
+import { Aviso } from "../../componentes/Aviso";
+import { Botao } from "../../componentes/Botao";
+import { Campo } from "../../componentes/Campo";
+import { Tabela } from "../../componentes/Tabela";
+import { useRequisicao } from "../../api/useRequisicao";
+import { formatarDataLonga } from "../../formato/datas";
+import { useApiDoPainel } from "../../painel/ProvedorDoPainel";
+import estilos from "./ListaDeClientes.module.css";
+
+export function ListaDeClientes() {
+  const router = useRouter();
+  const query = useSearchParams();
+  const api = useApiDoPainel();
+  const busca = query.get("busca") ?? "";
+
+  const clientes = useRequisicao(() => api.barbeiro.clientes(busca), [busca]);
+  // O último agendamento de cada um não vem na lista de clientes; a
+  // coluna sai daqui. Uma chamada, não uma por linha.
+  const agendamentos = useRequisicao(() => api.barbeiro.agendamentosDoIntervalo("2000-01-01", "2100-01-01"), []);
+
+  if (clientes.erro) return <Aviso>{clientes.erro.mensagem}</Aviso>;
+
+  function ultimoDe(clienteId: string): string {
+    const datas = (agendamentos.dados ?? [])
+      .filter((a) => a.cliente.id === clienteId)
+      .map((a) => a.data)
+      .sort();
+    const ultima = datas.at(-1);
+    return ultima ? formatarDataLonga(ultima) : "—";
+  }
+
+  return (
+    <div className={estilos.pagina}>
+      <div className={estilos.topo}>
+        <h1>Clientes</h1>
+        <Botao onClick={() => router.push("/painel/clientes/novo")}>+ Novo</Botao>
+      </div>
+
+      <Campo
+        rotulo="Buscar por nome ou telefone"
+        valor={busca}
+        onChange={(proximo) =>
+          router.push(
+            proximo ? `/painel/clientes?busca=${encodeURIComponent(proximo)}` : "/painel/clientes"
+          )
+        }
+      />
+
+      <Tabela
+        cabecalho={["Nome", "Telefone", "Último agendamento"]}
+        vazio="Nenhum cliente por aqui ainda."
+        aoAbrir={(id) => router.push(`/painel/clientes/${id}`)}
+        linhas={(clientes.dados ?? []).map((cliente) => ({
+          id: cliente.id,
+          celulas: [cliente.nome, cliente.telefone, ultimoDe(cliente.id)],
+        }))}
+      />
+    </div>
+  );
+}
+```
+
+`CadastroDeCliente.tsx` — nome, telefone e email opcional, com a
+normalização antes de enviar e o `conflito` tratado como na Tarefa 8.
+`DetalheDoCliente.tsx` — os mesmos campos preenchidos por
+`api.barbeiro.cliente(id)`, mais a lista de `agendamentos` que essa
+chamada devolve junto, cada linha levando a
+`/painel/agendamentos/<id>`.
+
+Nos dois, telefone entra com `formato="telefone"` no `Campo` e sai por
+`normalizarTelefoneObrigatorio`; `TelefoneInvalido` vira "Informe o DDD
+e o número, como (11) 99999-8888" no próprio campo.
+
+- [ ] **Step 5: Rodar e ver passar**
+
+Run: `pnpm --filter @gr-barber/web exec vitest run tests/telas/painel/clientes.test.tsx`
+Expected: PASS
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add apps/web/src/componentes/Tabela.tsx apps/web/src/componentes/Tabela.module.css apps/web/src/telas/painel/ListaDeClientes.tsx apps/web/src/telas/painel/CadastroDeCliente.tsx apps/web/src/telas/painel/DetalheDoCliente.tsx apps/web/src/telas/painel/*.module.css "apps/web/app/(painel)/painel/(guardado)/clientes" apps/web/tests/telas/painel/clientes.test.tsx
+git commit -m "feat(web): list, create and open the barbershop's clients
+
+The search term lives in the URL, so reloading keeps the filter and a
+result is linkable — the same reason the client flow put each step on a
+route. Phone is normalised before the call, so a missing area code stays
+an error on its field instead of a 400 in English."
+```
+
+---
+
+### Task 11: Serviços — lista, cadastro e edição
+
+A lista **inclui os inativos** de propósito: é desta tela que o barbeiro
+reativa o que desativou, e um serviço inativo que sumisse seria
+irrecuperável pela interface. Não existe `servico(id)` no client — a
+tela de edição acha na lista.
+
+**Files:**
+- Create: `apps/web/src/telas/painel/ListaDeServicos.tsx`
+- Create: `apps/web/src/telas/painel/CadastroDeServico.tsx`
+- Create: os `.module.css` correspondentes
+- Create: `apps/web/app/(painel)/painel/(guardado)/servicos/page.tsx`
+- Create: `apps/web/app/(painel)/painel/(guardado)/servicos/novo/page.tsx`
+- Create: `apps/web/app/(painel)/painel/(guardado)/servicos/[id]/page.tsx`
+- Test: `apps/web/tests/telas/painel/servicos.test.tsx`
+
+**Interfaces:**
+- Consumes: `useApiDoPainel`, `useRequisicao`, `Tabela` (Tarefa 10),
+  `formatarPreco`, `Chip`.
+- Produces:
+  - `ListaDeServicos()`
+  - `CadastroDeServico()` — lê `id` de `useParams`; sem `id`, cria
+
+- [ ] **Step 1: Escrever o teste que falha**
+
+```tsx
+import { screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { criarApiClientFalso } from "@gr-barber/api-client";
+import { CadastroDeServico } from "../../../src/telas/painel/CadastroDeServico";
+import { ListaDeServicos } from "../../../src/telas/painel/ListaDeServicos";
+import { navegacaoFalsa } from "../../ajudantes/navegacao";
+import { montarPainel } from "../../ajudantes/painel";
+
+function semear() {
+  return criarApiClientFalso({
+    servicos: [
+      { id: "s1", nome: "Corte", duracaoMinutos: 30, preco: "40.00", ativo: true },
+      { id: "s2", nome: "Barba", duracaoMinutos: 20, preco: "25.00", ativo: false },
+    ],
+  });
+}
+
+describe("serviços no painel", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    navegacaoFalsa.redefinir({ pathname: "/painel/servicos" });
+  });
+
+  it("lista ativos e inativos, marcando os inativos", async () => {
+    // É desta tela que o barbeiro reativa o que desativou; um inativo
+    // que sumisse seria irrecuperável pela interface.
+    montarPainel(<ListaDeServicos />, semear());
+
+    expect(await screen.findByText("Corte")).toBeInTheDocument();
+    expect(screen.getByText("Barba")).toBeInTheDocument();
+    expect(screen.getByText(/inativo/i)).toBeInTheDocument();
+  });
+
+  it("mostra preço e duração", async () => {
+    montarPainel(<ListaDeServicos />, semear());
+
+    expect(await screen.findByText("R$ 40,00")).toBeInTheDocument();
+    expect(screen.getByText("30 min")).toBeInTheDocument();
+  });
+
+  it("cria serviço com preço em string", async () => {
+    // String, nunca number: o preço é Decimal no banco e float perderia
+    // centavo.
+    navegacaoFalsa.redefinir({ pathname: "/painel/servicos/novo" });
+    const falso = semear();
+    const criar = vi.fn(
+      async (novo: { nome: string; duracaoMinutos: number; preco: string }) =>
+        falso.barbeiro.criarServico(novo)
+    );
+    falso.barbeiro.criarServico = criar;
+
+    montarPainel(<CadastroDeServico />, falso);
+
+    await userEvent.type(screen.getByLabelText(/nome/i), "Sobrancelha");
+    await userEvent.type(screen.getByLabelText(/duração/i), "15");
+    await userEvent.type(screen.getByLabelText(/preço/i), "20,00");
+    await userEvent.click(screen.getByRole("button", { name: /salvar/i }));
+
+    await waitFor(() =>
+      expect(criar).toHaveBeenCalledWith({
+        nome: "Sobrancelha",
+        duracaoMinutos: 15,
+        preco: "20.00",
+      })
+    );
+  });
+
+  it("a edição chega preenchida com o serviço da lista", async () => {
+    // Não existe servico(id) no client — a tela acha em servicos().
+    navegacaoFalsa.redefinir({ pathname: "/painel/servicos/s1", params: { id: "s1" } });
+    montarPainel(<CadastroDeServico />, semear());
+
+    expect(await screen.findByDisplayValue("Corte")).toBeInTheDocument();
+  });
+
+  it("desativa e reativa", async () => {
+    navegacaoFalsa.redefinir({ pathname: "/painel/servicos/s1", params: { id: "s1" } });
+    const falso = semear();
+    const desativar = vi.fn(async (id: string) => falso.barbeiro.desativarServico(id));
+    falso.barbeiro.desativarServico = desativar;
+
+    montarPainel(<CadastroDeServico />, falso);
+
+    await userEvent.click(await screen.findByRole("button", { name: /desativar/i }));
+
+    await waitFor(() => expect(desativar).toHaveBeenCalledWith("s1"));
+  });
+
+  it("serviço que não existe vira aviso", async () => {
+    navegacaoFalsa.redefinir({ pathname: "/painel/servicos/s9", params: { id: "s9" } });
+    montarPainel(<CadastroDeServico />, semear());
+
+    expect(await screen.findByText(/serviço não encontrado/i)).toBeInTheDocument();
+  });
+});
+```
+
+- [ ] **Step 2: Rodar e ver falhar**
+
+Run: `pnpm --filter @gr-barber/web exec vitest run tests/telas/painel/servicos.test.tsx`
+Expected: FAIL — as duas telas não existem.
+
+- [ ] **Step 3: Implementar**
+
+`ListaDeServicos.tsx` usa a `Tabela` com colunas Nome, Duração, Preço e
+uma coluna de estado onde o inativo ganha `<Chip tom="neutro">inativo</Chip>`.
+
+`CadastroDeServico.tsx`:
+
+```tsx
+"use client";
+
+import { useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import type { ErroDaApi } from "@gr-barber/api-client";
+import { Aviso } from "../../componentes/Aviso";
+import { Botao } from "../../componentes/Botao";
+import { Campo } from "../../componentes/Campo";
+import { useRequisicao } from "../../api/useRequisicao";
+import { useApiDoPainel } from "../../painel/ProvedorDoPainel";
+import estilos from "./CadastroDeServico.module.css";
+
+// "20,00" e "20.00" viram a mesma string decimal. Number entra só na
+// validação, nunca no que é enviado: o preço é Decimal no banco.
+function paraDecimal(digitado: string): string | null {
+  const limpo = digitado.trim().replace(",", ".");
+  if (!/^\d+(\.\d{1,2})?$/.test(limpo)) return null;
+  return Number(limpo).toFixed(2);
+}
+
+export function CadastroDeServico() {
+  const { id } = useParams<{ id?: string }>();
+  const router = useRouter();
+  const api = useApiDoPainel();
+
+  // Não existe servico(id) no client: cliente(id) e agendamento(id)
+  // existem, este não. A lista basta, e devolve inclusive os inativos.
+  const servicos = useRequisicao(() => api.barbeiro.servicos(), []);
+  const atual = id ? servicos.dados?.find((s) => s.id === id) : undefined;
+
+  const [nome, setNome] = useState("");
+  const [duracao, setDuracao] = useState("");
+  const [preco, setPreco] = useState("");
+  const [erroPreco, setErroPreco] = useState<string | undefined>();
+  const [aviso, setAviso] = useState<string | undefined>();
+  const [salvando, setSalvando] = useState(false);
+
+  useEffect(() => {
+    if (!atual) return;
+    setNome(atual.nome);
+    setDuracao(String(atual.duracaoMinutos));
+    setPreco(atual.preco);
+  }, [atual]);
+
+  if (id && servicos.dados && !atual) {
+    return <Aviso>Serviço não encontrado.</Aviso>;
+  }
+
+  async function salvar() {
+    setAviso(undefined);
+    setErroPreco(undefined);
+
+    const decimal = paraDecimal(preco);
+    if (!decimal) {
+      setErroPreco("Use um valor como 40,00");
+      return;
+    }
+
+    setSalvando(true);
+    try {
+      const corpo = {
+        nome: nome.trim(),
+        duracaoMinutos: Number(duracao),
+        preco: decimal,
+      };
+      if (id) await api.barbeiro.atualizarServico(id, corpo);
+      else await api.barbeiro.criarServico(corpo);
+      router.push("/painel/servicos");
+    } catch (causa) {
+      setAviso((causa as ErroDaApi).mensagem || "Não foi possível salvar agora.");
+    }
+    setSalvando(false);
+  }
+
+  async function alternarAtivo() {
+    if (!id || !atual) return;
+    setSalvando(true);
+    try {
+      // Soft delete: some da lista pública e o histórico de quem já foi
+      // atendido sobrevive.
+      if (atual.ativo) await api.barbeiro.desativarServico(id);
+      else await api.barbeiro.atualizarServico(id, { ativo: true });
+      servicos.recarregar();
+    } catch (causa) {
+      setAviso((causa as ErroDaApi).mensagem || "Não foi possível salvar agora.");
+    }
+    setSalvando(false);
+  }
+
+  return (
+    <div className={estilos.pagina}>
+      <h1>{id ? "Editar serviço" : "Novo serviço"}</h1>
+
+      <Campo rotulo="Nome" valor={nome} onChange={setNome} />
+      <Campo rotulo="Duração em minutos" valor={duracao} onChange={setDuracao} />
+      <Campo
+        rotulo="Preço"
+        valor={preco}
+        onChange={(proximo) => {
+          setPreco(proximo);
+          setErroPreco(undefined);
+        }}
+        erro={erroPreco}
+      />
+
+      {aviso ? <Aviso>{aviso}</Aviso> : null}
+
+      <Botao carregando={salvando} onClick={salvar}>
+        Salvar
+      </Botao>
+
+      {atual ? (
+        <Botao variante="contorno" carregando={salvando} onClick={alternarAtivo}>
+          {atual.ativo ? "Desativar" : "Reativar"}
+        </Botao>
+      ) : null}
+    </div>
+  );
+}
+```
+
+- [ ] **Step 4: Rodar e ver passar**
+
+Run: `pnpm --filter @gr-barber/web exec vitest run tests/telas/painel/servicos.test.tsx`
+Expected: PASS
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add apps/web/src/telas/painel/ListaDeServicos.tsx apps/web/src/telas/painel/CadastroDeServico.tsx "apps/web/app/(painel)/painel/(guardado)/servicos" apps/web/tests/telas/painel/servicos.test.tsx
+git commit -m "feat(web): manage services, inactive ones included
+
+servicos() returns inactive services on purpose: this screen is where a
+barber reactivates what they turned off, and one that vanished from the
+list would be unreachable through the interface. Price stays a string
+the whole way — it is Decimal in the database, and a float would lose a
+cent. There is no servico(id) on the client, so the edit screen finds
+its service in the list."
+```
+
+---
+
+### Task 12: `/painel/configuracoes`
+
+Três blocos: dados da barbearia, horários da semana e perfil do
+barbeiro. O bloco de horários manda a semana inteira num `PUT` — dia
+ausente do corpo vira fechado na API, de propósito.
+
+**Files:**
+- Create: `apps/web/src/telas/painel/ConfiguracoesDaBarbearia.tsx`
+- Create: `apps/web/src/telas/painel/ConfiguracoesDaBarbearia.module.css`
+- Create: `apps/web/app/(painel)/painel/(guardado)/configuracoes/page.tsx`
+- Test: `apps/web/tests/telas/painel/configuracoes.test.tsx`
+
+**Interfaces:**
+- Consumes: `useApiDoPainel`, `usePainel`, `useRequisicao`, `Campo`,
+  `Botao`, `Aviso`, `normalizarTelefoneObrigatorio`, `TelefoneInvalido`.
+- Produces: `ConfiguracoesDaBarbearia()`.
+
+- [ ] **Step 1: Escrever o teste que falha**
+
+```tsx
+import { screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { criarApiClientFalso } from "@gr-barber/api-client";
+import type { HorarioSerializado } from "@gr-barber/types";
+import { ConfiguracoesDaBarbearia } from "../../../src/telas/painel/ConfiguracoesDaBarbearia";
+import { navegacaoFalsa } from "../../ajudantes/navegacao";
+import { montarPainel } from "../../ajudantes/painel";
+
+describe("configurações da barbearia", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    navegacaoFalsa.redefinir({ pathname: "/painel/configuracoes" });
+  });
+
+  it("chega preenchida com os dados da barbearia", async () => {
+    montarPainel(<ConfiguracoesDaBarbearia />, criarApiClientFalso());
+
+    expect(await screen.findByDisplayValue("GR Barber")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Rua das Tesouras, 123")).toBeInTheDocument();
+  });
+
+  it("salva os dados da barbearia", async () => {
+    const falso = criarApiClientFalso();
+    const salvar = vi.fn(async (edicao: { nome?: string; endereco?: string | null }) =>
+      falso.barbeiro.atualizarMinhaBarbearia(edicao)
+    );
+    falso.barbeiro.atualizarMinhaBarbearia = salvar;
+
+    montarPainel(<ConfiguracoesDaBarbearia />, falso);
+
+    const campo = await screen.findByLabelText(/nome da barbearia/i);
+    await userEvent.clear(campo);
+    await userEvent.type(campo, "GR Barber Centro");
+    await userEvent.click(screen.getByRole("button", { name: /salvar dados/i }));
+
+    await waitFor(() =>
+      expect(salvar).toHaveBeenCalledWith(expect.objectContaining({ nome: "GR Barber Centro" }))
+    );
+  });
+
+  it("manda a semana inteira, inclusive os dias fechados", async () => {
+    // Dia ausente do corpo vira fechado na API, de propósito: "sem
+    // linha" e "fechado" são estados diferentes pro cálculo de
+    // disponibilidade. A tela edita os sete e envia os sete, sempre.
+    const falso = criarApiClientFalso();
+    const salvar = vi.fn(async (horarios: HorarioSerializado[]) =>
+      falso.barbeiro.salvarHorarios(horarios)
+    );
+    falso.barbeiro.salvarHorarios = salvar;
+
+    montarPainel(<ConfiguracoesDaBarbearia />, falso);
+
+    await userEvent.click(await screen.findByRole("button", { name: /salvar horários/i }));
+
+    await waitFor(() => expect(salvar).toHaveBeenCalled());
+    expect(salvar.mock.calls[0][0]).toHaveLength(7);
+  });
+
+  it("fechar um dia limpa abertura e fechamento", async () => {
+    const falso = criarApiClientFalso();
+    const salvar = vi.fn(async (horarios: HorarioSerializado[]) =>
+      falso.barbeiro.salvarHorarios(horarios)
+    );
+    falso.barbeiro.salvarHorarios = salvar;
+
+    montarPainel(<ConfiguracoesDaBarbearia />, falso);
+
+    await userEvent.click(await screen.findByRole("checkbox", { name: /fechado na segunda/i }));
+    await userEvent.click(screen.getByRole("button", { name: /salvar horários/i }));
+
+    await waitFor(() => expect(salvar).toHaveBeenCalled());
+    const segunda = salvar.mock.calls[0][0].find((h) => h.diaSemana === 1);
+    expect(segunda).toMatchObject({ fechado: true, horaAbertura: null, horaFechamento: null });
+  });
+
+  it("telefone do perfil sem DDD para no campo", async () => {
+    montarPainel(<ConfiguracoesDaBarbearia />, criarApiClientFalso());
+
+    await userEvent.type(await screen.findByLabelText(/seu telefone/i), "988887777");
+    await userEvent.click(screen.getByRole("button", { name: /salvar perfil/i }));
+
+    expect(await screen.findByText(/informe o DDD/i)).toBeInTheDocument();
+  });
+});
+```
+
+- [ ] **Step 2: Rodar e ver falhar**
+
+Run: `pnpm --filter @gr-barber/web exec vitest run tests/telas/painel/configuracoes.test.tsx`
+Expected: FAIL — a tela não existe.
+
+- [ ] **Step 3: Implementar**
+
+A tela mantém três estados independentes, um por bloco, cada um com seu
+botão de salvar — um salvar único mandaria três requisições e deixaria
+metade aplicada quando uma falhasse.
+
+O bloco de horários guarda a semana como
+`HorarioSerializado[]` de sete posições, indexada por `diaSemana`, e
+envia sempre as sete. Fechar um dia grava
+`{ fechado: true, horaAbertura: null, horaFechamento: null }` — deixar a
+hora antiga junto de `fechado: true` guardaria um estado que a API não
+usa e que a próxima leitura reexibiria.
+
+O telefone da barbearia e o do barbeiro passam os dois por
+`normalizarTelefoneObrigatorio` quando preenchidos; vazio vira `null`,
+que é o que a API aceita para limpar o campo.
+
+- [ ] **Step 4: Rodar e ver passar**
+
+Run: `pnpm --filter @gr-barber/web exec vitest run tests/telas/painel/configuracoes.test.tsx`
+Expected: PASS
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add apps/web/src/telas/painel/ConfiguracoesDaBarbearia.tsx apps/web/src/telas/painel/ConfiguracoesDaBarbearia.module.css "apps/web/app/(painel)/painel/(guardado)/configuracoes" apps/web/tests/telas/painel/configuracoes.test.tsx
+git commit -m "feat(web): edit the barbershop, its week and the barber's profile
+
+The week goes out whole on every save: a day missing from the body
+becomes closed in the API, on purpose, because \"no row\" and \"closed\"
+are different states for the availability calculation. Three blocks with
+three save buttons rather than one, so a failure leaves the other two
+untouched."
+```
+
+---
+
+### Task 13: Limpeza e documentação
+
+Fecha o critério 4 da spec da fundação e registra a divergência do mapa,
+como o sub-projeto B fez com a oitava tela.
+
+**Files:**
+- Delete: `apps/web/app/primitivos/page.tsx`
+- Delete: `apps/web/app/primitivos/page.module.css`
+- Modify: `docs/screens.md`
+- Modify: `docs/roadmap.md`
+- Modify: `apps/web/README.md`
+
+- [ ] **Step 1: Conferir que nada aponta pra vitrine**
+
+Run: `rg -n "primitivos" --glob '!node_modules' .`
+Expected: só os dois arquivos que vão sair, mais menções em specs (que
+ficam — spec é registro do que foi decidido, não documentação viva).
+
+- [ ] **Step 2: Remover a vitrine**
+
+```bash
+git rm -r apps/web/app/primitivos
+```
+
+Run: `pnpm --filter @gr-barber/web build`
+Expected: PASS — se algum CSS global dependia da página, o build acusa.
+
+- [ ] **Step 3: Atualizar `docs/screens.md`**
+
+Substituir a seção "Painel web (6 telas)" por:
+
+```markdown
+## Painel web (12 rotas)
+
+O mapa previa seis telas — Login, Dashboard, Agenda, Clientes, Serviços
+e Configurações. São doze rotas, por duas razões.
+
+Quatro são telas que este mapa deu ao app do barbeiro e não ao painel,
+para a mesma função: detalhe do agendamento, novo agendamento, cadastro
+de cliente e cadastro de serviço.
+
+A décima segunda o mapa não tem em lugar nenhum: **criar barbearia**. O
+primeiro acesso estava na tela de login do app do barbeiro, que é o
+sub-projeto D; como o painel veio antes, ele é o único caminho pelo qual
+uma barbearia pode existir.
+
+| Rota | O que faz |
+|---|---|
+| `/painel/entrar` | Entrar, e criar a barbearia no primeiro acesso |
+| `/painel` | Dashboard: contagem, ocupação, previsto e a lista do dia |
+| `/painel/agenda` | O dia em faixas, com a semana em cima |
+| `/painel/agendamentos/novo` | Cliente, serviços, data e horário numa tela |
+| `/painel/agendamentos/[id]` | Status e observações |
+| `/painel/clientes` | Lista com busca na URL |
+| `/painel/clientes/novo` | Nome, telefone e email |
+| `/painel/clientes/[id]` | Dados e histórico |
+| `/painel/servicos` | Lista, inativos inclusive |
+| `/painel/servicos/novo` | Nome, duração e preço |
+| `/painel/servicos/[id]` | Editar, desativar e reativar |
+| `/painel/configuracoes` | Barbearia, horários da semana e perfil |
+
+O prefixo `/painel` existe porque o slug da barbearia não tem lista de
+reservados: uma rota estática na raiz tornaria aquele slug inalcançável.
+```
+
+- [ ] **Step 4: Atualizar `docs/roadmap.md`**
+
+No passo 3, marcar o C como pronto, no formato dos dois anteriores:
+PR, commit de merge, data, número de rotas, contagem final de testes, e
+a divergência do mapa. Acrescentar às "Dívidas conhecidas" as duas que a
+spec registra: o slug em `localStorage` ficando velho numa aba antiga, e
+a ausência de lista de slugs reservados na API.
+
+- [ ] **Step 5: Verificação final**
+
+Run: `pnpm test`
+Expected: PASS
+
+Run: `pnpm type-check`
+Expected: PASS
+
+Run: `pnpm build`
+Expected: PASS
+
+Suba a API e o web e percorra à mão o critério 3 da spec: criar
+barbearia em `/painel/entrar`, cadastrar um serviço e o horário de
+funcionamento, e abrir `/<slug>` para agendar pelo fluxo do cliente. É a
+prova de que B e C se encontram.
+
+Confirme também o critério 4: trocar o tema pelo botão, recarregar e ver
+que ele permanece sem piscar; e abrir `/<slug>` com o sistema em modo
+escuro e ver que a página continua clara.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add docs/screens.md docs/roadmap.md apps/web/README.md
+git commit -m "docs: record the panel as done, and the twelve routes
+
+The map gave the panel six screens. Four of the remaining six are
+screens it gave to the Expo app for the same function; the twelfth,
+creating a barbershop, it has nowhere — first access lived on the app's
+login, and the panel shipped first. The primitives showcase goes away,
+closing the foundation spec's fourth completion criterion."
+```
+
