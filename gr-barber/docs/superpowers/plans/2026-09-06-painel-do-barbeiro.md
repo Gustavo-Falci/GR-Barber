@@ -1740,6 +1740,16 @@ describe("métricas do dia", () => {
     expect(ocupacao(lista, ABERTO)).toBe(25);
   });
 
+  it("arredonda pra baixo quando a fracao pede", () => {
+    // 60 dos 540 minutos dao 11,1111%: round devolve 11 e ceil devolve
+    // 12. E a unica fixture que separa os dois — 30/540 arredonda e
+    // teto pro mesmo 6, e 135/540 e exato, entao as tres implementacoes
+    // concordam. Sem este caso, trocar Math.round por Math.ceil passa.
+    const lista = [agendamento("confirmado", 60, "80.00")];
+
+    expect(ocupacao(lista, ABERTO)).toBe(11);
+  });
+
   it("dia fechado não tem ocupação, e não é zero", () => {
     // Zero por cento diria "aberto e vazio". Dividir por zero seria o
     // outro erro.
