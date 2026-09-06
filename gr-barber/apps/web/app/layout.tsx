@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 
 import { clashGrotesk, inter } from "./fontes";
 import { cssDeTokens } from "./tokens-css";
+import { SCRIPT_DE_TEMA } from "../src/painel/tema";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -20,6 +21,7 @@ export default function RootLayout({
     // var(--fonte-display) ou var(--fonte-corpo).
     <html lang="pt-BR" className={`${clashGrotesk.variable} ${inter.variable}`}>
       <head>
+        <script dangerouslySetInnerHTML={{ __html: SCRIPT_DE_TEMA }} />
         <style dangerouslySetInnerHTML={{ __html: cssDeTokens }} />
       </head>
       <body>{children}</body>

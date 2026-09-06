@@ -40,8 +40,11 @@ const varsDeEspaco = varsEmPixels("espaco", spacing);
 const varsDeBorda = varsEmPixels("borda", borderWidth);
 const varsDeTexto = varsEmPixels("texto", fontSize);
 
-// prefers-color-scheme por enquanto; quando existir troca manual de
-// tema, virar [data-theme="dark"] no <html> e ler do localStorage.
+// Três blocos, não dois. Sem a guarda :not([data-theme="light"]), quem
+// escolheu claro continua escurecendo num sistema escuro, porque o
+// @media venceria. Sem [data-theme="dark"], escolher escuro não faz
+// nada num sistema claro. Quem escreve o atributo é o script inline do
+// layout raiz — ver src/painel/tema.ts.
 export const cssDeTokens = `:root {
 ${varsDeCores(colors.light)}
 ${varsDeRaio}
@@ -51,7 +54,11 @@ ${varsDeTexto}
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
 ${varsDeCores(colors.dark)}
   }
+}
+
+[data-theme="dark"] {
+${varsDeCores(colors.dark)}
 }`;
