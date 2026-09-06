@@ -193,16 +193,34 @@ do dia entre a abertura e o fechamento, cada um ocupado ou livre.
 Clicar num livre vai para `/painel/agendamentos/novo?data=&hora=`;
 clicar num ocupado vai para o detalhe.
 
-Os horários da grade saem da mesma fonte que o resto do produto:
-`publico.disponibilidadeDoDia(slug, ...)` diz o que está livre, e
-`agendamentosDoDia(data)` diz o que ocupa cada faixa. Recalcular no
-navegador a partir da janela de funcionamento faria uma terceira
-implementação do motor de disponibilidade.
+**A grade não chama a disponibilidade, e não pode.** `FiltroDoDia`
+exige `servicoIds`, porque a pergunta que aquela rota responde é "onde
+cabe um atendimento de duração D" — e na agenda não há serviço
+escolhido, é só o dia sendo olhado. Foi o que fez a tela de horário do
+sub-projeto B só ser alcançável com `?servicos=` já na URL.
+
+A grade desenha, então, uma coisa mais simples: as faixas entre
+`horaAbertura` e `horaFechamento` do dia, que o layout já tem em
+`horarios()`, marcadas com o que `agendamentosDoDia(data)` ocupa. Isso
+é desenho de slot, não cálculo de disponibilidade — não decide se algo
+cabe, só mostra o que está lá. Quem chama `disponibilidadeDoDia` é a
+tela de novo agendamento, que tem os serviços selecionados e portanto
+tem a pergunta que a rota responde.
 
 **`/painel/agendamentos/novo` — tela larga.** Quatro blocos numa tela:
 busca de cliente (`clientes(busca)`) com um "+ cadastrar" que abre os
 campos ali mesmo e chama `criarCliente`; checklist de serviços com soma
-de duração e preço; calendário; lista de horários. `data`, `hora` e
+de duração e preço; calendário; lista de horários
+(`publico.disponibilidadeDoDia`, que aqui tem os `servicoIds` que ela
+exige).
+
+**O cadastro embutido trata `conflito`.** Telefone repetido é o caso
+comum, não o raro: quem chega para um walk-in muitas vezes já existe
+como `Cliente`, criado pelo upsert do agendamento público ou por um
+walk-in anterior. Um erro seco ali seria um beco — a tela busca o
+cadastro existente pelo telefone e o oferece para seleção, que é
+exatamente o que a pessoa queria. Sem isso, o cadastro embutido não
+resolve o caso pelo qual existe. `data`, `hora` e
 `cliente` viajam na query, então o link que a agenda gera chega
 preenchido e recarregar não perde a escolha. Envia
 `criarAgendamento({ barbeiroId, clienteId, servicoIds, data, horaInicio,
@@ -240,7 +258,15 @@ para digitar e a `normalizarTelefone` que roda antes de enviar.
 A lista vem de `servicos()`, que **inclui os inativos** de propósito: é
 desta tela que o barbeiro reativa o que desativou, e um serviço
 inativo que sumisse da lista seria irrecuperável pela interface.
-Inativo aparece marcado como tal. O preço é `string` em todo o caminho,
+Inativo aparece marcado como tal.
+
+**`/painel/servicos/[id]` acha o serviço na lista, porque não existe
+`servico(id)`.** O `criarApiBarbeiro` tem `cliente(id)` e
+`agendamento(id)`, mas não o irmão de serviço — a assimetria é fácil de
+não notar e viraria um método inventado no plano. `servicos()` devolve
+todos, inclusive inativos, então a lista basta.
+
+O preço é `string` em todo o caminho,
 nunca `number` — é `Decimal` no banco, e passar por float perderia
 centavo. Desativar chama `desativarServico`, que é soft delete: some da
 lista pública e o histórico de quem já foi atendido sobrevive.
@@ -330,6 +356,10 @@ informação de rota disponível antes de o React montar. O botão do
 painel troca o mesmo atributo e regrava a chave; navegar entre os dois
 grupos reavalia na montagem do layout de cada um, porque navegação do
 lado do cliente não roda o script de novo.
+
+A `<div data-theme="light">` de `(publico)/layout.tsx` **sai**. Com o
+atributo no `<html>`, ela não é só inerte — é um segundo mecanismo
+aparente para a mesma coisa, e quem ler depois vai achar que funciona.
 
 ## Os números do dashboard
 
