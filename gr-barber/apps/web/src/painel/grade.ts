@@ -29,7 +29,16 @@ export function faixasDoDia(entrada: {
   agora: Date;
   passo?: number;
 }): Faixa[] {
-  const { data, horario, agendamentos, agora, passo = 30 } = entrada;
+  // 15 minutos, não 30: é a granularidade do motor que decide o que pode
+  // ser marcado (packages/scheduling/src/index.ts, `intervaloMinutos`
+  // padrão 15, candidatos alinhados à grade a partir da meia-noite), e a
+  // API nunca valida `horaInicio` contra outra grade
+  // (apps/api/src/lib/agendamento.ts, apps/api/src/lib/disponibilidade.ts
+  // não passam outro valor). Um agendamento marcado às 09:15 pelo link do
+  // cliente existe e ocupa a cadeira; se este passo voltar a 30 ele
+  // desaparece da agenda sem aviso nenhum — a pior falha possível pra uma
+  // tela que existe pra o barbeiro confiar no que vê.
+  const { data, horario, agendamentos, agora, passo = 15 } = entrada;
   if (!horario || horario.fechado || !horario.horaAbertura || !horario.horaFechamento) {
     return [];
   }

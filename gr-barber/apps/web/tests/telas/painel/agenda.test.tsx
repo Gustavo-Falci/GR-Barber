@@ -1,7 +1,7 @@
 import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it } from "vitest";
-import { criarApiClientFalso } from "@gr-barber/api-client";
+import { criarApiClientFalso, ErroDaApi } from "@gr-barber/api-client";
 import { AgendaDoDia } from "../../../src/telas/painel/AgendaDoDia";
 import { navegacaoFalsa } from "../../ajudantes/navegacao";
 import { montarPainel } from "../../ajudantes/painel";
@@ -77,5 +77,21 @@ describe("agenda do dia", () => {
     montarPainel(<AgendaDoDia agora={AGORA} />, semear());
 
     expect(await screen.findByText(/João Silva/)).toBeInTheDocument();
+  });
+
+  it("erro ao carregar horários avisa, em vez de ficar carregando pra sempre", async () => {
+    // Sem este aviso, `!horarios.dados` nunca vira falso e a tela fica
+    // presa em "Carregando…" — pior que um erro, porque não avisa que
+    // algo deu errado.
+    const falso = semear();
+    falso.barbeiro.horarios = async () => {
+      throw new ErroDaApi(500, "erro_interno", "não foi possível carregar os horários");
+    };
+
+    montarPainel(<AgendaDoDia agora={AGORA} />, falso);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "não foi possível carregar os horários"
+    );
   });
 });

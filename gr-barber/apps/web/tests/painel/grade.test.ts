@@ -30,7 +30,10 @@ const AGENDAMENTO: AgendamentoComCliente = {
 };
 
 describe("faixas do dia", () => {
-  it("cobre a janela de funcionamento de meia em meia hora", () => {
+  it("cobre a janela de funcionamento de quinze em quinze minutos", () => {
+    // 15, não 30: é a granularidade de packages/scheduling (intervaloMinutos
+    // padrão), a mesma que a API valida na criação. Ver o comentário em
+    // faixasDoDia.
     const faixas = faixasDoDia({
       data: "2026-09-08",
       horario: ABERTO,
@@ -38,7 +41,16 @@ describe("faixas do dia", () => {
       agora: new Date("2026-09-01T10:00:00-03:00"),
     });
 
-    expect(faixas.map((f) => f.hora)).toEqual(["09:00", "09:30", "10:00", "10:30"]);
+    expect(faixas.map((f) => f.hora)).toEqual([
+      "09:00",
+      "09:15",
+      "09:30",
+      "09:45",
+      "10:00",
+      "10:15",
+      "10:30",
+      "10:45",
+    ]);
   });
 
   it("dia fechado não tem faixa nenhuma", () => {
@@ -60,8 +72,34 @@ describe("faixas do dia", () => {
       agora: new Date("2026-09-01T10:00:00-03:00"),
     });
 
-    expect(faixas[1].agendamento?.cliente.nome).toBe("João Silva");
+    // AGENDAMENTO começa às 09:30, que é a terceira faixa de 15 em 15
+    // minutos (09:00, 09:15, 09:30).
+    expect(faixas[2].agendamento?.cliente.nome).toBe("João Silva");
     expect(faixas[0].agendamento).toBeNull();
+  });
+
+  it("agendamento marcado num quarto de hora aparece na grade", () => {
+    // A regressão que este teste existe pra travar: se o passo voltar a
+    // 30, um agendamento marcado às 09:15 pelo link do cliente (a API
+    // oferece e aceita esse horário — packages/scheduling) some da
+    // agenda porque a faixa "09:15" nem chega a existir.
+    const agendamentoDeQuinze: AgendamentoComCliente = {
+      ...AGENDAMENTO,
+      id: "a2",
+      horaInicio: "09:15",
+      horaFim: "09:45",
+    };
+
+    const faixas = faixasDoDia({
+      data: "2026-09-08",
+      horario: ABERTO,
+      agendamentos: [agendamentoDeQuinze],
+      agora: new Date("2026-09-01T10:00:00-03:00"),
+    });
+
+    expect(faixas.find((f) => f.hora === "09:15")?.agendamento?.cliente.nome).toBe(
+      "João Silva"
+    );
   });
 
   it("marca como passada a faixa de hoje que já passou", () => {

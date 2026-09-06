@@ -29,7 +29,14 @@ export function AgendaDoDia({ agora = new Date() }: { agora?: Date }) {
   );
   const horarios = useRequisicao(() => api.barbeiro.horarios(), []);
 
+  // `daSemana.erro` fica de fora de propósito: ele só alimenta o ponto
+  // da faixa de semana, e um ponto que falta não vale apagar a tela
+  // inteira. `horarios.erro`, por outro lado, trava a montagem das
+  // faixas — sem ele o guard de baixo (`!horarios.dados`) nunca sai de
+  // "Carregando…", e o barbeiro fica esperando uma resposta que já
+  // chegou como erro.
   if (doDia.erro) return <Aviso>{doDia.erro.mensagem}</Aviso>;
+  if (horarios.erro) return <Aviso>{horarios.erro.mensagem}</Aviso>;
   if (!doDia.dados || !horarios.dados) return <p>Carregando…</p>;
 
   const diaDaSemana = new Date(`${data}T12:00:00`).getDay();
