@@ -103,13 +103,24 @@ describe("tema do painel", () => {
     });
 
     it("no painel, com valor estragado gravado, cai pro sistema em vez de escrever o lixo", () => {
+      // stubMatchMedia(true) de propósito: se a validação do valor
+      // gravado fosse removida, "banana" é truthy e o script usaria o
+      // valor estragado direto, caindo no ramo "light" do ternário final
+      // — o mesmo resultado que o sistema em modo claro daria. Com o
+      // sistema em modo *escuro*, o comportamento certo (ignorar o lixo
+      // e cair pro sistema) e o quebrado (usar "banana" como se fosse
+      // válido) divergem: "dark" vs "light".
       irParaCaminho("/painel/agenda");
       localStorage.setItem(CHAVE_DO_TEMA, "banana");
-      stubMatchMedia(false);
+      stubMatchMedia(true);
 
       rodarScriptDeTema();
 
-      expect(document.documentElement.getAttribute("data-theme")).toBe("light");
+      expect(document.documentElement.getAttribute("data-theme")).toBe("dark");
+      // Segunda confirmação independente: com a validação funcionando, o
+      // lixo é substituído por uma escolha válida gravada — não apenas
+      // ignorado ao gravar o atributo.
+      expect(localStorage.getItem(CHAVE_DO_TEMA)).toBe("escuro");
     });
 
     it("fora do painel, escreve light mesmo com 'escuro' gravado", () => {
