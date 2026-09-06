@@ -42,8 +42,13 @@ export function ocupacao(
   return Math.round((minutosOcupados(agendamentos) / janela) * 100);
 }
 
-// String de ponta a ponta: o preço é Decimal no banco e passar por
-// float perderia centavo. A soma acontece em centavos inteiros.
+// String de ponta a ponta: o preço é Decimal no banco. A soma acontece
+// em centavos inteiros por hábito defensivo com dinheiro, não porque
+// algum preço de duas casas alcançável aqui derrube essa conta: o erro
+// acumulado de somar doubles de duas casas fica na casa de 1e-11 até
+// pra mil itens no mesmo dia, muito abaixo dos 0,005 que fariam
+// `toFixed(2)` arredondar pro lado errado. Nenhum teste separa as duas
+// formas por isso — não tem entrada de duas casas que as separe.
 export function previstoDoDia(agendamentos: AgendamentoComCliente[]): string {
   const centavos = valem(agendamentos).reduce(
     (total, a) =>
