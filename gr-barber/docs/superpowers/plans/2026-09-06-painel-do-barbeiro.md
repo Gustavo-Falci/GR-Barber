@@ -2508,5 +2508,824 @@ that barrier is the screen's."
 
 ---
 
-O plano continua nas tarefas 8 a 13 — novo agendamento, detalhe do
-agendamento, clientes, serviços, configurações e limpeza.
+### Task 8: `/painel/agendamentos/novo` — tela larga
+
+Quatro blocos numa tela: cliente, serviços, data e horário. O wizard do
+fluxo do cliente existe porque celular não comporta quatro passos; um
+monitor comporta. É aqui — e só aqui — que a disponibilidade é chamada,
+porque é aqui que existem serviços selecionados.
+
+**Files:**
+- Create: `apps/web/src/telas/painel/NovoAgendamento.tsx`
+- Create: `apps/web/src/telas/painel/NovoAgendamento.module.css`
+- Create: `apps/web/src/telas/painel/BuscaDeCliente.tsx`
+- Create: `apps/web/src/telas/painel/BuscaDeCliente.module.css`
+- Create: `apps/web/app/(painel)/painel/(guardado)/agendamentos/novo/page.tsx`
+- Test: `apps/web/tests/telas/painel/novo-agendamento.test.tsx`
+
+**Interfaces:**
+- Consumes: `usePainel` (dá `perfil.id`, que é o `barbeiroId`, e `slug`),
+  `useApiDoBarbeiro`, `useRequisicao`, `Calendario`, `ListaDeHorarios`,
+  `ItemDeServico`, `formatarPreco`, `ehPassado`, `hojeIso`,
+  `normalizarTelefoneObrigatorio`, `TelefoneInvalido`.
+- Produces:
+  - `BuscaDeCliente({ escolhido, aoEscolher })` — busca, lista e o
+    cadastro embutido
+  - `NovoAgendamento({ agora }: { agora?: Date })`
+
+**Nota sobre a disponibilidade:** o client de barbeiro não tem método de
+disponibilidade — ela é rota pública. A tela usa
+`criarApiClient({...}).publico.disponibilidadeDoDia(slug, filtro)`. Para
+não montar um segundo client na tela, `ProvedorDoPainel` passa a expor
+também o escopo público. **Faça esta mudança no início desta tarefa:**
+em `src/painel/ProvedorDoPainel.tsx`, troque o tipo e a fábrica para
+devolver `{ barbeiro, publico }`, e ajuste `montarPainel` e os testes
+das tarefas 4 a 7 que passam `falso.barbeiro` para passarem
+`{ barbeiro: falso.barbeiro, publico: falso.publico }`. Rode `pnpm test`
+depois do ajuste e antes de seguir.
+
+- [ ] **Step 1: Ajustar o provedor para expor os dois escopos**
+
+Em `src/sessao/cliente-da-api.ts`, acrescente:
+
+```ts
+// O painel precisa do escopo público porque a disponibilidade é rota
+// pública por slug — não existe versão dela no escopo do barbeiro. O
+// token do barbeiro continua indo junto: rota pública ignora, e montar
+// um segundo client só pra isso duplicaria baseUrl e aoExpirarSessao.
+export function apiDoPainel(fetchInjetado?: typeof globalThis.fetch) {
+  const client = criarApiClient({
+    baseUrl: BASE_URL,
+    obterToken: () => sessaoDoBarbeiro.ler(),
+    aoExpirarSessao: () => sessaoDoBarbeiro.limpar(),
+    fetch: fetchInjetado,
+  });
+  return { barbeiro: client.barbeiro, publico: client.publico };
+}
+```
+
+Em `src/painel/ProvedorDoPainel.tsx`, troque `apiDoBarbeiro` por
+`apiDoPainel`, e o tipo por
+`export type ApiDoPainel = ReturnType<typeof apiDoPainel>`. O hook passa
+a se chamar `useApiDoPainel`. Atualize os consumidores: `SessaoDoPainel`
+(`api.barbeiro.meuPerfil()`), `DashboardDoDia`, `AgendaDoDia`,
+`EntrarNoPainel`, `montarPainel` e os testes que injetam o dublê.
+
+Run: `pnpm test`
+Expected: PASS — a suíte inteira, incluindo as tarefas 4 a 7.
+
+Commit este passo sozinho:
+
+```bash
+git commit -am "refactor(web): give the panel both API scopes
+
+Availability is a public route addressed by slug and has no barber-scope
+twin, so the new-appointment screen needs publico alongside barbeiro.
+Building a second client inside the screen would duplicate baseUrl and
+aoExpirarSessao."
+```
+
+- [ ] **Step 2: Escrever o teste da tela**
+
+`apps/web/tests/telas/painel/novo-agendamento.test.tsx`:
+
+```tsx
+import { screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { criarApiClientFalso, ErroDaApi } from "@gr-barber/api-client";
+import { NovoAgendamento } from "../../../src/telas/painel/NovoAgendamento";
+import { navegacaoFalsa } from "../../ajudantes/navegacao";
+import { montarPainel } from "../../ajudantes/painel";
+
+const AGORA = new Date("2026-09-08T10:00:00-03:00");
+
+function semear() {
+  return criarApiClientFalso({
+    clientes: [
+      { id: "c1", nome: "João Silva", telefone: "(11) 99999-0001", email: null, temConta: false },
+    ],
+    horariosLivres: ["11:00", "11:30", "12:00"],
+  });
+}
+
+describe("novo agendamento no painel", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    navegacaoFalsa.redefinir({
+      pathname: "/painel/agendamentos/novo",
+      query: { data: "2026-09-09", hora: "11:00" },
+    });
+  });
+
+  it("chega preenchido pela URL que a agenda montou", async () => {
+    montarPainel(<NovoAgendamento agora={AGORA} />, semear());
+
+    expect(await screen.findByRole("button", { name: "11:00", current: true })).toBeInTheDocument();
+  });
+
+  it("agenda com cliente, serviço, data e hora", async () => {
+    const falso = semear();
+    const criar = vi.fn(async (novo: Parameters<typeof falso.barbeiro.criarAgendamento>[0]) =>
+      falso.barbeiro.criarAgendamento(novo)
+    );
+    falso.barbeiro.criarAgendamento = criar;
+
+    montarPainel(<NovoAgendamento agora={AGORA} />, falso);
+
+    await userEvent.click(await screen.findByRole("button", { name: /João Silva/ }));
+    await userEvent.click(screen.getByRole("checkbox", { name: /Corte/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^agendar$/i }));
+
+    await waitFor(() => expect(criar).toHaveBeenCalled());
+    expect(criar.mock.calls[0][0]).toMatchObject({
+      // barbeiroId é o id do perfil logado: a barbearia do MVP tem um
+      // barbeiro só.
+      barbeiroId: "bb1",
+      clienteId: "c1",
+      servicoIds: ["s1"],
+      data: "2026-09-09",
+      horaInicio: "11:00",
+    });
+  });
+
+  it("não deixa agendar sem cliente ou sem serviço", async () => {
+    montarPainel(<NovoAgendamento agora={AGORA} />, semear());
+
+    expect(await screen.findByRole("button", { name: /^agendar$/i })).toBeDisabled();
+  });
+
+  it("cadastra cliente novo sem sair da tela", async () => {
+    montarPainel(<NovoAgendamento agora={AGORA} />, semear());
+
+    await userEvent.click(await screen.findByRole("button", { name: /cadastrar novo/i }));
+    await userEvent.type(screen.getByLabelText(/nome/i), "Ana Souza");
+    await userEvent.type(screen.getByLabelText(/telefone/i), "11988887777");
+    await userEvent.click(screen.getByRole("button", { name: /^cadastrar$/i }));
+
+    expect(await screen.findByRole("button", { name: /Ana Souza/, current: true })).toBeInTheDocument();
+  });
+
+  it("telefone já cadastrado oferece o cliente existente em vez de erro", async () => {
+    // É o caso comum do walk-in: quem chega já existe, criado pelo
+    // upsert do agendamento público.
+    const falso = semear();
+    falso.barbeiro.criarCliente = async () => {
+      throw new ErroDaApi(409, "conflito", "esse telefone já tem cadastro");
+    };
+    montarPainel(<NovoAgendamento agora={AGORA} />, falso);
+
+    await userEvent.click(await screen.findByRole("button", { name: /cadastrar novo/i }));
+    await userEvent.type(screen.getByLabelText(/nome/i), "João");
+    await userEvent.type(screen.getByLabelText(/telefone/i), "11999990001");
+    await userEvent.click(screen.getByRole("button", { name: /^cadastrar$/i }));
+
+    expect(await screen.findByText(/esse telefone já tem cadastro/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /João Silva/ })).toBeInTheDocument();
+  });
+
+  it("data no passado avisa e exige confirmar", async () => {
+    // Registrar retroativamente é legítimo — garantirAlteravel não toca
+    // o escopo do barbeiro. Fazer isso sem perceber, não.
+    navegacaoFalsa.redefinir({
+      pathname: "/painel/agendamentos/novo",
+      query: { data: "2026-09-01", hora: "11:00" },
+    });
+    montarPainel(<NovoAgendamento agora={AGORA} />, semear());
+
+    await userEvent.click(await screen.findByRole("button", { name: /João Silva/ }));
+    await userEvent.click(screen.getByRole("checkbox", { name: /Corte/ }));
+
+    expect(screen.getByText(/data no passado/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^agendar$/i })).toBeDisabled();
+
+    await userEvent.click(screen.getByRole("checkbox", { name: /registrar mesmo assim/i }));
+
+    expect(screen.getByRole("button", { name: /^agendar$/i })).toBeEnabled();
+  });
+
+  it("horario_ocupado manda recarregar os horários, não repetir o envio", async () => {
+    // É a corrida que a trava do banco pega depois de a disponibilidade
+    // já ter dito que cabia.
+    const falso = semear();
+    falso.barbeiro.criarAgendamento = async () => {
+      throw new ErroDaApi(409, "horario_ocupado", "esse horário já está ocupado");
+    };
+    montarPainel(<NovoAgendamento agora={AGORA} />, falso);
+
+    await userEvent.click(await screen.findByRole("button", { name: /João Silva/ }));
+    await userEvent.click(screen.getByRole("checkbox", { name: /Corte/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^agendar$/i }));
+
+    expect(await screen.findByText(/esse horário acabou de ser ocupado/i)).toBeInTheDocument();
+  });
+});
+```
+
+- [ ] **Step 3: Rodar e ver falhar**
+
+Run: `pnpm --filter @gr-barber/web exec vitest run tests/telas/painel/novo-agendamento.test.tsx`
+Expected: FAIL — `NovoAgendamento` não existe.
+
+- [ ] **Step 4: Implementar a busca de cliente**
+
+`apps/web/src/telas/painel/BuscaDeCliente.tsx`:
+
+```tsx
+"use client";
+
+import { useState } from "react";
+import type { ErroDaApi } from "@gr-barber/api-client";
+import { normalizarTelefoneObrigatorio, TelefoneInvalido } from "@gr-barber/formato";
+import type { ClienteSerializado } from "@gr-barber/types";
+import { Aviso } from "../../componentes/Aviso";
+import { Botao } from "../../componentes/Botao";
+import { Campo } from "../../componentes/Campo";
+import { useRequisicao } from "../../api/useRequisicao";
+import { useApiDoPainel } from "../../painel/ProvedorDoPainel";
+import estilos from "./BuscaDeCliente.module.css";
+
+export function BuscaDeCliente({
+  escolhido,
+  aoEscolher,
+}: {
+  escolhido: ClienteSerializado | null;
+  aoEscolher: (cliente: ClienteSerializado) => void;
+}) {
+  const api = useApiDoPainel();
+  const [busca, setBusca] = useState("");
+  const [cadastrando, setCadastrando] = useState(false);
+  const [nome, setNome] = useState("");
+  const [telefone, setTelefone] = useState("");
+  const [erroTelefone, setErroTelefone] = useState<string | undefined>();
+  const [aviso, setAviso] = useState<string | undefined>();
+
+  const clientes = useRequisicao(() => api.barbeiro.clientes(busca), [busca]);
+
+  async function cadastrar() {
+    setAviso(undefined);
+    setErroTelefone(undefined);
+
+    let numero: string;
+    try {
+      numero = normalizarTelefoneObrigatorio(telefone);
+    } catch (causa) {
+      setErroTelefone(
+        causa instanceof TelefoneInvalido
+          ? "Informe o DDD e o número, como (11) 99999-8888"
+          : "Telefone inválido"
+      );
+      return;
+    }
+
+    try {
+      const criado = await api.barbeiro.criarCliente({ nome: nome.trim(), telefone: numero });
+      setCadastrando(false);
+      aoEscolher(criado);
+    } catch (causa) {
+      const erro = causa as ErroDaApi;
+      if (erro.codigo === "conflito") {
+        // Telefone repetido é o caso comum do walk-in, não o raro: quem
+        // chega já existe, criado pelo upsert do agendamento público.
+        // Um erro seco aqui seria um beco.
+        setAviso("Esse telefone já tem cadastro — ele está na lista abaixo.");
+        setBusca(numero);
+        setCadastrando(false);
+      } else {
+        setAviso(erro.mensagem || "Não foi possível cadastrar agora.");
+      }
+    }
+  }
+
+  return (
+    <section className={estilos.bloco}>
+      <h2>Cliente</h2>
+
+      <Campo rotulo="Buscar por nome ou telefone" valor={busca} onChange={setBusca} />
+
+      {aviso ? <Aviso>{aviso}</Aviso> : null}
+
+      <ul className={estilos.lista}>
+        {(clientes.dados ?? []).map((cliente) => (
+          <li key={cliente.id}>
+            <button
+              type="button"
+              aria-current={escolhido?.id === cliente.id ? "true" : undefined}
+              onClick={() => aoEscolher(cliente)}
+            >
+              {cliente.nome} · {cliente.telefone}
+            </button>
+          </li>
+        ))}
+      </ul>
+
+      {cadastrando ? (
+        <div className={estilos.cadastro}>
+          <Campo rotulo="Nome" valor={nome} onChange={setNome} />
+          <Campo
+            rotulo="Telefone"
+            formato="telefone"
+            valor={telefone}
+            onChange={(proximo) => {
+              setTelefone(proximo);
+              setErroTelefone(undefined);
+            }}
+            erro={erroTelefone}
+          />
+          <Botao onClick={cadastrar}>Cadastrar</Botao>
+        </div>
+      ) : (
+        <Botao variante="contorno" onClick={() => setCadastrando(true)}>
+          + Cadastrar novo
+        </Botao>
+      )}
+    </section>
+  );
+}
+```
+
+- [ ] **Step 5: Implementar a tela**
+
+`apps/web/src/telas/painel/NovoAgendamento.tsx`:
+
+```tsx
+"use client";
+
+import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import type { ErroDaApi } from "@gr-barber/api-client";
+import type { ClienteSerializado } from "@gr-barber/types";
+import { Aviso } from "../../componentes/Aviso";
+import { Botao } from "../../componentes/Botao";
+import { Calendario } from "../../componentes/Calendario";
+import { formatarPreco, ItemDeServico } from "../../componentes/ItemDeServico";
+import { ListaDeHorarios } from "../../componentes/ListaDeHorarios";
+import { useRequisicao } from "../../api/useRequisicao";
+import { ehPassado, hojeIso } from "../../formato/datas";
+import { useApiDoPainel } from "../../painel/ProvedorDoPainel";
+import { usePainel } from "../../painel/SessaoDoPainel";
+import estilos from "./NovoAgendamento.module.css";
+
+export function NovoAgendamento({ agora = new Date() }: { agora?: Date }) {
+  const router = useRouter();
+  const query = useSearchParams();
+  const api = useApiDoPainel();
+  const { perfil, slug } = usePainel();
+
+  const data = query.get("data") ?? hojeIso(agora);
+  const hora = query.get("hora") ?? "";
+  const [mes, setMes] = useState(data.slice(0, 7));
+  const [cliente, setCliente] = useState<ClienteSerializado | null>(null);
+  const [servicoIds, setServicoIds] = useState<string[]>([]);
+  const [confirmouPassado, setConfirmouPassado] = useState(false);
+  const [aviso, setAviso] = useState<string | undefined>();
+  const [enviando, setEnviando] = useState(false);
+
+  const servicos = useRequisicao(() => api.barbeiro.servicos(), []);
+
+  // Só com serviço escolhido a pergunta faz sentido: /disponibilidade
+  // responde "onde cabe um atendimento de duração D".
+  const horarios = useRequisicao(
+    () =>
+      servicoIds.length === 0
+        ? Promise.resolve([])
+        : api.publico.disponibilidadeDoDia(slug, {
+            barbeiroId: perfil.id,
+            data,
+            servicoIds,
+          }),
+    [slug, perfil.id, data, servicoIds.join(",")]
+  );
+
+  const diasComVaga = useRequisicao(
+    () =>
+      servicoIds.length === 0
+        ? Promise.resolve({})
+        : api.publico.disponibilidadeDoMes(slug, {
+            barbeiroId: perfil.id,
+            mes,
+            servicoIds,
+          }),
+    [slug, perfil.id, mes, servicoIds.join(",")]
+  );
+
+  const passado = ehPassado(data, agora);
+  const pronto =
+    Boolean(cliente) && servicoIds.length > 0 && Boolean(hora) && (!passado || confirmouPassado);
+
+  function trocarQuery(proximos: Record<string, string>) {
+    const atual = new URLSearchParams(query.toString());
+    for (const [chave, valor] of Object.entries(proximos)) atual.set(chave, valor);
+    router.push(`/painel/agendamentos/novo?${atual.toString()}`);
+  }
+
+  async function agendar() {
+    if (!cliente) return;
+    setAviso(undefined);
+    setEnviando(true);
+
+    try {
+      const criado = await api.barbeiro.criarAgendamento({
+        // A barbearia do MVP tem um barbeiro só, e é o que está logado.
+        barbeiroId: perfil.id,
+        clienteId: cliente.id,
+        servicoIds,
+        data,
+        horaInicio: hora,
+      });
+      router.push(`/painel/agendamentos/${criado.id}`);
+    } catch (causa) {
+      const erro = causa as ErroDaApi;
+      if (erro.codigo === "horario_ocupado") {
+        // A corrida que a trava do banco pega depois de a
+        // disponibilidade já ter dito que cabia. A resposta certa é
+        // recarregar os horários, não repetir o envio.
+        setAviso("Esse horário acabou de ser ocupado. Escolha outro.");
+        horarios.recarregar();
+      } else {
+        setAviso(erro.mensagem || "Não foi possível agendar agora.");
+      }
+    }
+
+    setEnviando(false);
+  }
+
+  const escolhidos = (servicos.dados ?? []).filter((s) => servicoIds.includes(s.id));
+  const duracao = escolhidos.reduce((total, s) => total + s.duracaoMinutos, 0);
+  const total = escolhidos
+    .reduce((soma, s) => soma + Math.round(Number(s.preco) * 100), 0);
+
+  return (
+    <div className={estilos.pagina}>
+      <h1>Novo agendamento</h1>
+
+      <div className={estilos.grade}>
+        <BuscaDeCliente escolhido={cliente} aoEscolher={setCliente} />
+
+        <section className={estilos.bloco}>
+          <h2>Serviços</h2>
+          {(servicos.dados ?? [])
+            .filter((servico) => servico.ativo)
+            .map((servico) => (
+              <ItemDeServico
+                key={servico.id}
+                servico={servico}
+                marcado={servicoIds.includes(servico.id)}
+                aoAlternar={(id) =>
+                  setServicoIds((atuais) =>
+                    atuais.includes(id)
+                      ? atuais.filter((outro) => outro !== id)
+                      : [...atuais, id]
+                  )
+                }
+              />
+            ))}
+          <p>
+            {duracao} min · {formatarPreco((total / 100).toFixed(2))}
+          </p>
+        </section>
+
+        <section className={estilos.bloco}>
+          <h2>Data</h2>
+          <Calendario
+            mes={mes}
+            dias={diasComVaga.dados ?? {}}
+            agora={agora}
+            aoEscolher={(escolhida) => trocarQuery({ data: escolhida })}
+            aoTrocarMes={setMes}
+          />
+        </section>
+
+        <section className={estilos.bloco}>
+          <h2>Horário</h2>
+          <ListaDeHorarios
+            horarios={horarios.dados ?? []}
+            aoEscolher={(escolhida) => trocarQuery({ hora: escolhida })}
+          />
+        </section>
+      </div>
+
+      {passado ? (
+        <div className={estilos.passado}>
+          {/* garantirAlteravel não toca o escopo do barbeiro, então isto
+              é recuperável — registrar retroativamente um atendimento
+              que acabou de acontecer é legítimo. Fazer isso sem
+              perceber, não. */}
+          <p>Data no passado.</p>
+          <label>
+            <input
+              type="checkbox"
+              checked={confirmouPassado}
+              onChange={(evento) => setConfirmouPassado(evento.target.checked)}
+            />
+            Registrar mesmo assim
+          </label>
+        </div>
+      ) : null}
+
+      {aviso ? <Aviso>{aviso}</Aviso> : null}
+
+      <Botao disabled={!pronto} carregando={enviando} onClick={agendar}>
+        Agendar
+      </Botao>
+    </div>
+  );
+}
+```
+
+Acrescente `import { BuscaDeCliente } from "./BuscaDeCliente";` no topo.
+
+- [ ] **Step 6: Rodar e ver passar**
+
+Run: `pnpm --filter @gr-barber/web exec vitest run tests/telas/painel/novo-agendamento.test.tsx`
+Expected: PASS
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add apps/web/src/telas/painel/NovoAgendamento.tsx apps/web/src/telas/painel/NovoAgendamento.module.css apps/web/src/telas/painel/BuscaDeCliente.tsx apps/web/src/telas/painel/BuscaDeCliente.module.css "apps/web/app/(painel)/painel/(guardado)/agendamentos" apps/web/tests/telas/painel/novo-agendamento.test.tsx
+git commit -m "feat(web): book a walk-in from one wide screen
+
+Client, services, date and time are all visible at once — the client
+flow's wizard exists because a phone cannot hold four steps, and a
+monitor can. Creating a client happens inline, because the walk-in is
+exactly the person who is not registered yet, and a repeated phone
+offers the existing record instead of a dead end. A past date is allowed
+only through a deliberate checkbox: garantirAlteravel never runs in the
+barber scope, so the entry is recoverable, but it should not happen by
+accident."
+```
+
+---
+
+### Task 9: `/painel/agendamentos/[id]` — detalhe
+
+Muda status e observações. **Só isso:** o `PATCH /agendamentos/:id`
+aceita apenas esses dois campos, e o comentário em
+`apps/api/src/routers/agendamentos.ts:50` diz o porquê — aceitar data e
+hora ali pularia a checagem de disponibilidade inteira.
+
+**Files:**
+- Create: `apps/web/src/telas/painel/DetalheDoAgendamento.tsx`
+- Create: `apps/web/src/telas/painel/DetalheDoAgendamento.module.css`
+- Create: `apps/web/app/(painel)/painel/(guardado)/agendamentos/[id]/page.tsx`
+- Test: `apps/web/tests/telas/painel/detalhe-do-agendamento.test.tsx`
+
+**Interfaces:**
+- Consumes: `useApiDoPainel`, `useRequisicao`, `useParams`,
+  `formatarPreco`, `formatarDataLonga`, `Chip`, `Botao`, `Campo`,
+  `Aviso`.
+- Produces: `DetalheDoAgendamento()` — lê o `id` de `useParams`.
+
+- [ ] **Step 1: Escrever o teste que falha**
+
+```tsx
+import { screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { criarApiClientFalso } from "@gr-barber/api-client";
+import { DetalheDoAgendamento } from "../../../src/telas/painel/DetalheDoAgendamento";
+import { navegacaoFalsa } from "../../ajudantes/navegacao";
+import { montarPainel } from "../../ajudantes/painel";
+
+function semear() {
+  return criarApiClientFalso({
+    clientes: [
+      { id: "c1", nome: "João Silva", telefone: "(11) 99999-0001", email: null, temConta: false },
+    ],
+    agendamentos: [
+      {
+        id: "a1",
+        clienteId: "c1",
+        data: "2026-09-08",
+        horaInicio: "09:00",
+        horaFim: "09:30",
+        status: "pendente",
+        origem: "cliente",
+        observacoes: null,
+        servicos: [
+          { servicoId: "s1", nome: "Corte", precoNoMomento: "40.00", duracaoNoMomento: 30 },
+        ],
+      },
+    ],
+  });
+}
+
+describe("detalhe do agendamento", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    navegacaoFalsa.redefinir({
+      pathname: "/painel/agendamentos/a1",
+      params: { id: "a1" },
+    });
+  });
+
+  it("mostra cliente, serviços e o preço congelado", async () => {
+    montarPainel(<DetalheDoAgendamento />, semear());
+
+    expect(await screen.findByText(/João Silva/)).toBeInTheDocument();
+    // precoNoMomento, não o preço de hoje: é o que foi combinado com
+    // aquele cliente naquele dia.
+    expect(screen.getByText("R$ 40,00")).toBeInTheDocument();
+  });
+
+  it("muda o status", async () => {
+    const falso = semear();
+    const atualizar = vi.fn(
+      async (id: string, edicao: { status?: string; observacoes?: string | null }) =>
+        falso.barbeiro.atualizarAgendamento(id, edicao)
+    );
+    falso.barbeiro.atualizarAgendamento = atualizar;
+
+    montarPainel(<DetalheDoAgendamento />, falso);
+
+    await userEvent.click(await screen.findByRole("button", { name: /confirmado/i }));
+
+    await waitFor(() => expect(atualizar).toHaveBeenCalledWith("a1", { status: "confirmado" }));
+  });
+
+  it("salva observações", async () => {
+    const falso = semear();
+    const atualizar = vi.fn(
+      async (id: string, edicao: { status?: string; observacoes?: string | null }) =>
+        falso.barbeiro.atualizarAgendamento(id, edicao)
+    );
+    falso.barbeiro.atualizarAgendamento = atualizar;
+
+    montarPainel(<DetalheDoAgendamento />, falso);
+
+    await userEvent.type(await screen.findByLabelText(/observações/i), "cliente atrasa");
+    await userEvent.click(screen.getByRole("button", { name: /salvar observações/i }));
+
+    await waitFor(() =>
+      expect(atualizar).toHaveBeenCalledWith("a1", { observacoes: "cliente atrasa" })
+    );
+  });
+
+  it("diz que remarcar é cancelar e criar, sem oferecer botão que a API recusaria", async () => {
+    // PATCH /agendamentos/:id aceita só status e observacoes; remarcar
+    // existe apenas no escopo do cliente.
+    montarPainel(<DetalheDoAgendamento />, semear());
+
+    expect(await screen.findByText(/para mudar o horário, cancele e crie outro/i)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /remarcar/i })).not.toBeInTheDocument();
+  });
+
+  it("agendamento inexistente vira aviso, não tela em branco", async () => {
+    navegacaoFalsa.redefinir({
+      pathname: "/painel/agendamentos/a9",
+      params: { id: "a9" },
+    });
+    montarPainel(<DetalheDoAgendamento />, semear());
+
+    expect(await screen.findByText(/agendamento não encontrado/i)).toBeInTheDocument();
+  });
+});
+```
+
+- [ ] **Step 2: Rodar e ver falhar**
+
+Run: `pnpm --filter @gr-barber/web exec vitest run tests/telas/painel/detalhe-do-agendamento.test.tsx`
+Expected: FAIL — `DetalheDoAgendamento` não existe.
+
+- [ ] **Step 3: Implementar**
+
+```tsx
+"use client";
+
+import { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
+import type { ErroDaApi } from "@gr-barber/api-client";
+import { Aviso } from "../../componentes/Aviso";
+import { Botao } from "../../componentes/Botao";
+import { Campo } from "../../componentes/Campo";
+import { Chip } from "../../componentes/Chip";
+import { formatarPreco } from "../../componentes/ItemDeServico";
+import { useRequisicao } from "../../api/useRequisicao";
+import { formatarDataLonga } from "../../formato/datas";
+import { useApiDoPainel } from "../../painel/ProvedorDoPainel";
+import estilos from "./DetalheDoAgendamento.module.css";
+
+// Qualquer transição é aceita pela API: o barbeiro é a autoridade sobre
+// o que aconteceu no salão.
+const STATUS = ["pendente", "confirmado", "concluido", "cancelado", "no_show"] as const;
+
+export function DetalheDoAgendamento() {
+  const { id } = useParams<{ id: string }>();
+  const api = useApiDoPainel();
+  const agendamento = useRequisicao(() => api.barbeiro.agendamento(id), [id]);
+
+  const [observacoes, setObservacoes] = useState("");
+  const [aviso, setAviso] = useState<string | undefined>();
+  const [salvando, setSalvando] = useState(false);
+
+  useEffect(() => {
+    if (agendamento.dados) setObservacoes(agendamento.dados.observacoes ?? "");
+  }, [agendamento.dados]);
+
+  if (agendamento.erro) {
+    return (
+      <Aviso>
+        {agendamento.erro.codigo === "nao_encontrado"
+          ? "Agendamento não encontrado."
+          : agendamento.erro.mensagem}
+      </Aviso>
+    );
+  }
+  if (!agendamento.dados) return <p>Carregando…</p>;
+
+  const atual = agendamento.dados;
+
+  async function aplicar(edicao: { status?: string; observacoes?: string | null }) {
+    setAviso(undefined);
+    setSalvando(true);
+    try {
+      await api.barbeiro.atualizarAgendamento(id, edicao);
+      agendamento.recarregar();
+    } catch (causa) {
+      setAviso((causa as ErroDaApi).mensagem || "Não foi possível salvar agora.");
+    }
+    setSalvando(false);
+  }
+
+  const total = atual.servicos.reduce(
+    (soma, s) => soma + Math.round(Number(s.precoNoMomento) * 100),
+    0
+  );
+
+  return (
+    <div className={estilos.pagina}>
+      <h1>{atual.cliente.nome}</h1>
+      <p>{atual.cliente.telefone}</p>
+      <p>
+        {formatarDataLonga(atual.data)} · {atual.horaInicio}–{atual.horaFim}
+      </p>
+      <p>
+        {atual.servicos.map((s) => s.nome).join(" + ")} ·{" "}
+        {formatarPreco((total / 100).toFixed(2))}
+      </p>
+      <Chip tom="neutro">agendado pelo {atual.origem}</Chip>
+
+      <section>
+        <h2>Status</h2>
+        <div className={estilos.status}>
+          {STATUS.map((status) => (
+            <Botao
+              key={status}
+              variante={status === atual.status ? "solido" : "contorno"}
+              onClick={() => aplicar({ status })}
+              carregando={salvando}
+            >
+              {status}
+            </Botao>
+          ))}
+        </div>
+      </section>
+
+      <Campo
+        rotulo="Observações"
+        valor={observacoes}
+        onChange={setObservacoes}
+      />
+      <Botao onClick={() => aplicar({ observacoes })} carregando={salvando}>
+        Salvar observações
+      </Botao>
+
+      {/* A API não tem remarcar no escopo do barbeiro, e aceitar data e
+          hora no PATCH pularia a checagem de disponibilidade inteira.
+          Dizer isso é melhor do que um botão que voltaria erro. */}
+      <p className={estilos.nota}>
+        Para mudar o horário, cancele e crie outro agendamento.
+      </p>
+
+      {aviso ? <Aviso>{aviso}</Aviso> : null}
+    </div>
+  );
+}
+```
+
+Confira o nome da variante sólida em `src/componentes/Botao.tsx` antes
+de escrever — use a que existir, não invente `"solido"` se o arquivo
+chamar de outra coisa.
+
+- [ ] **Step 4: Rodar e ver passar**
+
+Run: `pnpm --filter @gr-barber/web exec vitest run tests/telas/painel/detalhe-do-agendamento.test.tsx`
+Expected: PASS
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add apps/web/src/telas/painel/DetalheDoAgendamento.tsx apps/web/src/telas/painel/DetalheDoAgendamento.module.css "apps/web/app/(painel)/painel/(guardado)/agendamentos/[id]" apps/web/tests/telas/painel/detalhe-do-agendamento.test.tsx
+git commit -m "feat(web): change an appointment's status and notes
+
+Those two fields are all PATCH /agendamentos/:id accepts — taking date
+and time there would skip the availability check entirely, which is why
+rescheduling exists only in the client scope. The screen says to cancel
+and create instead of offering a button the API would refuse."
+```
+
+---
+
+O plano continua nas tarefas 10 a 13 — clientes, serviços,
+configurações e limpeza.
