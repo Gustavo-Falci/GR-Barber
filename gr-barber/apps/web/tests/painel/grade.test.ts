@@ -89,6 +89,22 @@ describe("faixas do dia", () => {
     expect(faixas.every((f) => !f.passada)).toBe(true);
   });
 
+  it("fechado vence mesmo com horário preenchido", () => {
+    // A API nunca manda isto: horarios.ts zera as horas sempre que
+    // `fechado` vem true, então esta combinação não chega do servidor.
+    // O teste existe porque o tipo permite — `fechado` e as horas são
+    // campos independentes em HorarioSerializado — e a função não pode
+    // depender da disciplina de quem a chama.
+    const faixas = faixasDoDia({
+      data: "2026-09-08",
+      horario: { diaSemana: 2, horaAbertura: "09:00", horaFechamento: "18:00", fechado: true },
+      agendamentos: [],
+      agora: new Date("2026-09-01T10:00:00-03:00"),
+    });
+
+    expect(faixas).toEqual([]);
+  });
+
   it("a semana vai de domingo a sábado contendo o dia", () => {
     // 2026-09-08 é uma terça; o domingo daquela semana é 2026-09-06.
     expect(diasDaSemana("2026-09-08")[0]).toBe("2026-09-06");
