@@ -37,7 +37,13 @@ O que falta pro GR Barber sair do papel, mais ou menos em ordem:
      `@gr-barber/types`, tokens de espaço/borda/texto, Clash Grotesk
      self-hosted, Vitest + Testing Library no `apps/web`, os primitivos
      e a sessão. A suíte foi de 305 pra 370 testes.
-   - **B — fluxo do cliente na web (7 telas)**, sob `/[slug]`.
+   - **B — fluxo do cliente na web: pronto.** PR #8, merge `8b01e6f`,
+     em 2026-09-05. Oito telas sob `/[slug]` — perfil, os quatro passos
+     de agendar, confirmação, entrar e minha conta. A suíte foi de 370
+     pra 463 testes. O mapa previa sete: `/[slug]/entrar` é a oitava, e
+     existe porque "Meus agendamentos" exige token e nenhuma tela do
+     mapa fazia login. Ela cobre também o primeiro acesso, sem o qual
+     ninguém jamais teria senha.
    - **C — painel web do barbeiro (6 telas)**.
    - **D — app do barbeiro no Expo (10 telas)**.
 
