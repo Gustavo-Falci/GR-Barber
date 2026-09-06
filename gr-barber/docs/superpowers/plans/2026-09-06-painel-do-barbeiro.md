@@ -3247,7 +3247,7 @@ export function DetalheDoAgendamento() {
           {STATUS.map((status) => (
             <Botao
               key={status}
-              variante={status === atual.status ? "solido" : "contorno"}
+              variante={status === atual.status ? "primario" : "contorno"}
               onClick={() => aplicar({ status })}
               carregando={salvando}
             >
@@ -3279,9 +3279,9 @@ export function DetalheDoAgendamento() {
 }
 ```
 
-Confira o nome da variante sólida em `src/componentes/Botao.tsx` antes
-de escrever — use a que existir, não invente `"solido"` se o arquivo
-chamar de outra coisa.
+As variantes do `Botao` são `"primario" | "fantasma" | "contorno"`
+(`src/componentes/Botao.tsx`); `"primario" ` é o padrão quando nenhuma é
+informada.
 
 - [ ] **Step 4: Rodar e ver passar**
 
@@ -3327,7 +3327,7 @@ Três rotas e o componente `Tabela`, que serviços também usa.
   - `Tabela({ cabecalho, linhas })` onde
     `linhas: { id: string; celulas: ReactNode[] }[]` e
     `cabecalho: string[]`; a linha inteira é clicável via `aoAbrir?`
-  - `ListaDeClientes()`
+  - `ListaDeClientes({ agora }: { agora?: Date })`
   - `CadastroDeCliente()`
   - `DetalheDoCliente()`
 
@@ -3343,6 +3343,10 @@ import { DetalheDoCliente } from "../../../src/telas/painel/DetalheDoCliente";
 import { ListaDeClientes } from "../../../src/telas/painel/ListaDeClientes";
 import { navegacaoFalsa } from "../../ajudantes/navegacao";
 import { montarPainel } from "../../ajudantes/painel";
+
+// Instante fixo: a lista busca os agendamentos dos últimos 90 dias, e
+// sem passar o instante a janela mudaria a cada dia que o teste rodasse.
+const AGORA = new Date("2026-09-08T10:00:00-03:00");
 
 function semear() {
   return criarApiClientFalso({
@@ -3375,7 +3379,7 @@ describe("clientes no painel", () => {
   });
 
   it("lista os clientes com nome e telefone", async () => {
-    montarPainel(<ListaDeClientes />, semear());
+    montarPainel(<ListaDeClientes agora={AGORA} />, semear());
 
     expect(await screen.findByText("João Silva")).toBeInTheDocument();
     expect(screen.getByText("Marcos Reis")).toBeInTheDocument();
@@ -3383,7 +3387,7 @@ describe("clientes no painel", () => {
 
   it("a busca da URL chega na chamada", async () => {
     navegacaoFalsa.redefinir({ pathname: "/painel/clientes", query: { busca: "marcos" } });
-    montarPainel(<ListaDeClientes />, semear());
+    montarPainel(<ListaDeClientes agora={AGORA} />, semear());
 
     expect(await screen.findByText("Marcos Reis")).toBeInTheDocument();
     expect(screen.queryByText("João Silva")).not.toBeInTheDocument();
@@ -3393,7 +3397,7 @@ describe("clientes no painel", () => {
     // ?busca= na URL: recarregar não perde o filtro, e o resultado é
     // linkável — a mesma razão que fez o fluxo do cliente pôr o passo
     // na rota.
-    montarPainel(<ListaDeClientes />, semear());
+    montarPainel(<ListaDeClientes agora={AGORA} />, semear());
 
     await userEvent.type(await screen.findByLabelText(/buscar/i), "marcos");
 
@@ -3403,7 +3407,7 @@ describe("clientes no painel", () => {
   });
 
   it("abrir uma linha vai pro detalhe", async () => {
-    montarPainel(<ListaDeClientes />, semear());
+    montarPainel(<ListaDeClientes agora={AGORA} />, semear());
 
     await userEvent.click(await screen.findByRole("button", { name: /João Silva/ }));
 
@@ -3548,25 +3552,37 @@ import { Botao } from "../../componentes/Botao";
 import { Campo } from "../../componentes/Campo";
 import { Tabela } from "../../componentes/Tabela";
 import { useRequisicao } from "../../api/useRequisicao";
-import { formatarDataLonga } from "../../formato/datas";
+import { formatarDataLonga, hojeIso } from "../../formato/datas";
 import { useApiDoPainel } from "../../painel/ProvedorDoPainel";
 import estilos from "./ListaDeClientes.module.css";
 
-export function ListaDeClientes() {
+// `agora` por parâmetro porque a janela de 90 dias olha o relógio.
+export function ListaDeClientes({ agora = new Date() }: { agora?: Date }) {
   const router = useRouter();
   const query = useSearchParams();
   const api = useApiDoPainel();
   const busca = query.get("busca") ?? "";
 
   const clientes = useRequisicao(() => api.barbeiro.clientes(busca), [busca]);
-  // O último agendamento de cada um não vem na lista de clientes; a
-  // coluna sai daqui. Uma chamada, não uma por linha.
-  const agendamentos = useRequisicao(() => api.barbeiro.agendamentosDoIntervalo("2000-01-01", "2100-01-01"), []);
+
+  // O último agendamento não vem na lista de clientes, então sai daqui:
+  // uma chamada de intervalo, não uma por linha. A janela é de 90 dias
+  // e não "desde sempre" de propósito — buscar o histórico inteiro da
+  // barbearia a cada abertura da lista fica mais caro a cada mês, e
+  // quem não aparece há três meses aparece como "—", que é a informação
+  // que a coluna existe pra dar.
+  const janela = 90;
+  const ate = hojeIso(agora);
+  const de = hojeIso(new Date(agora.getTime() - janela * 24 * 60 * 60 * 1000));
+  const recentes = useRequisicao(
+    () => api.barbeiro.agendamentosDoIntervalo(de, ate),
+    [de, ate]
+  );
 
   if (clientes.erro) return <Aviso>{clientes.erro.mensagem}</Aviso>;
 
   function ultimoDe(clienteId: string): string {
-    const datas = (agendamentos.dados ?? [])
+    const datas = (recentes.dados ?? [])
       .filter((a) => a.cliente.id === clienteId)
       .map((a) => a.data)
       .sort();
