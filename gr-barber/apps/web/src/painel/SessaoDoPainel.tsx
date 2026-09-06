@@ -9,7 +9,6 @@ import {
   type ReactNode,
 } from "react";
 import { useRouter } from "next/navigation";
-import { ErroDaApi } from "@gr-barber/api-client";
 import type { PerfilBarbeiro } from "@gr-barber/types";
 import {
   encerrarSessaoDoBarbeiro,
@@ -52,14 +51,13 @@ export function SessaoDoPainel({ children }: { children: ReactNode }) {
       .then((resposta) => {
         if (vivo) setPerfil(resposta);
       })
-      .catch((causa: unknown) => {
+      .catch(() => {
         if (!vivo) return;
         // Qualquer falha ao provar quem é o chamador termina do mesmo
         // jeito: sem perfil não há painel. O 401 é o caso comum — o
         // token vale 7 dias e o hook da API consulta o banco a cada
         // requisição, então desativar um barbeiro invalida na hora.
-        if (causa instanceof ErroDaApi) sair();
-        else sair();
+        sair();
       });
 
     return () => {
