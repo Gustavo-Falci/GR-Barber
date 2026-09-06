@@ -87,6 +87,19 @@ describe("métricas do dia", () => {
     expect(ocupacao(lista, ABERTO)).toBe(25);
   });
 
+  it("a ocupação arredonda pro inteiro mais próximo, não pra cima", () => {
+    // Esta fixture existe pra prender o modo de arredondamento contra
+    // Math.ceil especificamente. 30/540 (5,5556%) arredonda e "tetoriza"
+    // pro mesmo 6; 135/540 é 25% exato — nenhuma das duas separa
+    // Math.round de Math.ceil. 60/540 = 11,1111%: Math.round dá 11,
+    // Math.ceil dá 12. Só esta fixture entrega valores diferentes pros
+    // dois, então é ela que prova que o código não está arredondando
+    // sempre pra cima.
+    const lista = [agendamento("confirmado", 60, "50.00")];
+
+    expect(ocupacao(lista, ABERTO)).toBe(11);
+  });
+
   it("dia fechado não tem ocupação, e não é zero", () => {
     // Zero por cento diria "aberto e vazio". Dividir por zero seria o
     // outro erro.
