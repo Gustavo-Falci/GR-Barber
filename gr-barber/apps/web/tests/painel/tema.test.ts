@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   aplicarTema,
   CHAVE_DO_TEMA,
@@ -7,10 +7,38 @@ import {
   SCRIPT_DE_TEMA,
 } from "../../src/painel/tema";
 
+// jsdom não implementa matchMedia. O stub fica local a este arquivo
+// porque só o script inline (via temaDoSistema) precisa dele.
+function stubMatchMedia(prefereEscuro: boolean): void {
+  window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+    matches: prefereEscuro,
+    media: query,
+    onchange: null,
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  })) as unknown as typeof window.matchMedia;
+}
+
+// Roda o script exatamente como o navegador roda: como uma string solta,
+// não como uma função já compilada. new Function reproduz isso — se
+// chamássemos uma versão importada da lógica em vez da string em si,
+// não estaríamos testando o que de fato vai pro <head>.
+function rodarScriptDeTema(): void {
+  new Function(SCRIPT_DE_TEMA)();
+}
+
+function irParaCaminho(caminho: string): void {
+  history.pushState(null, "", caminho);
+}
+
 describe("tema do painel", () => {
   beforeEach(() => {
     localStorage.clear();
     document.documentElement.removeAttribute("data-theme");
+    irParaCaminho("/");
   });
 
   it("sem escolha gravada, lerTema devolve null", () => {
@@ -41,8 +69,60 @@ describe("tema do painel", () => {
     expect(document.documentElement.dataset.theme).toBe("dark");
   });
 
-  it("o script inline decide pelo caminho da URL", () => {
-    expect(SCRIPT_DE_TEMA).toContain("/painel");
-    expect(SCRIPT_DE_TEMA).toContain("data-theme");
+  describe("o script inline", () => {
+    it("no painel, com 'escuro' já gravado, escreve dark", () => {
+      irParaCaminho("/painel/agenda");
+      localStorage.setItem(CHAVE_DO_TEMA, "escuro");
+      stubMatchMedia(false);
+
+      rodarScriptDeTema();
+
+      expect(document.documentElement.getAttribute("data-theme")).toBe("dark");
+    });
+
+    it("no painel, com 'claro' já gravado, escreve light", () => {
+      irParaCaminho("/painel/agenda");
+      localStorage.setItem(CHAVE_DO_TEMA, "claro");
+      stubMatchMedia(true);
+
+      rodarScriptDeTema();
+
+      expect(document.documentElement.getAttribute("data-theme")).toBe("light");
+    });
+
+    it("no painel, sem nada gravado e sistema escuro, escreve dark e grava a escolha", () => {
+      irParaCaminho("/painel/agenda");
+      stubMatchMedia(true);
+
+      rodarScriptDeTema();
+
+      expect(document.documentElement.getAttribute("data-theme")).toBe("dark");
+      // A escolha do primeiro acesso fica gravada — da próxima vez não é
+      // mais o sistema que decide, é o localStorage.
+      expect(localStorage.getItem(CHAVE_DO_TEMA)).toBe("escuro");
+    });
+
+    it("no painel, com valor estragado gravado, cai pro sistema em vez de escrever o lixo", () => {
+      irParaCaminho("/painel/agenda");
+      localStorage.setItem(CHAVE_DO_TEMA, "banana");
+      stubMatchMedia(false);
+
+      rodarScriptDeTema();
+
+      expect(document.documentElement.getAttribute("data-theme")).toBe("light");
+    });
+
+    it("fora do painel, escreve light mesmo com 'escuro' gravado", () => {
+      // Esta é a garantia de que o fluxo do cliente depende: nenhuma
+      // escolha do barbeiro escurece a página de quem chega por
+      // WhatsApp.
+      irParaCaminho("/gr-barber");
+      localStorage.setItem(CHAVE_DO_TEMA, "escuro");
+      stubMatchMedia(true);
+
+      rodarScriptDeTema();
+
+      expect(document.documentElement.getAttribute("data-theme")).toBe("light");
+    });
   });
 });
