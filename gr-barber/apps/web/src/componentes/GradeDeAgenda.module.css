@@ -1,0 +1,3 @@
+.grade { display: grid; gap: var(--espaco-xs); list-style: none; margin: 0; padding: 0; }
+.faixa button { width: 100%; text-align: left; padding: var(--espaco-sm) var(--espaco-md); border: var(--borda-padrao) solid var(--cor-ink); border-radius: var(--raio-md); background: var(--cor-surface); font-size: var(--texto-sm); cursor: pointer; }
+.passada { display: block; padding: var(--espaco-sm) var(--espaco-md); color: var(--cor-muted); font-size: var(--texto-sm); }
