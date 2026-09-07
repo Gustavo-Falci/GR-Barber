@@ -172,4 +172,41 @@ describe("clientes no painel", () => {
       expect(atualizar).toHaveBeenCalledWith("c1", expect.objectContaining({ nome: "João da Silva" }))
     );
   });
+
+  it("telefone repetido aponta pra lista, não deixa a tela sem saída", async () => {
+    navegacaoFalsa.redefinir({ pathname: "/painel/clientes/novo" });
+    const falso = criarApiClientFalso({ clientes: [] });
+    // `mensagem` vazia de propósito: o dublê por padrão já lança "esse
+    // telefone já tem cadastro", e se a asserção casasse com isso ela
+    // passaria mesmo sem o branch de `conflito` na tela — a mensagem
+    // teria vindo do erro genérico (`erro.mensagem || "..."`), não do
+    // texto que a tela escolhe pra esse código.
+    falso.barbeiro.criarCliente = async () => {
+      throw new ErroDaApi(409, "conflito", "");
+    };
+    montarPainel(<CadastroDeCliente />, falso);
+
+    await userEvent.type(await screen.findByLabelText(/nome/i), "Ana Souza");
+    await userEvent.type(screen.getByLabelText(/telefone/i), "11988887777");
+    await userEvent.click(screen.getByRole("button", { name: /cadastrar/i }));
+
+    expect(
+      await screen.findByText("Esse telefone já tem cadastro. Procure por ele na lista.")
+    ).toBeInTheDocument();
+  });
+
+  it("cliente inexistente vira aviso, não tela em branco", async () => {
+    navegacaoFalsa.redefinir({ pathname: "/painel/clientes/x9", params: { id: "x9" } });
+    const falso = semear();
+    // Mesma nota do teste de telefone repetido: o dublê por padrão já
+    // lança "cliente não encontrado" pra qualquer id que não existe, e
+    // a mensagem vazia aqui garante que só o branch `nao_encontrado` da
+    // tela pode produzir o texto que a asserção procura.
+    falso.barbeiro.cliente = async () => {
+      throw new ErroDaApi(404, "nao_encontrado", "");
+    };
+    montarPainel(<DetalheDoCliente />, falso);
+
+    expect(await screen.findByText("Cliente não encontrado.")).toBeInTheDocument();
+  });
 });
