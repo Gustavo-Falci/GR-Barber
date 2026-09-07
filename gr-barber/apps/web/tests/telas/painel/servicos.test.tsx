@@ -1,4 +1,4 @@
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { criarApiClientFalso } from "@gr-barber/api-client";
@@ -96,5 +96,48 @@ describe("serviços no painel", () => {
     montarPainel(<CadastroDeServico />, semear());
 
     expect(await screen.findByText(/serviço não encontrado/i)).toBeInTheDocument();
+  });
+
+  // Adicional: a asserção acima só prova que "inativo" aparece em algum
+  // lugar da página — passaria também se o chip saísse em toda linha.
+  // Esta prova o lado que faltava, escopada na própria linha do ativo
+  // pra não pegar o chip da linha do "Barba" e validar por acidente.
+  it("não marca o serviço ativo como inativo", async () => {
+    montarPainel(<ListaDeServicos />, semear());
+
+    const linhaDoAtivo = (await screen.findByText("Corte")).closest("tr");
+    if (!linhaDoAtivo) throw new Error("linha do serviço ativo não encontrada");
+
+    expect(within(linhaDoAtivo as HTMLElement).queryByText(/inativo/i)).not.toBeInTheDocument();
+  });
+
+  // Adicional: "20,00" não distingue trocar vírgula por ponto de
+  // normalizar pra duas casas — os dois caminhos produzem "20.00" pra
+  // essa entrada. "20,5" separa os dois: o normalizado vira "20.50", um
+  // replace sem o toFixed(2) ficaria em "20.5".
+  it("preço com uma casa decimal ainda vira duas ao salvar", async () => {
+    navegacaoFalsa.redefinir({ pathname: "/painel/servicos/novo" });
+    const falso = semear();
+    const original = falso.barbeiro.criarServico;
+    const criar = vi.fn(
+      async (novo: { nome: string; duracaoMinutos: number; preco: string }) =>
+        original(novo)
+    );
+    falso.barbeiro.criarServico = criar;
+
+    montarPainel(<CadastroDeServico />, falso);
+
+    await userEvent.type(await screen.findByLabelText(/nome/i), "Luzes");
+    await userEvent.type(screen.getByLabelText(/duração/i), "40");
+    await userEvent.type(screen.getByLabelText(/preço/i), "20,5");
+    await userEvent.click(screen.getByRole("button", { name: /salvar/i }));
+
+    await waitFor(() =>
+      expect(criar).toHaveBeenCalledWith({
+        nome: "Luzes",
+        duracaoMinutos: 40,
+        preco: "20.50",
+      })
+    );
   });
 });
