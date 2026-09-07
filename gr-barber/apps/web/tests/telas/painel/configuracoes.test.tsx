@@ -85,4 +85,47 @@ describe("configurações da barbearia", () => {
 
     expect(await screen.findByText(/informe o DDD/i)).toBeInTheDocument();
   });
+
+  // Apêndice: a tela edita os sete dias e envia os sete, sempre — mas
+  // antes de GET /barbearias/me/horarios responder, `semana` é `[]`.
+  // Um clique em "Salvar horários" nessa janela mandaria um array
+  // vazio, e a API fecha os sete dias quando um dia falta no corpo:
+  // um clique comum, num instante comum, fecharia a barbearia inteira
+  // em silêncio. Isso é dano de produção, não só a corrida de teste
+  // que motivou a trava original — a trava também impede este clique.
+  it("não manda horários vazios enquanto a semana ainda está carregando", async () => {
+    const falso = criarApiClientFalso();
+    const original = falso.barbeiro.salvarHorarios;
+    const salvar = vi.fn(async (horarios: HorarioSerializado[]) => original(horarios));
+    falso.barbeiro.salvarHorarios = salvar;
+
+    // Trava a leitura da semana até o teste mandar liberar: sem isso
+    // não há como observar a tela no instante em que a semana ainda
+    // não chegou.
+    let liberar: () => void = () => {};
+    const pendente = new Promise<void>((resolve) => {
+      liberar = resolve;
+    });
+    const horariosOriginais = falso.barbeiro.horarios;
+    falso.barbeiro.horarios = async () => {
+      await pendente;
+      return horariosOriginais();
+    };
+
+    montarPainel(<ConfiguracoesDaBarbearia />, falso);
+
+    await screen.findByText(/carregando/i);
+    // O botão pode não existir ainda (tela travada) ou existir
+    // desabilitado — o que importa é o resultado: nenhum array vazio
+    // chega à API. Um clique tentado aqui não pode ter efeito.
+    const botao = screen.queryByRole("button", { name: /salvar horários/i });
+    if (botao) await userEvent.click(botao);
+
+    expect(salvar).not.toHaveBeenCalled();
+
+    liberar();
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /salvar horários/i })).toBeInTheDocument()
+    );
+  });
 });
