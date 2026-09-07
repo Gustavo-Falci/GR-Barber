@@ -1,0 +1,4 @@
+.pagina { display: grid; gap: var(--espaco-lg); padding: var(--espaco-lg); max-width: 640px; }
+.status { display: flex; flex-wrap: wrap; gap: var(--espaco-sm); }
+.preco { font-weight: 600; }
+.nota { font-size: var(--texto-sm); }
