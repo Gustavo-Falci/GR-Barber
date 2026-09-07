@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { ErroDaApi } from "@gr-barber/api-client";
 import { normalizarTelefoneObrigatorio, TelefoneInvalido } from "@gr-barber/formato";
 import type { HorarioSerializado } from "@gr-barber/types";
@@ -47,16 +47,44 @@ export function ConfiguracoesDaBarbearia() {
   // disponibilidade.
   const barbearia = useRequisicao(() => api.publico.perfilDaBarbearia(slug), [slug]);
 
-  useEffect(() => {
-    if (!barbearia.dados) return;
+  // Sincronizado durante a renderização, e não num `useEffect`: um
+  // efeito só roda depois do commit, e entre o commit e o efeito o
+  // formulário já teria aparecido com o campo vazio — digitar nessa
+  // janela corre contra o preenchimento e perde o que a pessoa
+  // escreveu. Foi exatamente isso que aconteceu sob carga real: as duas
+  // buscas (`barbearia` e `horariosSalvos`) resolvendo no mesmo lote
+  // deixa o primeiro commit do formulário com `nomeDaBarbearia` ainda
+  // "", e sob contenção de CPU o efeito de preenchimento nem sempre
+  // termina antes do próximo passo do teste — valor observado em
+  // produção de teste: "GR BarberGR Barber Centro" (o preenchido em
+  // cima do que já tinha sido digitado). A trava de carregamento (mais
+  // abaixo) olha se os dados chegaram, não se o estado local já foi
+  // sincronizado com eles — por isso não fecha essa janela sozinha.
+  // Sincronizar aqui evita o commit intermediário: o React descarta
+  // essa renderização e refaz com o valor certo antes de pintar
+  // qualquer coisa. O `!==` contra o rastreador é o que impede o loop
+  // — sem ele, cada chamada de setState re-renderizaria e cairia na
+  // mesma condição outra vez.
+  const [barbeariaSincronizada, setBarbeariaSincronizada] = useState<typeof barbearia.dados>(null);
+  if (barbearia.dados && barbearia.dados !== barbeariaSincronizada) {
+    setBarbeariaSincronizada(barbearia.dados);
     setNomeDaBarbearia(barbearia.dados.nome);
     setTelefoneDaBarbearia(barbearia.dados.telefone ?? "");
     setEndereco(barbearia.dados.endereco ?? "");
-  }, [barbearia.dados]);
+  }
 
-  useEffect(() => {
-    if (horariosSalvos.dados) setSemana(horariosSalvos.dados);
-  }, [horariosSalvos.dados]);
+  // Mesmo motivo do bloco acima, aplicado à semana: sincronizar depois
+  // do commit (via efeito) deixaria uma janela em que o formulário já
+  // mostra os dias mas `semana` ainda é `[]`. A comparação de
+  // referência também é o que faz `horariosSalvos.recarregar()` (depois
+  // de salvar) sincronizar de novo — o array novo que a rota devolve
+  // não é `===` ao antigo, então a condição volta a ser verdadeira uma
+  // vez, e só uma.
+  const [semanaSincronizada, setSemanaSincronizada] = useState<typeof horariosSalvos.dados>(null);
+  if (horariosSalvos.dados && horariosSalvos.dados !== semanaSincronizada) {
+    setSemanaSincronizada(horariosSalvos.dados);
+    setSemana(horariosSalvos.dados);
+  }
 
   async function salvarDados() {
     setAviso(undefined);
