@@ -66,25 +66,44 @@ export function NovoAgendamento({ agora = new Date() }: { agora?: Date }) {
     [slug, perfil.id, mes, servicoIds.join(",")]
   );
 
-  // A hora que a agenda mandou pela URL entra na lista mesmo antes (ou
-  // além) do que a disponibilidade devolveu: sem serviço selecionado a
-  // chamada acima nem acontece, e sem isto o horário com que a tela
-  // "chegou preenchida" não apareceria pra marcar como atual. O que é
-  // enviado em `agendar()` é sempre este mesmo `hora`, então o que a
-  // pessoa vê marcado é exatamente o que o botão vai submeter.
+  // A hora que a agenda mandou pela URL só é sintetizada na lista
+  // enquanto nenhum serviço foi escolhido — o estado de "chegou
+  // preenchida" do teste 1, em que a chamada acima nem acontece. Depois
+  // que existe serviço e a busca de verdade já respondeu, a lista que
+  // ela devolveu é a única fonte de verdade: sintetizar `hora` ali
+  // também reintroduziria um horário que a disponibilidade acabou de
+  // excluir (por exemplo, depois de somar um segundo serviço), marcado
+  // como atual e com o botão de agendar ligado — a tela mentindo sobre
+  // um horário que a própria API acabou de rejeitar.
   const horariosCarregados = horarios.dados ?? [];
   const horariosParaExibir =
-    hora && !horariosCarregados.includes(hora)
-      ? [hora, ...horariosCarregados]
-      : horariosCarregados;
+    servicoIds.length === 0 && hora ? [hora] : horariosCarregados;
+
+  // Enquanto a busca de disponibilidade ainda não respondeu pra esta
+  // combinação de serviços (`carregando`), a lista antiga que sobrou de
+  // antes não é evidência de nada — nem a favor nem contra — então não
+  // trava o botão por causa dela; isso é o que mantém o clique em
+  // "Agendar" funcionando no mesmo instante em que o primeiro serviço é
+  // marcado, sem esperar a resposta chegar. Depois que a resposta
+  // chegou (`!carregando`), `hora` só continua aceitável se estiver na
+  // lista que voltou.
+  const horaAceitavel =
+    servicoIds.length === 0 || horarios.carregando || horariosCarregados.includes(hora);
 
   const passado = ehPassado(data, agora);
   const pronto =
-    Boolean(cliente) && servicoIds.length > 0 && Boolean(hora) && (!passado || confirmouPassado);
+    Boolean(cliente) &&
+    servicoIds.length > 0 &&
+    Boolean(hora) &&
+    horaAceitavel &&
+    (!passado || confirmouPassado);
 
-  function trocarQuery(proximos: Record<string, string>) {
+  function trocarQuery(proximos: Record<string, string | null>) {
     const atual = new URLSearchParams(query.toString());
-    for (const [chave, valor] of Object.entries(proximos)) atual.set(chave, valor);
+    for (const [chave, valor] of Object.entries(proximos)) {
+      if (valor === null) atual.delete(chave);
+      else atual.set(chave, valor);
+    }
     router.push(`/painel/agendamentos/novo?${atual.toString()}`);
   }
 
@@ -159,7 +178,16 @@ export function NovoAgendamento({ agora = new Date() }: { agora?: Date }) {
             mes={mes}
             dias={diasComVaga.dados ?? {}}
             agora={agora}
-            aoEscolher={(escolhida) => trocarQuery({ data: escolhida })}
+            // O horário escolhido é de um dia específico: trocar a data
+            // sem limpar `hora` deixaria a URL com um par
+            // data/hora que nunca foram oferecidos juntos. Diferente do
+            // caso de somar um serviço (em que o horário antigo pode ou
+            // não continuar cabendo, e só a resposta da disponibilidade
+            // decide), aqui não há dúvida a esperar: um novo dia sempre
+            // invalida a hora do dia anterior, então a limpeza é
+            // imediata, na própria troca de URL, sem depender de uma
+            // resposta de rede pra descobrir o óbvio.
+            aoEscolher={(escolhida) => trocarQuery({ data: escolhida, hora: null })}
             aoTrocarMes={setMes}
           />
         </section>

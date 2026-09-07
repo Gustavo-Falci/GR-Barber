@@ -138,12 +138,84 @@ describe("novo agendamento no painel", () => {
     falso.barbeiro.criarAgendamento = async () => {
       throw new ErroDaApi(409, "horario_ocupado", "esse horário já está ocupado");
     };
+    // Capturado antes de sobrescrever, pelo mesmo motivo do
+    // `criarAgendamento` original lá em cima: um wrapper que chamasse de
+    // volta `falso.publico.disponibilidadeDoDia` recursaria.
+    const original = falso.publico.disponibilidadeDoDia;
+    const disponibilidade = vi.fn(
+      (slug: string, filtro: Parameters<typeof original>[1]) => original(slug, filtro)
+    );
+    falso.publico.disponibilidadeDoDia = disponibilidade;
+
     montarPainel(<NovoAgendamento agora={AGORA} />, falso);
 
     await userEvent.click(await screen.findByRole("button", { name: /João Silva/ }));
     await userEvent.click(screen.getByRole("checkbox", { name: /Corte/ }));
+    await waitFor(() => expect(disponibilidade).toHaveBeenCalled());
+    const chamadasAntesDoEnvio = disponibilidade.mock.calls.length;
+
     await userEvent.click(screen.getByRole("button", { name: /^agendar$/i }));
 
     expect(await screen.findByText(/esse horário acabou de ser ocupado/i)).toBeInTheDocument();
+    // "Recarregar os horários, não repetir o envio" tem duas metades, e
+    // a mensagem acima só prova a segunda (que a tela não ficou muda).
+    // Sem o `horarios.recarregar()`, a mensagem apareceria do mesmo
+    // jeito e esta asserção que falharia — é ela que prova que a lista
+    // foi buscada de novo.
+    await waitFor(() =>
+      expect(disponibilidade.mock.calls.length).toBeGreaterThan(chamadasAntesDoEnvio)
+    );
+  });
+
+  it("um segundo serviço que deixa de caber no horário escolhido tira a marca e desliga o agendar", async () => {
+    // O cenário que o merge de `hora` na lista exibida (do teste de
+    // "chega preenchido") não podia mais cobrir sem mentir: depois que
+    // existe uma resposta de verdade da disponibilidade para a
+    // combinação atual de serviços, essa resposta é a única fonte —
+    // reintroduzir a hora antiga marcaria como atual, e deixaria
+    // agendar, um horário que a própria API acabou de excluir.
+    const falso = semear();
+    falso.publico.disponibilidadeDoDia = vi.fn(
+      async (_slug: string, filtro: { servicoIds: string[] }) =>
+        filtro.servicoIds.length > 1 ? ["12:00"] : ["11:00", "11:30", "12:00"]
+    );
+    montarPainel(<NovoAgendamento agora={AGORA} />, falso);
+
+    await userEvent.click(await screen.findByRole("button", { name: /João Silva/ }));
+    await userEvent.click(screen.getByRole("checkbox", { name: /Corte/ }));
+
+    expect(await screen.findByRole("button", { name: "11:00", current: true })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^agendar$/i })).toBeEnabled();
+
+    await userEvent.click(screen.getByRole("checkbox", { name: /Barba/ }));
+
+    // A duração somada de Corte + Barba não cabe mais às 11:00 na
+    // disponibilidade combinada acima: o botão daquele horário some da
+    // lista (não fica só "sem marca") porque a lista exibida agora é
+    // exatamente o que a API respondeu, sem síntese nenhuma.
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: "11:00" })).not.toBeInTheDocument()
+    );
+    expect(screen.getByRole("button", { name: /^agendar$/i })).toBeDisabled();
+  });
+
+  it("trocar de data limpa o horário escolhido, que era de outro dia", async () => {
+    // Diferente do caso de somar um serviço, aqui não há resposta de
+    // rede a esperar: um horário é sempre de um dia específico, e
+    // trocar o dia sem limpar a hora deixaria a URL com um par que
+    // nunca foi oferecido junto.
+    const falso = semear();
+    falso.estado.diasComVaga = { "2026-09-10": true };
+    montarPainel(<NovoAgendamento agora={AGORA} />, falso);
+
+    await userEvent.click(await screen.findByRole("button", { name: /João Silva/ }));
+    await userEvent.click(screen.getByRole("checkbox", { name: /Corte/ }));
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "10" })).toBeEnabled());
+    await userEvent.click(screen.getByRole("button", { name: "10" }));
+
+    const ultimaChamada = navegacaoFalsa.push.mock.calls.at(-1);
+    expect(ultimaChamada?.[0]).toContain("data=2026-09-10");
+    expect(ultimaChamada?.[0]).not.toContain("hora=");
   });
 });
