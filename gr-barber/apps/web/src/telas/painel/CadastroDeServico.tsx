@@ -1,0 +1,119 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import type { ErroDaApi } from "@gr-barber/api-client";
+import { Aviso } from "../../componentes/Aviso";
+import { Botao } from "../../componentes/Botao";
+import { Campo } from "../../componentes/Campo";
+import { useRequisicao } from "../../api/useRequisicao";
+import { useApiDoPainel } from "../../painel/ProvedorDoPainel";
+import estilos from "./CadastroDeServico.module.css";
+
+// "20,00" e "20.00" viram a mesma string decimal. Number entra só na
+// validação, nunca no que é enviado: o preço é Decimal no banco.
+function paraDecimal(digitado: string): string | null {
+  const limpo = digitado.trim().replace(",", ".");
+  if (!/^\d+(\.\d{1,2})?$/.test(limpo)) return null;
+  return Number(limpo).toFixed(2);
+}
+
+export function CadastroDeServico() {
+  const { id } = useParams<{ id?: string }>();
+  const router = useRouter();
+  const api = useApiDoPainel();
+
+  // Não existe servico(id) no client: cliente(id) e agendamento(id)
+  // existem, este não. A lista basta, e devolve inclusive os inativos.
+  const servicos = useRequisicao(() => api.barbeiro.servicos(), []);
+  const atual = id ? servicos.dados?.find((s) => s.id === id) : undefined;
+
+  const [nome, setNome] = useState("");
+  const [duracao, setDuracao] = useState("");
+  const [preco, setPreco] = useState("");
+  const [erroPreco, setErroPreco] = useState<string | undefined>();
+  const [aviso, setAviso] = useState<string | undefined>();
+  const [salvando, setSalvando] = useState(false);
+
+  useEffect(() => {
+    if (!atual) return;
+    setNome(atual.nome);
+    setDuracao(String(atual.duracaoMinutos));
+    setPreco(atual.preco);
+  }, [atual]);
+
+  if (id && servicos.dados && !atual) {
+    return <Aviso>Serviço não encontrado.</Aviso>;
+  }
+
+  async function salvar() {
+    setAviso(undefined);
+    setErroPreco(undefined);
+
+    const decimal = paraDecimal(preco);
+    if (!decimal) {
+      setErroPreco("Use um valor como 40,00");
+      return;
+    }
+
+    setSalvando(true);
+    try {
+      const corpo = {
+        nome: nome.trim(),
+        duracaoMinutos: Number(duracao),
+        preco: decimal,
+      };
+      if (id) await api.barbeiro.atualizarServico(id, corpo);
+      else await api.barbeiro.criarServico(corpo);
+      router.push("/painel/servicos");
+    } catch (causa) {
+      setAviso((causa as ErroDaApi).mensagem || "Não foi possível salvar agora.");
+    }
+    setSalvando(false);
+  }
+
+  async function alternarAtivo() {
+    if (!id || !atual) return;
+    setSalvando(true);
+    try {
+      // Soft delete: some da lista pública e o histórico de quem já foi
+      // atendido sobrevive.
+      if (atual.ativo) await api.barbeiro.desativarServico(id);
+      else await api.barbeiro.atualizarServico(id, { ativo: true });
+      servicos.recarregar();
+    } catch (causa) {
+      setAviso((causa as ErroDaApi).mensagem || "Não foi possível salvar agora.");
+    }
+    setSalvando(false);
+  }
+
+  return (
+    <div className={estilos.pagina}>
+      <h1>{id ? "Editar serviço" : "Novo serviço"}</h1>
+
+      <Campo rotulo="Nome" valor={nome} onChange={setNome} />
+      <Campo rotulo="Duração em minutos" valor={duracao} onChange={setDuracao} />
+      <Campo
+        rotulo="Preço"
+        valor={preco}
+        onChange={(proximo) => {
+          setPreco(proximo);
+          setErroPreco(undefined);
+        }}
+        erro={erroPreco}
+      />
+
+      {aviso ? <Aviso>{aviso}</Aviso> : null}
+
+      <Botao carregando={salvando} onClick={salvar}>
+        Salvar
+      </Botao>
+
+      {atual ? (
+        <Botao variante="contorno" carregando={salvando} onClick={alternarAtivo}>
+          {atual.ativo ? "Desativar" : "Reativar"}
+        </Botao>
+      ) : null}
+    </div>
+  );
+}

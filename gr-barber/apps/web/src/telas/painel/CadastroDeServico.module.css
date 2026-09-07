@@ -1,0 +1,1 @@
+.pagina { display: grid; gap: var(--espaco-lg); padding: var(--espaco-lg); max-width: 480px; }

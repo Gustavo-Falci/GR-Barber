@@ -1,0 +1,2 @@
+.pagina { display: grid; gap: var(--espaco-lg); padding: var(--espaco-lg); max-width: 720px; }
+.topo { display: flex; align-items: center; justify-content: space-between; gap: var(--espaco-md); }
