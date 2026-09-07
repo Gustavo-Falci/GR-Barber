@@ -2726,6 +2726,19 @@ describe("novo agendamento no painel", () => {
 });
 ```
 
+**Quatro correções que a execução desta tarefa exigiu nos snippets acima**,
+todas já no código entregue e registradas aqui para quem reexecutar o
+plano: `ListaDeHorarios` ganhou uma prop `selecionada?: string`, porque
+o teste pede `current: true` e o componente não tinha como marcar botão
+atual; a lista de horários exibida funde a `hora` da URL, para o slot
+pré-preenchido pelo clique da agenda aparecer mesmo antes de haver
+serviço escolhido (a busca em si continua barrada sem serviço, porque a
+API exige `minItems: 1` em `servicoIds`); o rótulo da busca virou
+"Buscar cliente", porque "Buscar por nome ou telefone" contém "nome" e
+"telefone" e colidia com os rótulos do cadastro embutido; e a lista
+renderizada funde o cliente recém-criado, já que a busca não é refeita
+quando o cadastro muda o estado do dublê sem mudar o termo.
+
 - [ ] **Step 2: Rodar e ver falhar**
 
 Run: `pnpm --filter @gr-barber/web exec vitest run tests/telas/painel/novo-agendamento.test.tsx`
@@ -3137,9 +3150,15 @@ describe("detalhe do agendamento", () => {
 
   it("muda o status", async () => {
     const falso = semear();
+    // O original e capturado ANTES da troca: `montarPainel` passa
+    // `falso.barbeiro` por referencia, entao dentro do mock
+    // `falso.barbeiro.atualizarAgendamento` ja resolveria para o proprio
+    // mock — recursao infinita que o catch da tela engole, deixando o
+    // teste verde sem nunca provar que a chamada real aconteceu.
+    const original = falso.barbeiro.atualizarAgendamento;
     const atualizar = vi.fn(
       async (id: string, edicao: { status?: string; observacoes?: string | null }) =>
-        falso.barbeiro.atualizarAgendamento(id, edicao)
+        original(id, edicao)
     );
     falso.barbeiro.atualizarAgendamento = atualizar;
 
@@ -3152,9 +3171,15 @@ describe("detalhe do agendamento", () => {
 
   it("salva observações", async () => {
     const falso = semear();
+    // O original e capturado ANTES da troca: `montarPainel` passa
+    // `falso.barbeiro` por referencia, entao dentro do mock
+    // `falso.barbeiro.atualizarAgendamento` ja resolveria para o proprio
+    // mock — recursao infinita que o catch da tela engole, deixando o
+    // teste verde sem nunca provar que a chamada real aconteceu.
+    const original = falso.barbeiro.atualizarAgendamento;
     const atualizar = vi.fn(
       async (id: string, edicao: { status?: string; observacoes?: string | null }) =>
-        falso.barbeiro.atualizarAgendamento(id, edicao)
+        original(id, edicao)
     );
     falso.barbeiro.atualizarAgendamento = atualizar;
 
@@ -3490,9 +3515,12 @@ describe("clientes no painel", () => {
   it("o detalhe salva a edição", async () => {
     navegacaoFalsa.redefinir({ pathname: "/painel/clientes/c1", params: { id: "c1" } });
     const falso = semear();
+    // Original capturado antes da troca — ver a nota do mesmo padrao na
+    // Tarefa 9: sem isso o mock chama a si mesmo.
+    const original = falso.barbeiro.atualizarCliente;
     const atualizar = vi.fn(
       async (id: string, edicao: { nome?: string; telefone?: string }) =>
-        falso.barbeiro.atualizarCliente(id, edicao)
+        original(id, edicao)
     );
     falso.barbeiro.atualizarCliente = atualizar;
 
@@ -3971,9 +3999,10 @@ describe("serviços no painel", () => {
     // centavo.
     navegacaoFalsa.redefinir({ pathname: "/painel/servicos/novo" });
     const falso = semear();
+    const original = falso.barbeiro.criarServico;
     const criar = vi.fn(
       async (novo: { nome: string; duracaoMinutos: number; preco: string }) =>
-        falso.barbeiro.criarServico(novo)
+        original(novo)
     );
     falso.barbeiro.criarServico = criar;
 
@@ -4004,7 +4033,8 @@ describe("serviços no painel", () => {
   it("desativa e reativa", async () => {
     navegacaoFalsa.redefinir({ pathname: "/painel/servicos/s1", params: { id: "s1" } });
     const falso = semear();
-    const desativar = vi.fn(async (id: string) => falso.barbeiro.desativarServico(id));
+    const original = falso.barbeiro.desativarServico;
+    const desativar = vi.fn(async (id: string) => original(id));
     falso.barbeiro.desativarServico = desativar;
 
     montarPainel(<CadastroDeServico />, falso);
@@ -4271,8 +4301,9 @@ describe("configurações da barbearia", () => {
 
   it("salva os dados da barbearia", async () => {
     const falso = criarApiClientFalso();
+    const original = falso.barbeiro.atualizarMinhaBarbearia;
     const salvar = vi.fn(async (edicao: { nome?: string; endereco?: string | null }) =>
-      falso.barbeiro.atualizarMinhaBarbearia(edicao)
+      original(edicao)
     );
     falso.barbeiro.atualizarMinhaBarbearia = salvar;
 
@@ -4293,8 +4324,9 @@ describe("configurações da barbearia", () => {
     // linha" e "fechado" são estados diferentes pro cálculo de
     // disponibilidade. A tela edita os sete e envia os sete, sempre.
     const falso = criarApiClientFalso();
+    const original = falso.barbeiro.salvarHorarios;
     const salvar = vi.fn(async (horarios: HorarioSerializado[]) =>
-      falso.barbeiro.salvarHorarios(horarios)
+      original(horarios)
     );
     falso.barbeiro.salvarHorarios = salvar;
 
@@ -4308,8 +4340,9 @@ describe("configurações da barbearia", () => {
 
   it("fechar um dia limpa abertura e fechamento", async () => {
     const falso = criarApiClientFalso();
+    const original = falso.barbeiro.salvarHorarios;
     const salvar = vi.fn(async (horarios: HorarioSerializado[]) =>
-      falso.barbeiro.salvarHorarios(horarios)
+      original(horarios)
     );
     falso.barbeiro.salvarHorarios = salvar;
 
