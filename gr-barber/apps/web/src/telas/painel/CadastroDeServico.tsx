@@ -42,6 +42,11 @@ export function CadastroDeServico() {
     setPreco(atual.preco);
   }, [atual]);
 
+  // Sem isto, uma falha em servicos() deixava dados null pra sempre: o
+  // guard de "não encontrado" também depende de dados, então nenhum dos
+  // dois disparava e a tela ficava no formulário vazio sem dizer nada.
+  if (servicos.erro) return <Aviso>{servicos.erro.mensagem}</Aviso>;
+
   if (id && servicos.dados && !atual) {
     return <Aviso>Serviço não encontrado.</Aviso>;
   }

@@ -1,7 +1,7 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { criarApiClientFalso } from "@gr-barber/api-client";
+import { criarApiClientFalso, ErroDaApi } from "@gr-barber/api-client";
 import { CadastroDeServico } from "../../../src/telas/painel/CadastroDeServico";
 import { ListaDeServicos } from "../../../src/telas/painel/ListaDeServicos";
 import { navegacaoFalsa } from "../../ajudantes/navegacao";
@@ -139,5 +139,43 @@ describe("serviços no painel", () => {
         preco: "20.50",
       })
     );
+  });
+
+  // Adicional: "desativa e reativa" só cobre a metade que o nome
+  // promete — nunca abre um inativo nem clica "Reativar". Pina o
+  // método e o corpo, porque atualizarServico com o corpo errado
+  // ainda satisfaria uma asserção que só checasse a chamada.
+  it("reativa um serviço inativo com o payload certo", async () => {
+    navegacaoFalsa.redefinir({ pathname: "/painel/servicos/s2", params: { id: "s2" } });
+    const falso = semear();
+    const original = falso.barbeiro.atualizarServico;
+    const atualizar = vi.fn(
+      async (id: string, edicao: { ativo?: boolean }) => original(id, edicao)
+    );
+    falso.barbeiro.atualizarServico = atualizar;
+
+    montarPainel(<CadastroDeServico />, falso);
+
+    await userEvent.click(await screen.findByRole("button", { name: /reativar/i }));
+
+    await waitFor(() => expect(atualizar).toHaveBeenCalledWith("s2", { ativo: true }));
+  });
+
+  // Adicional: sem checar servicos.erro, uma falha ao buscar a lista
+  // deixava dados null pra sempre — o guard de "não encontrado"
+  // também depende de dados, então a tela ficava no formulário vazio
+  // sem dizer nada.
+  it("erro ao buscar serviços vira aviso, não formulário em branco", async () => {
+    navegacaoFalsa.redefinir({ pathname: "/painel/servicos/s1", params: { id: "s1" } });
+    const falso = semear();
+    falso.barbeiro.servicos = async () => {
+      throw new ErroDaApi(500, "erro_interno", "não foi possível carregar os serviços");
+    };
+
+    montarPainel(<CadastroDeServico />, falso);
+
+    expect(
+      await screen.findByText("não foi possível carregar os serviços")
+    ).toBeInTheDocument();
   });
 });
