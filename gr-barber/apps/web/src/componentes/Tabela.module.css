@@ -1,0 +1,5 @@
+.tabela { width: 100%; border-collapse: collapse; }
+.tabela th { text-align: left; font-size: var(--texto-xs); color: var(--cor-ink-soft); padding: var(--espaco-sm); border-bottom: var(--borda-padrao) solid var(--cor-ink); }
+.tabela td { padding: var(--espaco-sm); border-bottom: var(--borda-padrao) solid var(--cor-line); }
+.tabela td:first-child { padding: 0; }
+.tabela td:first-child button { width: 100%; text-align: left; padding: var(--espaco-sm); border: none; background: none; font: inherit; color: inherit; cursor: pointer; }
