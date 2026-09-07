@@ -128,4 +128,39 @@ describe("configurações da barbearia", () => {
       expect(screen.getByRole("button", { name: /salvar horários/i })).toBeInTheDocument()
     );
   });
+
+  // Apêndice: nenhum dos três handlers tinha trava de reenvio — um
+  // duplo clique enquanto a primeira chamada ainda está em voo mandaria
+  // duas requisições da mesma ação. A asserção é sobre quantas vezes o
+  // método da API foi chamado, não sobre o atributo `disabled` do
+  // botão: checar só o atributo prova o atributo, não o comportamento
+  // que ele existe pra garantir.
+  it("um segundo clique não dispara outra chamada enquanto a primeira está em voo", async () => {
+    const falso = criarApiClientFalso();
+    const original = falso.barbeiro.atualizarMinhaBarbearia;
+
+    // Trava a primeira chamada até o teste mandar liberar: sem isso
+    // não há como tentar um segundo clique enquanto a primeira ainda
+    // está em voo.
+    let liberar: () => void = () => {};
+    const pendente = new Promise<void>((resolve) => {
+      liberar = resolve;
+    });
+    const salvar = vi.fn(async (edicao: { nome?: string; endereco?: string | null }) => {
+      await pendente;
+      return original(edicao);
+    });
+    falso.barbeiro.atualizarMinhaBarbearia = salvar;
+
+    montarPainel(<ConfiguracoesDaBarbearia />, falso);
+
+    const botao = await screen.findByRole("button", { name: /salvar dados/i });
+    await userEvent.click(botao);
+    // Segundo clique enquanto a primeira chamada ainda não resolveu.
+    await userEvent.click(botao);
+
+    liberar();
+    await waitFor(() => expect(salvar).toHaveBeenCalled());
+    expect(salvar).toHaveBeenCalledTimes(1);
+  });
 });

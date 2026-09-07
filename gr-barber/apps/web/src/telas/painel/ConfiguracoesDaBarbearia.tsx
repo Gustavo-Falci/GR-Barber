@@ -34,6 +34,12 @@ export function ConfiguracoesDaBarbearia() {
   const [telefone, setTelefone] = useState(perfil.telefone ?? "");
   const [erro, setErro] = useState<Record<string, string | undefined>>({});
   const [aviso, setAviso] = useState<string | undefined>();
+  // Um só, e não um por bloco: só um bloco costuma estar em edição por
+  // vez, e os três já guardam estado separado — dividir a trava não
+  // ganharia isolamento nenhum, só triplicaria o boilerplate. Mesma
+  // escolha de DetalheDoAgendamento, que também tem vários botões e um
+  // `salvando` só.
+  const [salvando, setSalvando] = useState(false);
 
   // A API tem PATCH /barbearias/me e nenhum GET: a única leitura dos
   // dados da própria barbearia é a rota pública por slug. Daí o painel
@@ -55,6 +61,7 @@ export function ConfiguracoesDaBarbearia() {
   async function salvarDados() {
     setAviso(undefined);
     setErro({});
+    setSalvando(true);
     try {
       await api.barbeiro.atualizarMinhaBarbearia({
         nome: nomeDaBarbearia.trim(),
@@ -67,11 +74,18 @@ export function ConfiguracoesDaBarbearia() {
         return;
       }
       setAviso((causa as ErroDaApi).mensagem || "Não foi possível salvar agora.");
+    } finally {
+      // `finally`, e não uma linha solta no fim: o catch acima tem um
+      // `return` no meio (telefone inválido), que pularia uma linha
+      // solta e deixaria o botão travado depois do primeiro erro desse
+      // tipo.
+      setSalvando(false);
     }
   }
 
   async function salvarHorarios() {
     setAviso(undefined);
+    setSalvando(true);
     try {
       // A semana inteira, sempre: dia ausente do corpo vira fechado na
       // API, de propósito — "sem linha" e "fechado" são estados
@@ -80,12 +94,15 @@ export function ConfiguracoesDaBarbearia() {
       horariosSalvos.recarregar();
     } catch (causa) {
       setAviso((causa as ErroDaApi).mensagem || "Não foi possível salvar agora.");
+    } finally {
+      setSalvando(false);
     }
   }
 
   async function salvarPerfil() {
     setAviso(undefined);
     setErro({});
+    setSalvando(true);
     try {
       await api.barbeiro.atualizarMeuPerfil({
         nome: nome.trim(),
@@ -97,6 +114,8 @@ export function ConfiguracoesDaBarbearia() {
         return;
       }
       setAviso((causa as ErroDaApi).mensagem || "Não foi possível salvar agora.");
+    } finally {
+      setSalvando(false);
     }
   }
 
@@ -133,7 +152,9 @@ export function ConfiguracoesDaBarbearia() {
           erro={erro.telefoneDaBarbearia}
         />
         <Campo rotulo="Endereço" valor={endereco} onChange={setEndereco} />
-        <Botao onClick={salvarDados}>Salvar dados</Botao>
+        <Botao onClick={salvarDados} carregando={salvando}>
+          Salvar dados
+        </Botao>
       </section>
 
       <section>
@@ -176,7 +197,9 @@ export function ConfiguracoesDaBarbearia() {
             )}
           </div>
         ))}
-        <Botao onClick={salvarHorarios}>Salvar horários</Botao>
+        <Botao onClick={salvarHorarios} carregando={salvando}>
+          Salvar horários
+        </Botao>
       </section>
 
       <section>
@@ -189,7 +212,9 @@ export function ConfiguracoesDaBarbearia() {
           onChange={setTelefone}
           erro={erro.telefone}
         />
-        <Botao onClick={salvarPerfil}>Salvar perfil</Botao>
+        <Botao onClick={salvarPerfil} carregando={salvando}>
+          Salvar perfil
+        </Botao>
       </section>
     </div>
   );
