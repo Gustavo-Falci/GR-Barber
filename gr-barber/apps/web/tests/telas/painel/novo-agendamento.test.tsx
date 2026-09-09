@@ -218,4 +218,45 @@ describe("novo agendamento no painel", () => {
     expect(ultimaChamada?.[0]).toContain("data=2026-09-10");
     expect(ultimaChamada?.[0]).not.toContain("hora=");
   });
+
+  // O quarto caminho de salvamento do painel (ao lado dos três save
+  // buttons de Configurações, guardados em 8d044fa): o "Cadastrar"
+  // embutido de BuscaDeCliente não tinha `salvando` nem `carregando`, e
+  // um duplo clique disparava `criarCliente` duas vezes — a segunda
+  // voltaria 409 e a tela culparia o barbeiro por um duplicado que ela
+  // mesma acabou de criar. A asserção é sobre quantas vezes o método da
+  // API foi chamado, não sobre o atributo `disabled`, mesma razão de
+  // 8d044fa: o atributo prova o atributo, não o comportamento que ele
+  // existe pra garantir.
+  it("um segundo clique em Cadastrar (cliente embutido) não dispara outra chamada enquanto a primeira está em voo", async () => {
+    const falso = semear();
+    // Original capturado antes da troca — mesma nota de recursão das
+    // outras chamadas deste arquivo.
+    const original = falso.barbeiro.criarCliente;
+
+    let liberar: () => void = () => {};
+    const pendente = new Promise<void>((resolve) => {
+      liberar = resolve;
+    });
+    const criar = vi.fn(async (novo: Parameters<typeof original>[0]) => {
+      await pendente;
+      return original(novo);
+    });
+    falso.barbeiro.criarCliente = criar;
+
+    montarPainel(<NovoAgendamento agora={AGORA} />, falso);
+
+    await userEvent.click(await screen.findByRole("button", { name: /cadastrar novo/i }));
+    await userEvent.type(screen.getByLabelText(/nome/i), "Ana Souza");
+    await userEvent.type(screen.getByLabelText(/telefone/i), "11988887777");
+
+    const botao = screen.getByRole("button", { name: /^cadastrar$/i });
+    await userEvent.click(botao);
+    // Segundo clique enquanto a primeira chamada ainda não resolveu.
+    await userEvent.click(botao);
+
+    liberar();
+    await waitFor(() => expect(criar).toHaveBeenCalled());
+    expect(criar).toHaveBeenCalledTimes(1);
+  });
 });

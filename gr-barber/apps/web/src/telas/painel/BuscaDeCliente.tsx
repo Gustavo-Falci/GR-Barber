@@ -25,6 +25,13 @@ export function BuscaDeCliente({
   const [telefone, setTelefone] = useState("");
   const [erroTelefone, setErroTelefone] = useState<string | undefined>();
   const [aviso, setAviso] = useState<string | undefined>();
+  // O quarto caminho de salvamento do painel, ao lado dos três save
+  // buttons de Configurações (8d044fa) — este ficou de fora daquele
+  // fix por viver embutido em NovoAgendamento, não numa tela própria.
+  // Sem a trava, um duplo clique dispara `criarCliente` duas vezes; a
+  // segunda volta 409 e a tela culparia o barbeiro por um duplicado que
+  // ela mesma acabou de criar.
+  const [salvando, setSalvando] = useState(false);
 
   const clientes = useRequisicao(() => api.barbeiro.clientes(busca), [busca]);
 
@@ -40,6 +47,12 @@ export function BuscaDeCliente({
       : listaBase;
 
   async function cadastrar() {
+    // Trava explícita, e não só o `carregando` no botão: um `disabled`
+    // que só existe depois de um re-render deixa a discriminação
+    // depender de quando o React agenda esse render. Isto barra o
+    // segundo clique não importa o timing.
+    if (salvando) return;
+
     setAviso(undefined);
     setErroTelefone(undefined);
 
@@ -55,6 +68,7 @@ export function BuscaDeCliente({
       return;
     }
 
+    setSalvando(true);
     try {
       const criado = await api.barbeiro.criarCliente({ nome: nome.trim(), telefone: numero });
       setCadastrando(false);
@@ -74,6 +88,7 @@ export function BuscaDeCliente({
         setAviso(erro.mensagem || "Não foi possível cadastrar agora.");
       }
     }
+    setSalvando(false);
   }
 
   return (
@@ -116,7 +131,9 @@ export function BuscaDeCliente({
             }}
             erro={erroTelefone}
           />
-          <Botao onClick={cadastrar}>Cadastrar</Botao>
+          <Botao onClick={cadastrar} carregando={salvando}>
+            Cadastrar
+          </Botao>
         </div>
       ) : (
         <Botao variante="contorno" onClick={() => setCadastrando(true)}>
