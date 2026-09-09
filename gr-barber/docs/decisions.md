@@ -72,3 +72,32 @@ tradução do código.
 datados, e corrigi-los faria cada um descrever um código que não existia
 naquele dia. Ao seguir um caminho `rotas/` num documento antigo, leia
 `routers/`.
+
+## Preencher formulário com dado buscado: durante o render, não em `useEffect`
+
+Quatro telas do painel — `ConfiguracoesDaBarbearia`, `CadastroDeServico`,
+`DetalheDoCliente` e `DetalheDoAgendamento` — sincronizam o estado do
+formulário a partir do dado buscado durante a própria renderização, e
+não num `useEffect`: comparam o dado contra uma referência rastreada
+num `useState` e chamam `setState` só quando ela muda.
+
+Um efeito roda depois do commit. Entre o commit (que já mostra o
+formulário, com o campo vazio) e o efeito (que preenche), existe uma
+janela em que a tela está visível e vazia — e quem digita nela perde a
+corrida: o preenchimento chega por cima do que já foi escrito. Foi
+reproduzido sob carga real como `nome: 'GR BarberGR Barber Centro'` em
+`ConfiguracoesDaBarbearia` e `'João SilvaJoão da Silva'` em
+`DetalheDoCliente` — o valor buscado concatenado com o que já estava no
+campo, não um timeout qualquer. Sincronizar durante a renderização
+fecha a janela: o React descarta esse render e refaz com o valor certo
+antes de pintar qualquer coisa na tela, então não existe commit
+intermediário pra ver ou agir sobre ele. A comparação contra a
+referência rastreada é o que evita o loop de renderização.
+
+**Pegadinha conhecida**: os testes que fixam essa regra (a sonda em
+`apps/web/tests/ajudantes/sondaDeCorrida.tsx`) dependem de uma garantia
+do React, não de um timer — dentro de UM commit, todo `useLayoutEffect`
+roda antes de qualquer `useEffect`, que é sempre passivo e adiado. Um
+upgrade de major do React deveria reverificar essas sondas por mutação
+(voltar a versão `useEffect` e confirmar que o teste falha de novo),
+não só rodar a suíte e ver verde.
