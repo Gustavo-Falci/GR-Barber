@@ -237,4 +237,14 @@ describe("detalhe do agendamento", () => {
       expect(atualizar).toHaveBeenCalledWith("a1", { observacoes: "cliente atrasa" })
     );
   });
+
+  it("os botões de status mostram o rótulo traduzido, não o enum cru", async () => {
+    montarPainel(<DetalheDoAgendamento />, semear());
+
+    expect(await screen.findByRole("button", { name: "concluído" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "não compareceu" })).toBeInTheDocument();
+    // O enum cru não pode aparecer em nenhum botão.
+    expect(screen.queryByRole("button", { name: "concluido" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "no_show" })).not.toBeInTheDocument();
+  });
 });

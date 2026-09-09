@@ -40,7 +40,23 @@ export function ListaDeClientes({ agora = new Date() }: { agora?: Date }) {
     [de, ate]
   );
 
-  if (clientes.erro) return <Aviso>{clientes.erro.mensagem}</Aviso>;
+  if (clientes.erro) {
+    return <Aviso>{clientes.erro.mensagem || "Não foi possível carregar os clientes agora."}</Aviso>;
+  }
+  // `recentes.erro`, ao contrário do `daSemana.erro` da agenda (que fica
+  // de fora de propósito, ver o comentário lá), não pode ficar de fora
+  // aqui: quando essa chamada falha, `recentes.dados` fica `null` e
+  // `ultimoDe` devolve "—" pra TODO cliente — e "—" não é "sem dado
+  // ainda", é a alegação de que ninguém aparece há três meses. Uma
+  // falha de carregamento virando essa afirmação confiante e falsa é
+  // pior do que a tela inteira parar num aviso.
+  if (recentes.erro) {
+    return (
+      <Aviso>
+        {recentes.erro.mensagem || "Não foi possível carregar os últimos agendamentos agora."}
+      </Aviso>
+    );
+  }
 
   function ultimoDe(clienteId: string): string {
     const datas = (recentes.dados ?? [])
@@ -63,7 +79,12 @@ export function ListaDeClientes({ agora = new Date() }: { agora?: Date }) {
         valor={digitado}
         onChange={(proximo) => {
           setDigitado(proximo);
-          router.push(
+          // replace, não push: cada tecla mudaria a URL, e um push por
+          // tecla empilharia uma entrada no histórico por tecla — digitar
+          // "joão" deixaria quatro apertos de voltar só pra sair da tela.
+          // replace mantém a busca linkável (o que o filtro na URL
+          // existe pra dar) sem empilhar nada.
+          router.replace(
             proximo ? `/painel/clientes?busca=${encodeURIComponent(proximo)}` : "/painel/clientes"
           );
         }}

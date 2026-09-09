@@ -10,6 +10,7 @@ import { Campo } from "../../componentes/Campo";
 import { Tabela } from "../../componentes/Tabela";
 import { useRequisicao } from "../../api/useRequisicao";
 import { formatarDataLonga } from "../../formato/datas";
+import { rotuloDoStatus } from "../../formato/status";
 import { useApiDoPainel } from "../../painel/ProvedorDoPainel";
 import estilos from "./DetalheDoCliente.module.css";
 
@@ -85,7 +86,15 @@ export function DetalheDoCliente() {
       });
       cliente.recarregar();
     } catch (causa) {
-      setAviso((causa as ErroDaApi).mensagem || "Não foi possível salvar agora.");
+      const erro = causa as ErroDaApi;
+      // Mesma cópia de CadastroDeCliente.tsx pro `conflito` de telefone:
+      // um barbeiro editando um cliente não deve ver uma mensagem pior
+      // do que quem está criando um do zero pro mesmo caso.
+      setAviso(
+        erro.codigo === "conflito"
+          ? "Esse telefone já tem cadastro. Procure por ele na lista."
+          : erro.mensagem || "Não foi possível salvar agora."
+      );
     }
     setSalvando(false);
   }
@@ -124,7 +133,7 @@ export function DetalheDoCliente() {
             formatarDataLonga(agendamento.data),
             agendamento.horaInicio,
             agendamento.servicos.map((s) => s.nome).join(" + "),
-            agendamento.status,
+            rotuloDoStatus(agendamento.status),
           ],
         }))}
       />

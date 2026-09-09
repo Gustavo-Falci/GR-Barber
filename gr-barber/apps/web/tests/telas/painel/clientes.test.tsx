@@ -84,17 +84,22 @@ describe("clientes no painel", () => {
     expect(await screen.findByLabelText(/buscar/i)).toHaveValue("marcos");
   });
 
-  it("digitar na busca põe o termo na URL", async () => {
-    // ?busca= na URL: recarregar não perde o filtro, e o resultado é
-    // linkável — a mesma razão que fez o fluxo do cliente pôr o passo
-    // na rota.
+  it("digitar na busca põe o termo na URL, sem empilhar histórico", async () => {
+    // replace, e não push: ?busca= na URL mantém a busca linkável e
+    // recarregável — a mesma razão que fez o fluxo do cliente pôr o
+    // passo na rota — mas um push por tecla empilharia uma entrada de
+    // histórico por tecla, e "joão" custaria quatro apertos de voltar
+    // só pra sair da tela. Atualizado de `push` pra `replace` pela
+    // revisão de branch (item 3): a asserção antiga cobria exatamente o
+    // comportamento que o fix remove.
     montarPainel(<ListaDeClientes agora={AGORA} />, semear());
 
     await userEvent.type(await screen.findByLabelText(/buscar/i), "marcos");
 
     await waitFor(() =>
-      expect(navegacaoFalsa.push).toHaveBeenCalledWith("/painel/clientes?busca=marcos")
+      expect(navegacaoFalsa.replace).toHaveBeenCalledWith("/painel/clientes?busca=marcos")
     );
+    expect(navegacaoFalsa.push).not.toHaveBeenCalled();
   });
 
   it("abrir uma linha vai pro detalhe", async () => {
@@ -306,5 +311,70 @@ describe("clientes no painel", () => {
         expect.objectContaining({ nome: "João da Silva" })
       )
     );
+  });
+
+  it("o histórico do detalhe mostra o status traduzido, não o enum cru", async () => {
+    navegacaoFalsa.redefinir({ pathname: "/painel/clientes/c1", params: { id: "c1" } });
+    montarPainel(<DetalheDoCliente />, semear());
+
+    // O agendamento de João em `semear()` tem status "concluido".
+    expect(await screen.findByText("concluído")).toBeInTheDocument();
+    expect(screen.queryByText("concluido")).not.toBeInTheDocument();
+  });
+
+  // Mesma nota das outras mensagens vazias neste arquivo: sem `mensagem`
+  // vazia, "Não foi possível salvar agora." (o fallback genérico) e a
+  // cópia amigável do `conflito` seriam dois textos plausíveis demais
+  // pra provar qual ramo produziu qual — aqui a mensagem vazia garante
+  // que só o branch `codigo === "conflito"` pode produzir a cópia
+  // esperada; sem ele, o teste veria o fallback genérico, não o texto
+  // cru da API (que também é "").
+  it("editar um cliente com telefone repetido usa a mesma cópia do cadastro, não o fallback genérico", async () => {
+    navegacaoFalsa.redefinir({ pathname: "/painel/clientes/c1", params: { id: "c1" } });
+    const falso = semear();
+    falso.barbeiro.atualizarCliente = async () => {
+      throw new ErroDaApi(409, "conflito", "");
+    };
+    montarPainel(<DetalheDoCliente />, falso);
+
+    await screen.findByDisplayValue("João Silva");
+    await userEvent.click(screen.getByRole("button", { name: /salvar/i }));
+
+    expect(
+      await screen.findByText("Esse telefone já tem cadastro. Procure por ele na lista.")
+    ).toBeInTheDocument();
+  });
+
+  // Representa os oito pontos de fallback do item 1 da revisão de
+  // branch: um erro sem `mensagem` (o corpo que a API manda pra 401,
+  // por exemplo) não pode virar um Aviso vazio.
+  it("uma falha ao carregar clientes sem mensagem cai no fallback, não numa caixa vazia", async () => {
+    const falso = semear();
+    falso.barbeiro.clientes = async () => {
+      throw new ErroDaApi(500, "erro_interno", "");
+    };
+    montarPainel(<ListaDeClientes agora={AGORA} />, falso);
+
+    expect(
+      await screen.findByText(/não foi possível carregar os clientes agora/i)
+    ).toBeInTheDocument();
+  });
+
+  // Mutação testada manualmente: comentar o `if (recentes.erro)` faz
+  // este teste falhar mostrando "—" pra João em vez do aviso — a lista
+  // continua renderizando normalmente porque só `clientes.erro` travava
+  // a tela antes deste fix, e a chamada de intervalo falhando não
+  // impedia `clientes.dados` de chegar.
+  it("uma falha ao carregar os últimos agendamentos vira aviso, não um '—' confiante em toda linha", async () => {
+    const falso = semear();
+    falso.barbeiro.agendamentosDoIntervalo = async () => {
+      throw new ErroDaApi(500, "erro_interno", "");
+    };
+    montarPainel(<ListaDeClientes agora={AGORA} />, falso);
+
+    expect(
+      await screen.findByText(/não foi possível carregar os últimos agendamentos agora/i)
+    ).toBeInTheDocument();
+    expect(screen.queryByText("João Silva")).not.toBeInTheDocument();
   });
 });

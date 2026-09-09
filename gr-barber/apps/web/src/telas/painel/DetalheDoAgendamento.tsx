@@ -10,6 +10,7 @@ import { Chip } from "../../componentes/Chip";
 import { formatarPreco } from "../../componentes/ItemDeServico";
 import { useRequisicao } from "../../api/useRequisicao";
 import { formatarDataLonga } from "../../formato/datas";
+import { rotuloDoStatus } from "../../formato/status";
 import { useApiDoPainel } from "../../painel/ProvedorDoPainel";
 import estilos from "./DetalheDoAgendamento.module.css";
 
@@ -98,7 +99,7 @@ export function DetalheDoAgendamento() {
               onClick={() => aplicar({ status })}
               carregando={salvando}
             >
-              {status}
+              {rotuloDoStatus(status)}
             </Botao>
           ))}
         </div>

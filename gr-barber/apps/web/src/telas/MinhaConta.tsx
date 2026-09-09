@@ -11,24 +11,9 @@ import { Cartao } from "../componentes/Cartao";
 import { Chip } from "../componentes/Chip";
 import { caminhoDoPasso } from "../fluxo/passos";
 import { formatarDataLonga } from "../formato/datas";
+import { rotuloDoStatus } from "../formato/status";
 import { sessaoDoCliente } from "../sessao/armazenamento";
 import estilos from "./MinhaConta.module.css";
-
-// O enum da API é vocabulário de banco, não de conversa: `no_show` e
-// `concluido` em cru numa tela em português destoam do resto, e um
-// status novo que a tela ainda não conhece cai no próprio valor cru em
-// vez de quebrar.
-const ROTULO_DO_STATUS: Record<string, string> = {
-  pendente: "pendente",
-  confirmado: "confirmado",
-  concluido: "concluído",
-  cancelado: "cancelado",
-  no_show: "não compareceu",
-};
-
-function rotuloDoStatus(status: string): string {
-  return ROTULO_DO_STATUS[status] ?? status;
-}
 
 export function MinhaConta() {
   const { slug } = useParams<{ slug: string }>();
