@@ -1,0 +1,4 @@
+.pagina { display: grid; gap: var(--espaco-lg); padding: var(--espaco-lg); max-width: 720px; }
+.semana { display: grid; grid-template-columns: repeat(7, 1fr); gap: var(--espaco-xs); list-style: none; margin: 0; padding: 0; }
+.semana button { width: 100%; padding: var(--espaco-sm); border: var(--borda-padrao) solid var(--cor-ink); border-radius: var(--raio-sm); background: var(--cor-surface); font-size: var(--texto-xs); cursor: pointer; }
+.semana button[aria-current="date"] { background: var(--cor-ink); color: var(--cor-paper); }

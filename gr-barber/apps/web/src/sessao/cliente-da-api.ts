@@ -1,5 +1,9 @@
 import { criarApiClient } from "@gr-barber/api-client";
-import { sessaoDoBarbeiro, sessaoDoCliente } from "./armazenamento";
+import {
+  encerrarSessaoDoBarbeiro,
+  sessaoDoBarbeiro,
+  sessaoDoCliente,
+} from "./armazenamento";
 
 // A URL da API muda por ambiente e é lida no navegador, então precisa
 // do prefixo NEXT_PUBLIC_. O padrão é o dev local da API.
@@ -32,4 +36,41 @@ export function apiDoCliente(
     aoExpirarSessao: () => sessao.limpar(),
     fetch: fetchInjetado,
   });
+}
+
+// Um 401 pode chegar de qualquer tela guardada, não só da checagem
+// inicial de sessão — e este módulo, que monta o client uma vez em
+// `ProvedorDoPainel`, não tem router. `SessaoDoPainel` empresta o
+// próprio `sair` (que já limpa a sessão e navega) registrando-o aqui
+// assim que monta; um registro só, porque só existe um painel montado
+// por vez. Sem registro nenhum (SSR, ou um client de teste construído
+// fora da árvore do painel), o 401 ainda limpa a sessão — só não navega.
+let saidaDoPainel: (() => void) | null = null;
+
+export function registrarSaidaDoPainel(sair: (() => void) | null): void {
+  saidaDoPainel = sair;
+}
+
+// Dois escopos, e não só `.barbeiro`: a disponibilidade é rota pública
+// por slug e não tem gêmea no escopo do barbeiro, mas a tela de novo
+// agendamento precisa dela. Montar um segundo client dentro da tela
+// duplicaria baseUrl e aoExpirarSessao. O `apiDoBarbeiro` acima
+// continua para quem só quer o escopo protegido.
+export function apiDoPainel(fetchInjetado?: typeof globalThis.fetch) {
+  const client = criarApiClient({
+    baseUrl: BASE_URL,
+    obterToken: () => sessaoDoBarbeiro.ler(),
+    // As duas chaves, e não só o token: um 401 no meio da sessão
+    // termina a sessão do mesmo jeito que um "Sair" — e um logout que
+    // esquecesse o slug deixaria lixo que a sessão seguinte leria como
+    // se fosse dela (ver o comentário de `encerrarSessaoDoBarbeiro` em
+    // armazenamento.ts). Navegar é responsabilidade de quem se
+    // registrou acima.
+    aoExpirarSessao: () => {
+      encerrarSessaoDoBarbeiro();
+      saidaDoPainel?.();
+    },
+    fetch: fetchInjetado,
+  });
+  return { barbeiro: client.barbeiro, publico: client.publico };
 }

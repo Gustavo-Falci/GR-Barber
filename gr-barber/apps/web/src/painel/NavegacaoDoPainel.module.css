@@ -1,0 +1,23 @@
+.barra {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-md);
+  padding: var(--espaco-md) var(--espaco-lg);
+  border-bottom: var(--borda-padrao) solid var(--cor-ink);
+  background: var(--cor-paper);
+}
+
+.marca {
+  font-family: var(--fonte-display), system-ui, sans-serif;
+  font-size: var(--texto-lg);
+}
+
+.links {
+  display: flex;
+  gap: var(--espaco-md);
+  margin-inline-end: auto;
+}
+
+.links a[aria-current="page"] {
+  text-decoration: underline;
+}

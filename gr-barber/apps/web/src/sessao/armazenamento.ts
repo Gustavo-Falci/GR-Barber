@@ -38,3 +38,15 @@ export const sessaoDoBarbeiro = sessaoNaChave("sessao.barbeiro");
 export function sessaoDoCliente(slug: string): Sessao {
   return sessaoNaChave(`sessao.cliente.${slug}`);
 }
+
+// O slug não vem do GET /me, que devolve só barbeariaId — ele chega no
+// SessaoBarbeiro do login e do signup, e a tela de novo agendamento
+// precisa dele para a disponibilidade, que é rota pública por slug.
+export const sessaoDaBarbearia = sessaoNaChave("sessao.barbearia");
+
+// Uma função e não duas chamadas soltas: um logout que esquecesse o
+// slug deixaria lixo que a próxima sessão leria como se fosse dela.
+export function encerrarSessaoDoBarbeiro(): void {
+  sessaoDoBarbeiro.limpar();
+  sessaoDaBarbearia.limpar();
+}

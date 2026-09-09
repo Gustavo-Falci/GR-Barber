@@ -44,7 +44,16 @@ O que falta pro GR Barber sair do papel, mais ou menos em ordem:
      existe porque "Meus agendamentos" exige token e nenhuma tela do
      mapa fazia login. Ela cobre também o primeiro acesso, sem o qual
      ninguém jamais teria senha.
-   - **C — painel web do barbeiro (6 telas)**.
+   - **C — painel web do barbeiro: pronto.** PR *(pendente — ainda não
+     aberto)*, merge *(pendente)*, em 2026-09-08. Doze rotas sob
+     `/painel`, não seis: quatro são telas que o mapa deu ao app do
+     barbeiro pra mesma função (detalhe e criação de agendamento,
+     cadastro de cliente, cadastro de serviço), e a décima segunda —
+     criar barbearia — o mapa não tem em lugar nenhum, porque o
+     primeiro acesso estava na tela de login do sub-projeto D e o
+     painel chegou primeiro. Fecha também o quarto critério da spec da
+     fundação: a vitrine `/primitivos` sai, substituída pelas telas de
+     verdade. A suíte foi de 463 pra 571 testes.
    - **D — app do barbeiro no Expo (10 telas)**.
 
    Duas decisões do sub-projeto A que mudam o resto do roteiro: o
@@ -117,3 +126,31 @@ O que falta pro GR Barber sair do papel, mais ou menos em ordem:
   quer dizer que já está na fila pra ser feito. Empurrar a checagem
   pra dentro do `criarAgendamento` mudaria comportamento da fase 4,
   que já tem testes escritos sem essa regra.
+- **Uma barbearia com o slug `painel` perde o próprio link público.** O
+  painel vive sob o prefixo `/painel`, e esse é um segmento estático —
+  que vence a rota dinâmica `[slug]` do fluxo do cliente. A validação
+  de slug na API é `^[a-z0-9-]{3,80}$`, sem lista de reservados, então
+  `painel` é aceito no cadastro e fica inalcançável depois, sem erro em
+  lugar nenhum. O prefixo reduziu o problema de pouco mais de uma
+  dezena de slugs sombreados (um por rota que o painel teria criado na
+  raiz) pra exatamente um, mas não o eliminou. Fechar de verdade é uma
+  lista de reservados na validação de slug — mudança de API, fora do
+  escopo deste sub-projeto.
+- **O painel lê a própria barbearia pela rota pública.** A API tem
+  `PATCH /barbearias/me` e nenhum `GET`: a única leitura dos dados da
+  barbearia é `GET /barbearias/:slug`, a mesma rota que a tela de
+  agendamento do cliente usa. A tela de Configurações do painel depende
+  então de uma rota pública pra exibir o que ela própria escreve. Fecha
+  com um `GET /barbearias/me`.
+- **O slug da barbearia é gravado uma vez, no login, e não existe jeito
+  de trocá-lo.** `GET /me` devolve `barbeariaId` e nenhum slug, e a
+  disponibilidade é rota pública endereçada por slug — por isso o
+  painel grava o slug no `localStorage`, ao lado do token, no momento
+  do login. Uma versão anterior desta dívida descrevia uma aba antiga
+  sobrevivendo com o slug velho depois de uma troca em Configurações —
+  isso não pode acontecer: `PATCH /barbearias/me` exclui `slug` de
+  propósito (`apps/api/src/routers/barbearias.ts`), e a tela de
+  Configurações não tem campo pra ele. A dívida real é essa ausência —
+  um barbeiro que erra o slug no cadastro, ou quer mudar o nome do
+  salão no link, fica preso nele. Fecha com uma rota de troca de slug
+  — mudança de API — e o campo correspondente em Configurações.

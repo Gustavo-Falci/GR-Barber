@@ -91,3 +91,122 @@ describe("criarApiClientFalso", () => {
     expect(segundo.estado.agendamentos).toHaveLength(0);
   });
 });
+
+describe("dublê — escopo do barbeiro", () => {
+  it("lista todos os clientes semeados", async () => {
+    const falso = criarApiClientFalso({
+      clientes: [
+        { id: "c1", nome: "João Silva", telefone: "(11) 99999-0001", email: null, temConta: false },
+        { id: "c2", nome: "Marcos Reis", telefone: "(11) 99999-0002", email: null, temConta: false },
+      ],
+    });
+
+    expect(await falso.barbeiro.clientes()).toHaveLength(2);
+  });
+
+  it("filtra por nome sem se importar com caixa", async () => {
+    const falso = criarApiClientFalso({
+      clientes: [
+        { id: "c1", nome: "João Silva", telefone: "(11) 99999-0001", email: null, temConta: false },
+        { id: "c2", nome: "Marcos Reis", telefone: "(11) 99999-0002", email: null, temConta: false },
+      ],
+    });
+
+    const achados = await falso.barbeiro.clientes("marcos");
+
+    expect(achados.map((c) => c.id)).toEqual(["c2"]);
+  });
+
+  it("filtra por telefone comparando dígito a dígito", async () => {
+    // A API compara com regexp_replace no SQL: quem digita 999990002
+    // acha (11) 99999-0002, sem parêntese nem traço.
+    const falso = criarApiClientFalso({
+      clientes: [
+        { id: "c1", nome: "João Silva", telefone: "(11) 99999-0001", email: null, temConta: false },
+        { id: "c2", nome: "Marcos Reis", telefone: "(11) 99999-0002", email: null, temConta: false },
+      ],
+    });
+
+    const achados = await falso.barbeiro.clientes("999990002");
+
+    expect(achados.map((c) => c.id)).toEqual(["c2"]);
+  });
+
+  it("cria cliente novo e o devolve na lista", async () => {
+    const falso = criarApiClientFalso({ clientes: [] });
+
+    const criado = await falso.barbeiro.criarCliente({
+      nome: "Ana Souza",
+      telefone: "(11) 98888-7777",
+    });
+
+    expect(criado.nome).toBe("Ana Souza");
+    expect(await falso.barbeiro.clientes()).toHaveLength(1);
+  });
+
+  it("recusa telefone já cadastrado com conflito", async () => {
+    // É o caso comum do walk-in: quem chega já existe, criado pelo
+    // upsert do agendamento público.
+    const falso = criarApiClientFalso({
+      clientes: [
+        { id: "c1", nome: "João Silva", telefone: "(11) 99999-0001", email: null, temConta: false },
+      ],
+    });
+
+    await expect(
+      falso.barbeiro.criarCliente({ nome: "João", telefone: "(11) 99999-0001" })
+    ).rejects.toMatchObject({ codigo: "conflito" });
+  });
+
+  it("acha cliente por id na lista inteira", async () => {
+    const falso = criarApiClientFalso({
+      clientes: [
+        { id: "c1", nome: "João Silva", telefone: "(11) 99999-0001", email: null, temConta: false },
+        { id: "c2", nome: "Marcos Reis", telefone: "(11) 99999-0002", email: null, temConta: false },
+      ],
+    });
+
+    const achado = await falso.barbeiro.cliente("c2");
+
+    expect(achado.nome).toBe("Marcos Reis");
+    expect(achado.agendamentos).toEqual([]);
+  });
+
+  it("devolve 404 para cliente que não existe", async () => {
+    const falso = criarApiClientFalso({ clientes: [] });
+
+    await expect(falso.barbeiro.cliente("c9")).rejects.toBeInstanceOf(ErroDaApi);
+  });
+
+  it("o signup devolve a barbearia que foi enviada", async () => {
+    const falso = criarApiClientFalso();
+
+    const sessao = await falso.barbeiro.signup({
+      barbearia: { nome: "Barbearia do Zé", slug: "barbearia-do-ze" },
+      barbeiro: { nome: "Zé", email: "ze@barbearia.com", senha: "segredo123" },
+    });
+
+    expect(sessao.barbearia.slug).toBe("barbearia-do-ze");
+    expect(sessao.barbearia.nome).toBe("Barbearia do Zé");
+    expect(sessao.barbeiro.nome).toBe("Zé");
+  });
+
+  it("o agendamento do barbeiro carrega o cliente que ele escolheu", async () => {
+    const falso = criarApiClientFalso({
+      clientes: [
+        { id: "c1", nome: "João Silva", telefone: "(11) 99999-0001", email: null, temConta: false },
+        { id: "c2", nome: "Marcos Reis", telefone: "(11) 99999-0002", email: null, temConta: false },
+      ],
+    });
+
+    const criado = await falso.barbeiro.criarAgendamento({
+      barbeiroId: "bb1",
+      clienteId: "c2",
+      servicoIds: ["s1"],
+      data: "2026-09-08",
+      horaInicio: "09:00",
+    });
+
+    expect(criado.cliente.nome).toBe("Marcos Reis");
+  });
+});

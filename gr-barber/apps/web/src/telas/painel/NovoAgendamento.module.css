@@ -1,0 +1,4 @@
+.pagina { display: grid; gap: var(--espaco-lg); padding: var(--espaco-lg); max-width: 1080px; }
+.grade { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--espaco-lg); }
+.bloco { display: grid; gap: var(--espaco-sm); padding: var(--espaco-md); border: var(--borda-padrao) solid var(--cor-ink); border-radius: var(--raio-md); background: var(--cor-surface); align-content: start; }
+.passado { display: grid; gap: var(--espaco-xs); padding: var(--espaco-md); border: var(--borda-padrao) solid var(--cor-ink); border-radius: var(--raio-md); background: var(--cor-pale-yellow); }
