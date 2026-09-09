@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import type { ErroDaApi } from "@gr-barber/api-client";
 import { Aviso } from "../../componentes/Aviso";
@@ -35,12 +35,28 @@ export function CadastroDeServico() {
   const [aviso, setAviso] = useState<string | undefined>();
   const [salvando, setSalvando] = useState(false);
 
-  useEffect(() => {
-    if (!atual) return;
+  // Sincronizado durante a renderização, e não num `useEffect`: mesmo
+  // mecanismo do fix em ConfiguracoesDaBarbearia (181514d) — um efeito
+  // só roda depois do commit, e entre o commit e o efeito o formulário
+  // já teria aparecido com os campos vazios, aberto a digitar contra o
+  // preenchimento assíncrono.
+  //
+  // O rastreador aqui é `atual` (o item achado na lista), não
+  // `servicos.dados` (a lista inteira): o dublê de teste devolve a
+  // mesma referência de array em toda chamada a `servicos()` (só o item
+  // dentro dela é substituído por `{...antigo, ...edicao}`), então
+  // `servicos.dados !== anterior` nunca dispararia depois de
+  // `servicos.recarregar()`. `atual`, por vir de `.find()` sobre esse
+  // array, aponta pro objeto recém-substituído — muda de referência
+  // sempre que o serviço é editado ou reativado, com ou sem essa
+  // peculiaridade do dublê.
+  const [atualSincronizado, setAtualSincronizado] = useState<typeof atual>(undefined);
+  if (atual && atual !== atualSincronizado) {
+    setAtualSincronizado(atual);
     setNome(atual.nome);
     setDuracao(String(atual.duracaoMinutos));
     setPreco(atual.preco);
-  }, [atual]);
+  }
 
   // Sem isto, uma falha em servicos() deixava dados null pra sempre: o
   // guard de "não encontrado" também depende de dados, então nenhum dos

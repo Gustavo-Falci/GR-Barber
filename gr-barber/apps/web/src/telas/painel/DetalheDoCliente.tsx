@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import type { ErroDaApi } from "@gr-barber/api-client";
 import { normalizarTelefoneObrigatorio, TelefoneInvalido } from "@gr-barber/formato";
@@ -28,12 +28,26 @@ export function DetalheDoCliente() {
   const [aviso, setAviso] = useState<string | undefined>();
   const [salvando, setSalvando] = useState(false);
 
-  useEffect(() => {
-    if (!cliente.dados) return;
+  // Sincronizado durante a renderização, e não num `useEffect`: um
+  // efeito só roda depois do commit, e entre o commit e o efeito o
+  // formulário já teria aparecido com os campos vazios — digitar nessa
+  // janela corre contra o preenchimento e perde o que a pessoa
+  // escreveu. Mesmo mecanismo do fix em ConfiguracoesDaBarbearia
+  // (181514d): a trava `!cliente.dados` mais abaixo olha se os dados
+  // chegaram, não se o estado local já foi sincronizado com eles — por
+  // isso não fecha essa janela sozinha. Sincronizar aqui evita o commit
+  // intermediário: o React descarta essa renderização e refaz com o
+  // valor certo antes de pintar qualquer coisa. O `!==` contra o
+  // rastreador é o que impede o loop, e também é o que faz
+  // `cliente.recarregar()` (depois de salvar) sincronizar de novo — a
+  // resposta fresca do GET não é `===` à anterior.
+  const [clienteSincronizado, setClienteSincronizado] = useState<typeof cliente.dados>(null);
+  if (cliente.dados && cliente.dados !== clienteSincronizado) {
+    setClienteSincronizado(cliente.dados);
     setNome(cliente.dados.nome);
     setTelefone(cliente.dados.telefone);
     setEmail(cliente.dados.email ?? "");
-  }, [cliente.dados]);
+  }
 
   if (cliente.erro) {
     return (

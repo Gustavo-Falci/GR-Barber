@@ -1,4 +1,4 @@
-import { screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { criarApiClientFalso, ErroDaApi } from "@gr-barber/api-client";
@@ -208,5 +208,119 @@ describe("clientes no painel", () => {
     montarPainel(<DetalheDoCliente />, falso);
 
     expect(await screen.findByText("Cliente não encontrado.")).toBeInTheDocument();
+  });
+
+  // Apêndice: prova a corrida descrita em DetalheDoCliente.tsx sem
+  // depender de sorte de agendamento do event loop. A tela tem uma
+  // trava `if (!cliente.dados) return <Carregando>` que só olha se os
+  // dados chegaram — não se `nome`/`telefone`/`email` já foram
+  // sincronizados a partir deles. Entre o commit que sai da trava e o
+  // efeito de preenchimento (que só roda depois desse commit), digitar
+  // corre contra o preenchimento e perde o que a pessoa escreveu.
+  //
+  // `findByLabelText`/`waitFor` resolvem assim que o elemento existe no
+  // DOM (via MutationObserver, uma microtarefa) — em geral rápido
+  // demais pra essa janela, e por isso o bug só aparecia sob a
+  // contenção real de CPU de `pnpm test` na raiz. Este teste força a
+  // interleaving na mão: trava a resposta de `cliente(id)`, e depois de
+  // liberar, distingue as duas fases só com temporizadores.
+  //
+  // A distinção empírica (ver relatório): resolver a promessa da API
+  // só avança o estado do React numa macrotarefa real — 20 voltas de
+  // `await Promise.resolve()` (só microtarefas) não bastam para sair da
+  // trava de carregamento. Uma volta de `setTimeout(..., 0)` depois
+  // disso é suficiente pra sair da trava (o `<h1>` já lê
+  // `cliente.dados.nome` direto, sem depender do estado local) mas
+  // insuficiente pra rodar o `useEffect` de preenchimento (agendado
+  // como passive effect, numa macrotarefa separada) — é exatamente
+  // essa segunda macrotarefa que ainda não rodou nesse ponto. As duas
+  // fases só ficam separáveis porque esta tela também renderiza a
+  // <Tabela> do histórico (uma linha): comprovado experimentalmente que
+  // com zero agendamentos as duas macrotarefas colapsam na mesma volta
+  // e a janela desaparece — por isso o agendamento de "a1" abaixo não é
+  // um detalhe do fixture, é o que abre a janela.
+  it("digitar no instante em que o cliente chega não perde a edição (corrida de sincronização)", async () => {
+    navegacaoFalsa.redefinir({ pathname: "/painel/clientes/c1", params: { id: "c1" } });
+    const falso = criarApiClientFalso({
+      clientes: [
+        { id: "c1", nome: "João Silva", telefone: "(11) 99999-0001", email: null, temConta: false },
+      ],
+      // Este agendamento é o que dá à <Tabela> do histórico uma linha
+      // pra montar — sem ele o commit que sai de "Carregando…" é pequeno
+      // demais e o React nunca cede o controle entre esse commit e o
+      // efeito de preenchimento, fechando a janela que este teste existe
+      // pra provar. Não é decoração do fixture.
+      agendamentos: [
+        {
+          id: "a1",
+          clienteId: "c1",
+          data: "2026-08-30",
+          horaInicio: "09:00",
+          horaFim: "09:30",
+          status: "concluido",
+          origem: "cliente",
+          observacoes: null,
+          servicos: [
+            { servicoId: "s1", nome: "Corte", precoNoMomento: "40.00", duracaoNoMomento: 30 },
+          ],
+        },
+      ],
+    });
+    const original = falso.barbeiro.atualizarCliente;
+    const atualizar = vi.fn(
+      async (id: string, edicao: { nome?: string; telefone?: string }) =>
+        original(id, edicao)
+    );
+    falso.barbeiro.atualizarCliente = atualizar;
+
+    // Trava a leitura do cliente até o teste mandar liberar: só assim
+    // dá pra parar exatamente no instante em que os dados chegaram mas
+    // o efeito de preenchimento ainda não rodou.
+    let liberar: () => void = () => {};
+    const pendente = new Promise<void>((resolve) => {
+      liberar = resolve;
+    });
+    const clienteOriginal = falso.barbeiro.cliente;
+    falso.barbeiro.cliente = async (id: string) => {
+      await pendente;
+      return clienteOriginal(id);
+    };
+
+    montarPainel(<DetalheDoCliente />, falso);
+    await screen.findByText(/carregando/i);
+
+    liberar();
+    // Só microtarefas: nenhum `await` aqui cede pro loop de
+    // macrotarefas onde a resposta da API e o commit que sai da trava
+    // de carregamento acontecem. Confirma que ainda não saiu da trava.
+    for (let i = 0; i < 20; i++) await Promise.resolve();
+    expect(screen.getByText(/carregando/i)).toBeInTheDocument();
+
+    // Uma única macrotarefa: o bastante pro commit que sai da trava,
+    // insuficiente pro efeito de preenchimento (agendado numa
+    // macrotarefa separada) — é este o instante que a produção também
+    // atravessa, só que sem controle sobre quanto tempo dura. Com a
+    // versão de `useEffect` (o bug), `campo.value` ainda é "" aqui: o
+    // preenchimento não rodou. Com o fix (sincronizado durante a
+    // renderização), o preenchimento já aconteceu no mesmo commit que
+    // saiu da trava, então `campo.value` já é "João Silva" — a corrida
+    // não tem mais onde acontecer, e é exatamente isso que este teste
+    // prova. A asserção que realmente distingue os dois casos é a de
+    // `atualizar` no fim: com o bug, o `fireEvent.change` abaixo dispara
+    // o `act()` que estava represando o efeito pendente, e o efeito
+    // sobrescreve "João da Silva" de volta para "João Silva" antes do
+    // clique em Salvar.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const campo = screen.getByLabelText(/^nome$/i) as HTMLInputElement;
+
+    fireEvent.change(campo, { target: { value: "João da Silva" } });
+    await userEvent.click(screen.getByRole("button", { name: /salvar/i }));
+
+    await waitFor(() =>
+      expect(atualizar).toHaveBeenCalledWith(
+        "c1",
+        expect.objectContaining({ nome: "João da Silva" })
+      )
+    );
   });
 });

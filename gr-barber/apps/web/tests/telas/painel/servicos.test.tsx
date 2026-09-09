@@ -178,4 +178,58 @@ describe("serviços no painel", () => {
       await screen.findByText("não foi possível carregar os serviços")
     ).toBeInTheDocument();
   });
+
+  // Apêndice: CadastroDeServico.tsx sincroniza os campos durante a
+  // renderização, mas o rastreador é `atual` (o item achado na lista) e
+  // não `servicos.dados` (o array inteiro) — de propósito. O dublê
+  // devolve a MESMA referência de array em toda chamada a `servicos()`
+  // (`return estado.servicos`, nunca reatribuído; só o item dentro dela
+  // é trocado por `{...antigo, ...edicao}`). Se o rastreador fosse
+  // `servicos.dados`, a condição `servicos.dados !== anterior` nunca
+  // voltaria a ser verdadeira depois de `servicos.recarregar()` — a
+  // tela ficaria travada nos valores da primeira leitura pra sempre,
+  // mesmo com o servidor tendo mudado o serviço embaixo dela.
+  //
+  // (Não é uma reprodução da corrida de sincronização em si: as três
+  // técnicas usadas para pinar essa corrida em DetalheDoCliente.tsx —
+  // temporizador único, MessageChannel na mesma classe de prioridade do
+  // agendador do React, e MutationObserver — não encontram uma janela
+  // observável aqui. A render que torna `atual` disponível e o efeito
+  // de preenchimento sempre terminam no mesmo turno de JavaScript pra
+  // esta tela, inclusive forçando um `.find()` sobre um array de 300 mil
+  // itens pra tentar empurrar o trabalho síncrono acima do limite de
+  // fatia do agendador — ainda colapsado. A explicação mais provável:
+  // ao contrário de DetalheDoCliente.tsx, que sai de "Carregando…" pra
+  // uma árvore bem maior — três campos mais uma <Tabela> com linha —
+  // esta tela e DetalheDoAgendamento.tsx não têm essa trava, ou têm uma
+  // árvore de tamanho fixo que não cresce com os dados semeados, o que
+  // aparentemente nunca dá ao React motivo pra ceder o controle entre o
+  // commit e o efeito. Ver o relatório para o rastro completo.)
+  it("desativar com um novo nome no servidor atualiza o campo (o rastreador é o item, não a lista)", async () => {
+    navegacaoFalsa.redefinir({ pathname: "/painel/servicos/s1", params: { id: "s1" } });
+    const falso = semear();
+    // Original capturado antes da troca — mesma nota de sempre: chamar
+    // `falso.barbeiro.atualizarServico` de dentro do mock de
+    // `desativarServico` só é seguro porque `original` foi salvo antes
+    // da reatribuição.
+    const original = falso.barbeiro.atualizarServico;
+    // Simula o servidor mudando o nome junto da desativação — poderia
+    // ser outro barbeiro editando ao mesmo tempo. O que importa pro
+    // teste é só que a resposta de `servicos.recarregar()` traga um
+    // nome diferente do que já estava no campo.
+    falso.barbeiro.desativarServico = async (id: string) =>
+      original(id, { ativo: false, nome: "Corte Premium" });
+
+    montarPainel(<CadastroDeServico />, falso);
+
+    expect(await screen.findByDisplayValue("Corte")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /desativar/i }));
+
+    // `alternarAtivo` chama `servicos.recarregar()` depois de desativar:
+    // o array devolvido é a mesma referência de sempre, mas o item
+    // achado por `.find()` é outro objeto — é essa troca de referência
+    // do item que deve reabrir a sincronização.
+    expect(await screen.findByDisplayValue("Corte Premium")).toBeInTheDocument();
+  });
 });

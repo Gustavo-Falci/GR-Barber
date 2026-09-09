@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useParams } from "next/navigation";
 import type { EdicaoDoAgendamento, ErroDaApi } from "@gr-barber/api-client";
 import { Aviso } from "../../componentes/Aviso";
@@ -26,9 +26,22 @@ export function DetalheDoAgendamento() {
   const [aviso, setAviso] = useState<string | undefined>();
   const [salvando, setSalvando] = useState(false);
 
-  useEffect(() => {
-    if (agendamento.dados) setObservacoes(agendamento.dados.observacoes ?? "");
-  }, [agendamento.dados]);
+  // Sincronizado durante a renderização, e não num `useEffect`: mesmo
+  // mecanismo do fix em ConfiguracoesDaBarbearia (181514d). A trava
+  // `!agendamento.dados` mais abaixo olha se os dados chegaram, não se
+  // `observacoes` já foi sincronizado com eles — entre o commit que abre
+  // o formulário e o efeito que preencheria o campo, digitar aí corre
+  // contra o preenchimento. O `!==` contra o rastreador evita o loop e
+  // também é o que faz `agendamento.recarregar()` — chamado depois de
+  // toda ação em `aplicar()`, inclusive "Salvar observações" — sincronizar
+  // de novo: a resposta fresca do GET não é `===` à anterior.
+  const [agendamentoSincronizado, setAgendamentoSincronizado] = useState<typeof agendamento.dados>(
+    null
+  );
+  if (agendamento.dados && agendamento.dados !== agendamentoSincronizado) {
+    setAgendamentoSincronizado(agendamento.dados);
+    setObservacoes(agendamento.dados.observacoes ?? "");
+  }
 
   if (agendamento.erro) {
     return (

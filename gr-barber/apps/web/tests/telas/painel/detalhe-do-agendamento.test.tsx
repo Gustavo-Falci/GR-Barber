@@ -129,4 +129,46 @@ describe("detalhe do agendamento", () => {
 
     expect(await screen.findByText(/agendamento não encontrado/i)).toBeInTheDocument();
   });
+
+  // Apêndice: DetalheDoAgendamento.tsx sincroniza `observacoes` durante
+  // a renderização, rastreando `agendamento.dados` por referência. Toda
+  // ação em `aplicar()` — inclusive um clique de status, que não mexe
+  // em observações — chama `agendamento.recarregar()` depois de
+  // salvar, e o dublê (`comCliente`) devolve um objeto literal novo em
+  // toda chamada a `agendamento(id)`. Isso importa: se o rastreador
+  // fosse trocado por um booleano "já sincronizei uma vez" (o jeito
+  // ingênuo de calar o aviso de loop de render), esse recarregamento
+  // nunca reabriria a sincronização, e o campo ficaria preso no valor
+  // da primeira leitura mesmo com o servidor tendo mudado embaixo dele.
+  //
+  // (Não é uma reprodução da corrida de sincronização em si — mesma
+  // ressalva do apêndice equivalente em servicos.test.tsx: as técnicas
+  // usadas para pinar a corrida em DetalheDoCliente.tsx não encontram
+  // uma janela observável aqui; a render que sai de "Carregando…" e o
+  // efeito de preenchimento terminam no mesmo turno de JavaScript nesta
+  // tela. Ver o relatório.)
+  it("um clique de status também traz observações atualizadas do servidor (recarregar reabre a sincronização)", async () => {
+    const falso = semear();
+    // Simula outra origem mudando a observação entre o clique de status
+    // e o refetch que ele dispara — poderia ser outra aba do mesmo
+    // barbeiro. O que importa pro teste é só que a resposta de
+    // `agendamento.recarregar()` traga uma observação diferente da que
+    // já estava no campo.
+    const original = falso.barbeiro.atualizarAgendamento;
+    falso.barbeiro.atualizarAgendamento = async (id: string, edicao: EdicaoDoAgendamento) =>
+      original(id, { ...edicao, observacoes: "mudou no servidor" });
+
+    montarPainel(<DetalheDoAgendamento />, falso);
+
+    await userEvent.click(await screen.findByRole("button", { name: /confirmado/i }));
+
+    // `aplicar` chama `agendamento.recarregar()` depois do PATCH: o
+    // objeto que `comCliente` devolve é sempre novo, então o
+    // rastreador correto reabre a sincronização e o campo reflete o
+    // valor recém-chegado — mesmo tendo sido um clique de status, não
+    // de observações.
+    expect(
+      await screen.findByDisplayValue("mudou no servidor")
+    ).toBeInTheDocument();
+  });
 });
