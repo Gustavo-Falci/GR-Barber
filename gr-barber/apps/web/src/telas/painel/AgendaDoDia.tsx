@@ -35,8 +35,12 @@ export function AgendaDoDia({ agora = new Date() }: { agora?: Date }) {
   // faixas — sem ele o guard de baixo (`!horarios.dados`) nunca sai de
   // "Carregando…", e o barbeiro fica esperando uma resposta que já
   // chegou como erro.
-  if (doDia.erro) return <Aviso>{doDia.erro.mensagem}</Aviso>;
-  if (horarios.erro) return <Aviso>{horarios.erro.mensagem}</Aviso>;
+  if (doDia.erro) {
+    return <Aviso>{doDia.erro.mensagem || "Não foi possível carregar a agenda agora."}</Aviso>;
+  }
+  if (horarios.erro) {
+    return <Aviso>{horarios.erro.mensagem || "Não foi possível carregar os horários agora."}</Aviso>;
+  }
   if (!doDia.dados || !horarios.dados) return <p>Carregando…</p>;
 
   const diaDaSemana = new Date(`${data}T12:00:00`).getDay();

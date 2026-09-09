@@ -160,8 +160,12 @@ export function ConfiguracoesDaBarbearia() {
   // preenchimento assíncrono do campo e perde a digitação — o mesmo
   // problema que a guarda de sessão resolve pro perfil, aqui pros dois
   // outros GETs da tela.
-  if (barbearia.erro) return <Aviso>{barbearia.erro.mensagem}</Aviso>;
-  if (horariosSalvos.erro) return <Aviso>{horariosSalvos.erro.mensagem}</Aviso>;
+  if (barbearia.erro) {
+    return <Aviso>{barbearia.erro.mensagem || "Não foi possível carregar a barbearia agora."}</Aviso>;
+  }
+  if (horariosSalvos.erro) {
+    return <Aviso>{horariosSalvos.erro.mensagem || "Não foi possível carregar os horários agora."}</Aviso>;
+  }
   if (!barbearia.dados || !horariosSalvos.dados) return <p>Carregando…</p>;
 
   return (

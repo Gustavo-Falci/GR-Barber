@@ -17,7 +17,9 @@ export function ListaDeServicos() {
   // desativou, e um inativo que sumisse seria irrecuperável.
   const servicos = useRequisicao(() => api.barbeiro.servicos(), []);
 
-  if (servicos.erro) return <Aviso>{servicos.erro.mensagem}</Aviso>;
+  if (servicos.erro) {
+    return <Aviso>{servicos.erro.mensagem || "Não foi possível carregar os serviços agora."}</Aviso>;
+  }
 
   return (
     <div className={estilos.pagina}>

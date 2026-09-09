@@ -24,7 +24,9 @@ export function DashboardDoDia({ agora = new Date() }: { agora?: Date }) {
   const agendamentos = useRequisicao(() => api.barbeiro.agendamentosDoDia(hoje), [hoje]);
   const horarios = useRequisicao(() => api.barbeiro.horarios(), []);
 
-  if (agendamentos.erro) return <Aviso>{agendamentos.erro.mensagem}</Aviso>;
+  if (agendamentos.erro) {
+    return <Aviso>{agendamentos.erro.mensagem || "Não foi possível carregar o dia agora."}</Aviso>;
+  }
   if (!agendamentos.dados || !horarios.dados) return <p>Carregando…</p>;
 
   const doDia = agendamentos.dados;
