@@ -15,6 +15,7 @@ import {
   sessaoDaBarbearia,
   sessaoDoBarbeiro,
 } from "../sessao/armazenamento";
+import { registrarSaidaDoPainel } from "../sessao/cliente-da-api";
 import { useApiDoPainel } from "./ProvedorDoPainel";
 
 interface Painel {
@@ -38,6 +39,17 @@ export function SessaoDoPainel({ children }: { children: ReactNode }) {
     encerrarSessaoDoBarbeiro();
     router.replace("/painel/entrar");
   }, [router]);
+
+  // `apiDoPainel` monta o client de verdade uma vez, em `ProvedorDoPainel`,
+  // sem router — um 401 que chegue de uma tela já montada (não da
+  // checagem abaixo) precisa de um jeito de navegar mesmo assim. Este
+  // efeito empresta o `sair` de cima pra esse handler chamar; roda antes
+  // do guard de `!perfil` mais abaixo, então o registro existe mesmo
+  // enquanto o perfil ainda está carregando.
+  useEffect(() => {
+    registrarSaidaDoPainel(sair);
+    return () => registrarSaidaDoPainel(null);
+  }, [sair]);
 
   useEffect(() => {
     if (!sessaoDoBarbeiro.ler()) {
