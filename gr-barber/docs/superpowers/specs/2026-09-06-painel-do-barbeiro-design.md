@@ -446,12 +446,17 @@ que o falso pode se afastar da API real sem teste de contrato.
 
 ## Dívidas que esta fase cria
 
-- **O slug fica em `localStorage` ao lado do token**, e é lido pela tela
-  de novo agendamento para chamar a disponibilidade. Se o barbeiro
-  trocar o slug da barbearia em Configurações, a chave grava o valor
-  novo na mesma hora — mas uma aba antiga aberta em outro lugar segue
-  com o velho até recarregar. Fecha de vez quando `GET /me` devolver a
-  barbearia inteira, o que é mudança de API.
+- **O slug fica em `localStorage` ao lado do token, gravado uma vez no
+  login, e não existe jeito de trocá-lo.** É lido pela tela de novo
+  agendamento para chamar a disponibilidade. Uma versão anterior desta
+  dívida descrevia uma aba antiga sobrevivendo com o slug velho depois
+  de uma troca em Configurações — isso não pode acontecer:
+  `PATCH /barbearias/me` exclui `slug` de propósito
+  (`apps/api/src/routers/barbearias.ts`), e a tela de Configurações não
+  tem campo pra ele. A dívida real é essa ausência — um barbeiro que
+  erra o slug no cadastro, ou quer mudar o nome do salão no link, fica
+  preso nele. Fecha com uma rota de troca de slug — mudança de API — e
+  o campo correspondente em Configurações.
 - **O painel lê a própria barbearia pela rota pública.** A API tem
   `PATCH /barbearias/me` e nenhum `GET`: a única leitura dos dados da
   barbearia é `GET /barbearias/:slug`, a mesma que o cliente usa. Serve,

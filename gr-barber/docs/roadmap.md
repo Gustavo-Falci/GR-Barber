@@ -142,10 +142,15 @@ O que falta pro GR Barber sair do papel, mais ou menos em ordem:
   agendamento do cliente usa. A tela de Configurações do painel depende
   então de uma rota pública pra exibir o que ela própria escreve. Fecha
   com um `GET /barbearias/me`.
-- **O slug da barbearia mora no `localStorage`, ao lado do token.**
-  `GET /me` devolve `barbeariaId` e nenhum slug, e a disponibilidade é
-  rota pública endereçada por slug — por isso o painel grava o slug no
-  login. Se o barbeiro troca o slug em Configurações, a chave
-  atualiza na mesma hora, mas uma aba antiga aberta em outro lugar
-  segue com o valor velho até recarregar. Fecha com o mesmo
-  `GET /barbearias/me` da dívida anterior.
+- **O slug da barbearia é gravado uma vez, no login, e não existe jeito
+  de trocá-lo.** `GET /me` devolve `barbeariaId` e nenhum slug, e a
+  disponibilidade é rota pública endereçada por slug — por isso o
+  painel grava o slug no `localStorage`, ao lado do token, no momento
+  do login. Uma versão anterior desta dívida descrevia uma aba antiga
+  sobrevivendo com o slug velho depois de uma troca em Configurações —
+  isso não pode acontecer: `PATCH /barbearias/me` exclui `slug` de
+  propósito (`apps/api/src/routers/barbearias.ts`), e a tela de
+  Configurações não tem campo pra ele. A dívida real é essa ausência —
+  um barbeiro que erra o slug no cadastro, ou quer mudar o nome do
+  salão no link, fica preso nele. Fecha com uma rota de troca de slug
+  — mudança de API — e o campo correspondente em Configurações.
