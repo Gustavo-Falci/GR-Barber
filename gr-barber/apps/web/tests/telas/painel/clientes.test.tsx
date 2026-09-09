@@ -7,6 +7,7 @@ import { DetalheDoCliente } from "../../../src/telas/painel/DetalheDoCliente";
 import { ListaDeClientes } from "../../../src/telas/painel/ListaDeClientes";
 import { navegacaoFalsa } from "../../ajudantes/navegacao";
 import { montarPainel } from "../../ajudantes/painel";
+import { montarPainelComSonda } from "../../ajudantes/sondaDeCorrida";
 
 // Instante fixo: a lista busca os agendamentos dos últimos 90 dias, e
 // sem passar o instante a janela mudaria a cada dia que o teste rodasse.
@@ -211,60 +212,44 @@ describe("clientes no painel", () => {
   });
 
   // Apêndice: prova a corrida descrita em DetalheDoCliente.tsx sem
-  // depender de sorte de agendamento do event loop. A tela tem uma
-  // trava `if (!cliente.dados) return <Carregando>` que só olha se os
-  // dados chegaram — não se `nome`/`telefone`/`email` já foram
-  // sincronizados a partir deles. Entre o commit que sai da trava e o
-  // efeito de preenchimento (que só roda depois desse commit), digitar
-  // corre contra o preenchimento e perde o que a pessoa escreveu.
+  // depender de sorte do event loop. A tela tem uma trava
+  // `if (!cliente.dados) return <Carregando>` que só olha se os dados
+  // chegaram — não se `nome`/`telefone`/`email` já foram sincronizados
+  // a partir deles. Entre o commit que sai da trava e o efeito de
+  // preenchimento (que só roda depois desse commit, se a tela ainda
+  // estiver na versão `useEffect`), digitar corre contra o
+  // preenchimento e perde o que a pessoa escreveu.
   //
-  // `findByLabelText`/`waitFor` resolvem assim que o elemento existe no
-  // DOM (via MutationObserver, uma microtarefa) — em geral rápido
-  // demais pra essa janela, e por isso o bug só aparecia sob a
-  // contenção real de CPU de `pnpm test` na raiz. Este teste força a
-  // interleaving na mão: trava a resposta de `cliente(id)`, e depois de
-  // liberar, distingue as duas fases só com temporizadores.
+  // Mecanismo (ver `sondaDeCorrida.tsx` e o relatório para o histórico
+  // de tentativas anteriores, todas descartadas): contar macrotarefas
+  // de fora funciona aqui, mas não em telas com árvore pós-carregamento
+  // pequena (CadastroDeServico, DetalheDoAgendamento) — nelas o commit
+  // e o efeito colapsam no mesmo turno de JavaScript sob qualquer
+  // técnica de temporizador. A sonda evita depender disso: usa a
+  // garantia do próprio React de que, dentro de UM commit, layout
+  // effects rodam antes de qualquer effect passivo. Ela é montada como
+  // irmã da tela, e seu layout effect (sem array de dependências) roda
+  // em toda renderização SUA — o gatilho pra essa renderização vem do
+  // mock da API, chamado de forma síncrona no exato ponto em que ele
+  // retoma de uma promessa travada. As duas atualizações (a da tela e a
+  // da sonda) entram no mesmo lote pendente do React, então costumam
+  // commitar juntas — e quando isso acontece, o layout effect da sonda
+  // vê o DOM logo depois do commit da tela, antes do efeito passivo
+  // dela rodar.
   //
-  // A distinção empírica (ver relatório): resolver a promessa da API
-  // só avança o estado do React numa macrotarefa real — 20 voltas de
-  // `await Promise.resolve()` (só microtarefas) não bastam para sair da
-  // trava de carregamento. Uma volta de `setTimeout(..., 0)` depois
-  // disso é suficiente pra sair da trava (o `<h1>` já lê
-  // `cliente.dados.nome` direto, sem depender do estado local) mas
-  // insuficiente pra rodar o `useEffect` de preenchimento (agendado
-  // como passive effect, numa macrotarefa separada) — é exatamente
-  // essa segunda macrotarefa que ainda não rodou nesse ponto. As duas
-  // fases só ficam separáveis porque esta tela também renderiza a
-  // <Tabela> do histórico (uma linha): comprovado experimentalmente que
-  // com zero agendamentos as duas macrotarefas colapsam na mesma volta
-  // e a janela desaparece — por isso o agendamento de "a1" abaixo não é
-  // um detalhe do fixture, é o que abre a janela.
+  // `fireEvent.change` não pode ser chamado direto de dentro do layout
+  // effect (o próprio React rejeita com "Should not already be
+  // working" — ainda estamos dentro do work loop dele). Por isso o
+  // layout effect só resolve uma promessa, e o `fireEvent.change` roda
+  // no microtask seguinte, ainda antes de qualquer macrotarefa (onde o
+  // efeito passivo, se existir, está agendado).
   it("digitar no instante em que o cliente chega não perde a edição (corrida de sincronização)", async () => {
     navegacaoFalsa.redefinir({ pathname: "/painel/clientes/c1", params: { id: "c1" } });
     const falso = criarApiClientFalso({
       clientes: [
         { id: "c1", nome: "João Silva", telefone: "(11) 99999-0001", email: null, temConta: false },
       ],
-      // Este agendamento é o que dá à <Tabela> do histórico uma linha
-      // pra montar — sem ele o commit que sai de "Carregando…" é pequeno
-      // demais e o React nunca cede o controle entre esse commit e o
-      // efeito de preenchimento, fechando a janela que este teste existe
-      // pra provar. Não é decoração do fixture.
-      agendamentos: [
-        {
-          id: "a1",
-          clienteId: "c1",
-          data: "2026-08-30",
-          horaInicio: "09:00",
-          horaFim: "09:30",
-          status: "concluido",
-          origem: "cliente",
-          observacoes: null,
-          servicos: [
-            { servicoId: "s1", nome: "Corte", precoNoMomento: "40.00", duracaoNoMomento: 30 },
-          ],
-        },
-      ],
+      agendamentos: [],
     });
     const original = falso.barbeiro.atualizarCliente;
     const atualizar = vi.fn(
@@ -273,47 +258,46 @@ describe("clientes no painel", () => {
     );
     falso.barbeiro.atualizarCliente = atualizar;
 
-    // Trava a leitura do cliente até o teste mandar liberar: só assim
-    // dá pra parar exatamente no instante em que os dados chegaram mas
-    // o efeito de preenchimento ainda não rodou.
+    // Trava a leitura do cliente até o teste mandar liberar.
     let liberar: () => void = () => {};
     const pendente = new Promise<void>((resolve) => {
       liberar = resolve;
     });
     const clienteOriginal = falso.barbeiro.cliente;
+    let disparoDaSonda: () => void = () => {};
     falso.barbeiro.cliente = async (id: string) => {
       await pendente;
+      // Síncrono, antes de qualquer outro `await` desta função: é o
+      // que faz a atualização da sonda entrar no mesmo lote do React
+      // que a atualização (`setDados`) que a tela eventualmente dispara.
+      disparoDaSonda();
       return clienteOriginal(id);
     };
 
-    montarPainel(<DetalheDoCliente />, falso);
+    // A sonda roda `aoRenderizar` uma vez no mount (tela ainda
+    // carregando — ignorada abaixo) e de novo quando `disparar()` é
+    // chamado. Na segunda chamada, resolve `prontinho`: o teste
+    // continua no microtask seguinte, ainda antes de qualquer efeito
+    // passivo pendente da tela ter rodado.
+    let chamadas = 0;
+    let resolverProntinho: () => void = () => {};
+    const prontinho = new Promise<void>((resolve) => {
+      resolverProntinho = resolve;
+    });
+    const { disparar } = montarPainelComSonda(<DetalheDoCliente />, falso, () => {
+      chamadas++;
+      if (chamadas < 2) return;
+      resolverProntinho();
+    });
+    disparoDaSonda = disparar;
+
     await screen.findByText(/carregando/i);
-
     liberar();
-    // Só microtarefas: nenhum `await` aqui cede pro loop de
-    // macrotarefas onde a resposta da API e o commit que sai da trava
-    // de carregamento acontecem. Confirma que ainda não saiu da trava.
-    for (let i = 0; i < 20; i++) await Promise.resolve();
-    expect(screen.getByText(/carregando/i)).toBeInTheDocument();
 
-    // Uma única macrotarefa: o bastante pro commit que sai da trava,
-    // insuficiente pro efeito de preenchimento (agendado numa
-    // macrotarefa separada) — é este o instante que a produção também
-    // atravessa, só que sem controle sobre quanto tempo dura. Com a
-    // versão de `useEffect` (o bug), `campo.value` ainda é "" aqui: o
-    // preenchimento não rodou. Com o fix (sincronizado durante a
-    // renderização), o preenchimento já aconteceu no mesmo commit que
-    // saiu da trava, então `campo.value` já é "João Silva" — a corrida
-    // não tem mais onde acontecer, e é exatamente isso que este teste
-    // prova. A asserção que realmente distingue os dois casos é a de
-    // `atualizar` no fim: com o bug, o `fireEvent.change` abaixo dispara
-    // o `act()` que estava represando o efeito pendente, e o efeito
-    // sobrescreve "João da Silva" de volta para "João Silva" antes do
-    // clique em Salvar.
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await prontinho;
     const campo = screen.getByLabelText(/^nome$/i) as HTMLInputElement;
-
     fireEvent.change(campo, { target: { value: "João da Silva" } });
+
     await userEvent.click(screen.getByRole("button", { name: /salvar/i }));
 
     await waitFor(() =>

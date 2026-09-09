@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { criarApiClientFalso, ErroDaApi } from "@gr-barber/api-client";
@@ -6,6 +6,7 @@ import { CadastroDeServico } from "../../../src/telas/painel/CadastroDeServico";
 import { ListaDeServicos } from "../../../src/telas/painel/ListaDeServicos";
 import { navegacaoFalsa } from "../../ajudantes/navegacao";
 import { montarPainel } from "../../ajudantes/painel";
+import { montarPainelComSonda } from "../../ajudantes/sondaDeCorrida";
 
 function semear() {
   return criarApiClientFalso({
@@ -190,21 +191,18 @@ describe("serviços no painel", () => {
   // tela ficaria travada nos valores da primeira leitura pra sempre,
   // mesmo com o servidor tendo mudado o serviço embaixo dela.
   //
-  // (Não é uma reprodução da corrida de sincronização em si: as três
-  // técnicas usadas para pinar essa corrida em DetalheDoCliente.tsx —
-  // temporizador único, MessageChannel na mesma classe de prioridade do
-  // agendador do React, e MutationObserver — não encontram uma janela
-  // observável aqui. A render que torna `atual` disponível e o efeito
-  // de preenchimento sempre terminam no mesmo turno de JavaScript pra
-  // esta tela, inclusive forçando um `.find()` sobre um array de 300 mil
-  // itens pra tentar empurrar o trabalho síncrono acima do limite de
-  // fatia do agendador — ainda colapsado. A explicação mais provável:
-  // ao contrário de DetalheDoCliente.tsx, que sai de "Carregando…" pra
-  // uma árvore bem maior — três campos mais uma <Tabela> com linha —
-  // esta tela e DetalheDoAgendamento.tsx não têm essa trava, ou têm uma
-  // árvore de tamanho fixo que não cresce com os dados semeados, o que
-  // aparentemente nunca dá ao React motivo pra ceder o controle entre o
-  // commit e o efeito. Ver o relatório para o rastro completo.)
+  // (Não é uma reprodução da corrida de sincronização em si — isso
+  // está no teste seguinte, via a sonda em `sondaDeCorrida.tsx`. Um
+  // primeiro round tentou três outras técnicas — temporizador único,
+  // MessageChannel na mesma classe de prioridade do agendador do
+  // React, e MutationObserver — e nenhuma achou uma janela observável
+  // aqui: a render que torna `atual` disponível e o efeito de
+  // preenchimento terminam no mesmo turno de JavaScript pra esta tela
+  // quando observados de FORA (mesmo forçando um `.find()` sobre um
+  // array de 300 mil itens). A sonda funciona porque não observa de
+  // fora: ela participa do MESMO commit, e o React garante a ordem
+  // entre layout effects e effects passivos dentro dele. Ver o
+  // relatório para o histórico completo.)
   it("desativar com um novo nome no servidor atualiza o campo (o rastreador é o item, não a lista)", async () => {
     navegacaoFalsa.redefinir({ pathname: "/painel/servicos/s1", params: { id: "s1" } });
     const falso = semear();
@@ -231,5 +229,82 @@ describe("serviços no painel", () => {
     // achado por `.find()` é outro objeto — é essa troca de referência
     // do item que deve reabrir a sincronização.
     expect(await screen.findByDisplayValue("Corte Premium")).toBeInTheDocument();
+  });
+
+  // Apêndice: prova a corrida de sincronização em si (a diferença entre
+  // este teste e o anterior). Sem trava de carregamento, esta tela
+  // renderiza o campo desde o primeiro render — a corrida não é
+  // "carregando some, campo aparece vazio", é "o campo já existe, e
+  // pode ser digitado antes do rastreador (`atual`) sincronizar os
+  // valores buscados nele".
+  //
+  // Mecanismo (ver `sondaDeCorrida.tsx` e o relatório para o histórico
+  // de três tentativas anteriores que não encontraram essa janela
+  // observando de fora): uma sonda irmã da tela, com um layout effect
+  // sem array de dependências, disparada de dentro do mock de
+  // `servicos()` no exato ponto síncrono em que ele retoma de uma
+  // promessa travada. O React garante que, dentro do commit em que as
+  // duas atualizações caem juntas, layout effects rodam antes de
+  // qualquer effect passivo — por isso o layout effect da sonda vê o
+  // campo tal como a tela o deixou, antes do `useEffect` de
+  // preenchimento (se a tela ainda estiver na versão com bug) rodar.
+  it("digitar no instante em que os dados chegam não perde a edição (corrida de sincronização)", async () => {
+    navegacaoFalsa.redefinir({ pathname: "/painel/servicos/s1", params: { id: "s1" } });
+    const falso = semear();
+    const original = falso.barbeiro.atualizarServico;
+    const atualizar = vi.fn(
+      async (id: string, edicao: { nome?: string; duracaoMinutos?: number; preco?: string }) =>
+        original(id, edicao)
+    );
+    falso.barbeiro.atualizarServico = atualizar;
+
+    // Trava a leitura da lista até o teste mandar liberar.
+    let liberar: () => void = () => {};
+    const pendente = new Promise<void>((resolve) => {
+      liberar = resolve;
+    });
+    const servicosOriginal = falso.barbeiro.servicos;
+    let disparoDaSonda: () => void = () => {};
+    falso.barbeiro.servicos = async () => {
+      await pendente;
+      // Síncrono, antes de qualquer outro `await`: coloca a
+      // atualização da sonda no mesmo lote que o `setDados` da tela.
+      disparoDaSonda();
+      return servicosOriginal();
+    };
+
+    // A sonda roda `aoRenderizar` uma vez no mount (ignorada abaixo,
+    // com o formulário ainda sem `atual`) e de novo quando
+    // `disparar()` é chamado. Nesse segundo turno, resolve
+    // `prontinho`, e o `fireEvent.change` do teste roda no microtask
+    // seguinte — ainda antes de qualquer macrotarefa, onde um efeito
+    // passivo pendente estaria agendado.
+    let chamadas = 0;
+    let resolverProntinho: () => void = () => {};
+    const prontinho = new Promise<void>((resolve) => {
+      resolverProntinho = resolve;
+    });
+    const { disparar } = montarPainelComSonda(<CadastroDeServico />, falso, () => {
+      chamadas++;
+      if (chamadas < 2) return; // ignora o mount
+      resolverProntinho();
+    });
+    disparoDaSonda = disparar;
+
+    await screen.findByLabelText(/^nome$/i);
+    liberar();
+
+    await prontinho;
+    const campo = screen.getByLabelText(/^nome$/i) as HTMLInputElement;
+    fireEvent.change(campo, { target: { value: "Corte Editado" } });
+
+    await userEvent.click(screen.getByRole("button", { name: /^salvar$/i }));
+
+    await waitFor(() =>
+      expect(atualizar).toHaveBeenCalledWith(
+        "s1",
+        expect.objectContaining({ nome: "Corte Editado" })
+      )
+    );
   });
 });

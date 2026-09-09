@@ -1,10 +1,11 @@
-import { screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { criarApiClientFalso, ErroDaApi, type EdicaoDoAgendamento } from "@gr-barber/api-client";
 import { DetalheDoAgendamento } from "../../../src/telas/painel/DetalheDoAgendamento";
 import { navegacaoFalsa } from "../../ajudantes/navegacao";
 import { montarPainel } from "../../ajudantes/painel";
+import { montarPainelComSonda } from "../../ajudantes/sondaDeCorrida";
 
 function semear() {
   return criarApiClientFalso({
@@ -141,12 +142,13 @@ describe("detalhe do agendamento", () => {
   // nunca reabriria a sincronização, e o campo ficaria preso no valor
   // da primeira leitura mesmo com o servidor tendo mudado embaixo dele.
   //
-  // (Não é uma reprodução da corrida de sincronização em si — mesma
-  // ressalva do apêndice equivalente em servicos.test.tsx: as técnicas
-  // usadas para pinar a corrida em DetalheDoCliente.tsx não encontram
-  // uma janela observável aqui; a render que sai de "Carregando…" e o
-  // efeito de preenchimento terminam no mesmo turno de JavaScript nesta
-  // tela. Ver o relatório.)
+  // (Não é uma reprodução da corrida de sincronização em si — isso está
+  // no teste seguinte, via a sonda em `sondaDeCorrida.tsx`. Mesma
+  // ressalva do apêndice equivalente em servicos.test.tsx: um primeiro
+  // round de três técnicas — temporizador único, MessageChannel,
+  // MutationObserver, todas observando de FORA — não encontrou uma
+  // janela aqui; a sonda funciona por participar do MESMO commit, não
+  // por observá-lo de fora. Ver o relatório.)
   it("um clique de status também traz observações atualizadas do servidor (recarregar reabre a sincronização)", async () => {
     const falso = semear();
     // Simula outra origem mudando a observação entre o clique de status
@@ -170,5 +172,69 @@ describe("detalhe do agendamento", () => {
     expect(
       await screen.findByDisplayValue("mudou no servidor")
     ).toBeInTheDocument();
+  });
+
+  // Apêndice: prova a corrida de sincronização em si. Mecanismo (ver
+  // `sondaDeCorrida.tsx` e o relatório para o histórico da primeira
+  // rodada de tentativas, todas descartadas): uma sonda irmã da tela,
+  // com um layout effect sem array de dependências, disparada de
+  // dentro do mock de `agendamento()` no exato ponto síncrono em que
+  // ele retoma de uma promessa travada. O React garante que, dentro do
+  // commit em que as duas atualizações caem juntas, layout effects
+  // rodam antes de qualquer effect passivo — por isso o layout effect
+  // da sonda vê `observacoes` tal como a tela o deixou, antes do
+  // `useEffect` de preenchimento (se a tela ainda estiver na versão com
+  // bug) rodar.
+  it("digitar no instante em que o agendamento chega não perde a edição (corrida de sincronização)", async () => {
+    const falso = semear();
+    const original = falso.barbeiro.atualizarAgendamento;
+    const atualizar = vi.fn(
+      async (id: string, edicao: EdicaoDoAgendamento) => original(id, edicao)
+    );
+    falso.barbeiro.atualizarAgendamento = atualizar;
+
+    // Trava a leitura do agendamento até o teste mandar liberar.
+    let liberar: () => void = () => {};
+    const pendente = new Promise<void>((resolve) => {
+      liberar = resolve;
+    });
+    const agendamentoOriginal = falso.barbeiro.agendamento;
+    let disparoDaSonda: () => void = () => {};
+    falso.barbeiro.agendamento = async (id: string) => {
+      await pendente;
+      // Síncrono, antes de qualquer outro `await`: coloca a
+      // atualização da sonda no mesmo lote que o `setDados` da tela.
+      disparoDaSonda();
+      return agendamentoOriginal(id);
+    };
+
+    // A sonda roda `aoRenderizar` uma vez no mount (tela ainda
+    // carregando — ignorada abaixo) e de novo quando `disparar()` é
+    // chamado. Nesse segundo turno, resolve `prontinho`, e o
+    // `fireEvent.change` do teste roda no microtask seguinte.
+    let chamadas = 0;
+    let resolverProntinho: () => void = () => {};
+    const prontinho = new Promise<void>((resolve) => {
+      resolverProntinho = resolve;
+    });
+    const { disparar } = montarPainelComSonda(<DetalheDoAgendamento />, falso, () => {
+      chamadas++;
+      if (chamadas < 2) return;
+      resolverProntinho();
+    });
+    disparoDaSonda = disparar;
+
+    await screen.findByText(/carregando/i);
+    liberar();
+
+    await prontinho;
+    const campo = screen.getByLabelText(/observações/i) as HTMLInputElement;
+    fireEvent.change(campo, { target: { value: "cliente atrasa" } });
+
+    await userEvent.click(screen.getByRole("button", { name: /salvar observações/i }));
+
+    await waitFor(() =>
+      expect(atualizar).toHaveBeenCalledWith("a1", { observacoes: "cliente atrasa" })
+    );
   });
 });

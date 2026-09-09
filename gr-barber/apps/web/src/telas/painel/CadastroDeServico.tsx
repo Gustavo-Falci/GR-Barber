@@ -39,7 +39,19 @@ export function CadastroDeServico() {
   // mecanismo do fix em ConfiguracoesDaBarbearia (181514d) — um efeito
   // só roda depois do commit, e entre o commit e o efeito o formulário
   // já teria aparecido com os campos vazios, aberto a digitar contra o
-  // preenchimento assíncrono.
+  // preenchimento assíncrono. Setar estado durante a própria
+  // renderização faz o React descartar essa renderização e refazer com
+  // o valor certo antes de pintar qualquer coisa — não existe commit
+  // intermediário pra observar ou editar.
+  //
+  // O `!==` contra o rastreador (`atualSincronizado`) é o que impede o
+  // loop: sem ele, cada `setNome`/`setDuracao`/`setPreco` re-renderiza,
+  // a condição continua verdadeira (nada mudou o valor de `atual`, mas
+  // também nada faria a igualdade falhar de novo), e o componente
+  // re-renderiza pra sempre. É tentador "simplificar" isto pra um
+  // booleano tipo `jaSincronizei` — não faça: um booleano nunca reabre
+  // depois do primeiro `true`, e quebra o re-sync depois de
+  // `alternarAtivo()` (abaixo) chamar `servicos.recarregar()`.
   //
   // O rastreador aqui é `atual` (o item achado na lista), não
   // `servicos.dados` (a lista inteira): o dublê de teste devolve a
