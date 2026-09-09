@@ -18,6 +18,17 @@ function paraDecimal(digitado: string): string | null {
   return Number(limpo).toFixed(2);
 }
 
+// Mesma guarda do preço, pro campo ao lado: `duracaoMinutos` é inteiro
+// na API, e um `Number(duracao)` direto deixa "" virar 0 e "abc" virar
+// NaN — que o `JSON.stringify` do corpo transforma em `null`, e a API
+// rejeita com uma mensagem de schema que o barbeiro não tem como agir.
+function paraMinutos(digitado: string): number | null {
+  const limpo = digitado.trim();
+  if (!/^\d+$/.test(limpo)) return null;
+  const numero = Number(limpo);
+  return numero > 0 ? numero : null;
+}
+
 export function CadastroDeServico() {
   const { id } = useParams<{ id?: string }>();
   const router = useRouter();
@@ -31,6 +42,7 @@ export function CadastroDeServico() {
   const [nome, setNome] = useState("");
   const [duracao, setDuracao] = useState("");
   const [preco, setPreco] = useState("");
+  const [erroDuracao, setErroDuracao] = useState<string | undefined>();
   const [erroPreco, setErroPreco] = useState<string | undefined>();
   const [aviso, setAviso] = useState<string | undefined>();
   const [salvando, setSalvando] = useState(false);
@@ -73,7 +85,9 @@ export function CadastroDeServico() {
   // Sem isto, uma falha em servicos() deixava dados null pra sempre: o
   // guard de "não encontrado" também depende de dados, então nenhum dos
   // dois disparava e a tela ficava no formulário vazio sem dizer nada.
-  if (servicos.erro) return <Aviso>{servicos.erro.mensagem}</Aviso>;
+  if (servicos.erro) {
+    return <Aviso>{servicos.erro.mensagem || "Não foi possível carregar os serviços agora."}</Aviso>;
+  }
 
   if (id && servicos.dados && !atual) {
     return <Aviso>Serviço não encontrado.</Aviso>;
@@ -81,6 +95,7 @@ export function CadastroDeServico() {
 
   async function salvar() {
     setAviso(undefined);
+    setErroDuracao(undefined);
     setErroPreco(undefined);
 
     const decimal = paraDecimal(preco);
@@ -89,11 +104,17 @@ export function CadastroDeServico() {
       return;
     }
 
+    const minutos = paraMinutos(duracao);
+    if (!minutos) {
+      setErroDuracao("Use um número inteiro de minutos, como 30");
+      return;
+    }
+
     setSalvando(true);
     try {
       const corpo = {
         nome: nome.trim(),
-        duracaoMinutos: Number(duracao),
+        duracaoMinutos: minutos,
         preco: decimal,
       };
       if (id) await api.barbeiro.atualizarServico(id, corpo);
@@ -125,7 +146,15 @@ export function CadastroDeServico() {
       <h1>{id ? "Editar serviço" : "Novo serviço"}</h1>
 
       <Campo rotulo="Nome" valor={nome} onChange={setNome} />
-      <Campo rotulo="Duração em minutos" valor={duracao} onChange={setDuracao} />
+      <Campo
+        rotulo="Duração em minutos"
+        valor={duracao}
+        onChange={(proximo) => {
+          setDuracao(proximo);
+          setErroDuracao(undefined);
+        }}
+        erro={erroDuracao}
+      />
       <Campo
         rotulo="Preço"
         valor={preco}

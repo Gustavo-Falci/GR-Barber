@@ -307,4 +307,25 @@ describe("serviços no painel", () => {
       )
     );
   });
+
+  // O preço vem preenchido válido de propósito: `paraDecimal` roda
+  // ANTES da guarda de duração no handler, e um preço inválido também
+  // retornaria cedo — o que faria este teste passar mesmo sem nenhuma
+  // guarda na duração, sem provar nada sobre ela.
+  it("duração vazia ou não numérica não chama a API — mesma guarda do preço, no campo ao lado", async () => {
+    navegacaoFalsa.redefinir({ pathname: "/painel/servicos/novo" });
+    const falso = semear();
+    const criar = vi.fn(falso.barbeiro.criarServico);
+    falso.barbeiro.criarServico = criar;
+
+    montarPainel(<CadastroDeServico />, falso);
+
+    await userEvent.type(await screen.findByLabelText(/nome/i), "Sobrancelha");
+    await userEvent.type(screen.getByLabelText(/preço/i), "40,00");
+    await userEvent.type(screen.getByLabelText(/duração/i), "abc");
+    await userEvent.click(screen.getByRole("button", { name: /^salvar$/i }));
+
+    expect(await screen.findByText(/use um número inteiro de minutos/i)).toBeInTheDocument();
+    expect(criar).not.toHaveBeenCalled();
+  });
 });
