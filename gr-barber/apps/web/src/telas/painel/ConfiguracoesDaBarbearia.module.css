@@ -1,2 +1,98 @@
-.pagina { display: grid; gap: var(--espaco-lg); padding: var(--espaco-lg); max-width: 640px; }
-.dia { display: flex; flex-wrap: wrap; align-items: center; gap: var(--espaco-md); }
+.pagina {
+  display: grid;
+  gap: var(--espaco-lg);
+  align-content: start;
+}
+
+/* Duas colunas: os dois formulários curtos de um lado, o horário de
+   funcionamento do outro. A proporção 5/7 não é decorativa — a coluna
+   do horário precisa caber nome do dia (7rem) + "fechado" (8rem) +
+   dois campos de hora (7.5rem cada) sem quebrar, e a dos formulários
+   fica na medida em que um campo de texto ainda é confortável de ler.
+
+   `align-items: start` pra que a coluna mais curta não estique os
+   cartões até a altura da mais alta — cartão com metade de espaço
+   vazio embaixo parece bloco carregando pela metade. */
+.grade {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  gap: var(--espaco-lg);
+  align-items: start;
+}
+
+.coluna {
+  display: grid;
+  gap: var(--espaco-lg);
+  align-content: start;
+}
+
+/* Abaixo de 1080px as duas colunas não cabem lado a lado sem apertar os
+   campos de hora, então voltam a empilhar. */
+@media (max-width: 1080px) {
+  .grade {
+    grid-template-columns: 1fr;
+  }
+
+  /* Empilhado, o formulário volta à medida estreita: campo de texto de
+     1100px de largura é pior que a coluna que se acabou de perder. */
+  .grade > * {
+    max-width: 680px;
+  }
+}
+
+/* Uma linha por dia da semana: nome, "fechado" e, quando aberto, os
+   dois horários. Grid e não flex solto pra que os nomes dos dias
+   fiquem alinhados em coluna, e não cada um começando num lugar.
+
+   As três colunas são fixas nas duas primeiras e livre na terceira, e
+   valem igual em todo dia — é isso que faz as caixas de hora de
+   segunda a sábado começarem todas na mesma vertical, aberto ou
+   fechado o dia de cima. */
+.dia {
+  display: grid;
+  grid-template-columns: 7rem 8rem 1fr;
+  align-items: center;
+  gap: var(--espaco-md);
+  /* A altura não muda quando o dia é fechado e os campos somem: sem o
+     mínimo, marcar "fechado" encolhia a linha e a lista inteira pulava
+     sob o cursor. */
+  min-height: 68px;
+  padding-block: var(--espaco-xs);
+  border-block-end: var(--borda-hairline) solid var(--cor-line);
+}
+
+.dia:last-of-type {
+  border-block-end: none;
+}
+
+/* As duas horas lado a lado. Largura fixa por campo porque o conteúdo
+   é sempre HH:MM — esticar uma caixa de cinco caracteres até o fim da
+   seção é o que fazia o "Abre" parecer campo de texto livre. */
+.horas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--espaco-md);
+}
+
+.horas > * {
+  width: 7.5rem;
+}
+
+/* O rótulo "fechado" e a caixa formam um alvo só — clicar na palavra
+   marca a caixa, e o conjunto passa dos 44px de altura mínima. */
+.dia label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--espaco-sm);
+  min-height: 44px;
+  cursor: pointer;
+  font-size: var(--texto-sm);
+  color: var(--cor-ink-soft);
+}
+
+@media (max-width: 560px) {
+  .dia {
+    grid-template-columns: 1fr;
+    gap: var(--espaco-sm);
+  }
+}

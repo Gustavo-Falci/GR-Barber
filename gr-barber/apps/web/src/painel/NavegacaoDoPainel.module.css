@@ -1,23 +1,137 @@
+/* O shell do painel: barra lateral fixa e a área de conteúdo rolando ao
+   lado. Grid e não flex porque a lateral tem largura fixa e o conteúdo
+   fica com `minmax(0, 1fr)` — sem o `0`, uma tabela larga empurraria a
+   coluna em vez de rolar dentro dela. */
+.shell {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  min-height: 100vh;
+}
+
 .barra {
   display: flex;
-  align-items: center;
-  gap: var(--espaco-md);
-  padding: var(--espaco-md) var(--espaco-lg);
-  border-bottom: var(--borda-padrao) solid var(--cor-ink);
-  background: var(--cor-paper);
+  flex-direction: column;
+  gap: var(--espaco-lg);
+  padding: var(--espaco-lg) var(--espaco-md);
+  border-inline-end: var(--borda-padrao) solid var(--cor-ink);
+  background: var(--cor-paper-soft);
+  /* A lateral acompanha a rolagem do conteúdo: numa agenda longa, sair
+     e trocar de tema continuam à mão sem voltar ao topo. */
+  position: sticky;
+  top: 0;
+  height: 100vh;
 }
 
 .marca {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--espaco-sm) var(--espaco-md);
+  border: var(--borda-padrao) solid var(--cor-ink);
+  border-radius: var(--raio-md);
+  background: var(--cor-accent);
+  box-shadow: 0 4px 0 var(--cor-shadow);
+  color: var(--cor-dark);
   font-family: var(--fonte-display), system-ui, sans-serif;
   font-size: var(--texto-lg);
+  /* O slug da barbearia pode ser longo (até 80 caracteres) e não pode
+     empurrar a largura da lateral nem quebrar em duas linhas. */
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .links {
   display: flex;
-  gap: var(--espaco-md);
-  margin-inline-end: auto;
+  flex-direction: column;
+  gap: var(--espaco-xs);
+  /* Empurra o rodapé (tema e sair) pro fim da coluna. */
+  margin-block-end: auto;
 }
 
+.links a {
+  display: block;
+  padding: var(--espaco-sm) var(--espaco-md);
+  border: var(--borda-padrao) solid transparent;
+  border-radius: var(--raio-md);
+  color: var(--cor-ink-soft);
+  font-weight: 600;
+}
+
+.links a:hover {
+  border-color: var(--cor-line);
+  background: var(--cor-surface);
+  color: var(--cor-ink);
+}
+
+/* O estado atual não se anuncia só pela cor: ganha borda, fundo e a
+   sombra deslocada da casa, então continua legível em escala de cinza
+   e pra quem não distingue o amarelo do bege. */
 .links a[aria-current="page"] {
-  text-decoration: underline;
+  border-color: var(--cor-ink);
+  background: var(--cor-accent);
+  box-shadow: 0 3px 0 var(--cor-shadow);
+  color: var(--cor-dark);
+}
+
+.rodape {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-sm);
+  padding-block-start: var(--espaco-md);
+  border-block-start: var(--borda-hairline) solid var(--cor-line);
+}
+
+/* A área de conteúdo. O container centra e limita a medida: o painel
+   abria com tudo colado na esquerda porque cada tela tinha `max-width`
+   sem `margin-inline: auto`, e numa tela de 1920 sobravam 1200px de
+   vazio. 1180px é largura de dashboard — cabe a agenda de sete
+   colunas sem virar linha de texto longa demais pra ler. */
+.conteudo {
+  padding: var(--espaco-xl) var(--espaco-lg);
+}
+
+.container {
+  max-width: 1180px;
+  margin-inline: auto;
+}
+
+/* Abaixo de 900px a lateral vira uma faixa no topo e a navegação rola
+   na horizontal — é o mesmo conjunto de links, sem menu escondido. */
+@media (max-width: 900px) {
+  .shell {
+    grid-template-columns: 1fr;
+  }
+
+  .barra {
+    position: static;
+    height: auto;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--espaco-md);
+    border-inline-end: none;
+    border-block-end: var(--borda-padrao) solid var(--cor-ink);
+  }
+
+  .links {
+    flex-direction: row;
+    flex-wrap: nowrap;
+    margin-block-end: 0;
+    margin-inline-end: auto;
+    overflow-x: auto;
+  }
+
+  .links a {
+    white-space: nowrap;
+  }
+
+  .rodape {
+    flex-direction: row;
+    padding-block-start: 0;
+    border-block-start: none;
+  }
+
+  .conteudo {
+    padding: var(--espaco-lg) var(--espaco-md);
+  }
 }

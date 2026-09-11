@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Botao } from "../componentes/Botao";
 import { aplicarTema, gravarTema, lerTema, temaDoSistema, type Tema } from "./tema";
 import { usePainel } from "./SessaoDoPainel";
 import estilos from "./NavegacaoDoPainel.module.css";
@@ -32,9 +33,12 @@ export function NavegacaoDoPainel() {
   }
 
   return (
-    <header className={estilos.barra}>
+    // <aside> e não <header>: numa barra lateral de navegação o papel é
+    // de conteúdo complementar, e o <nav> aqui dentro é quem carrega a
+    // marcação que importa pra quem navega por landmark.
+    <aside className={estilos.barra}>
       <strong className={estilos.marca}>{slug}</strong>
-      <nav className={estilos.links}>
+      <nav className={estilos.links} aria-label="Seções do painel">
         {LINKS.map((link) => (
           <Link
             key={link.href}
@@ -51,12 +55,17 @@ export function NavegacaoDoPainel() {
           </Link>
         ))}
       </nav>
-      <button type="button" onClick={trocarTema}>
-        {tema === "claro" ? "Modo escuro" : "Modo claro"}
-      </button>
-      <button type="button" onClick={sair}>
-        Sair
-      </button>
-    </header>
+      <div className={estilos.rodape}>
+        {/* Eram dois <button> crus, os únicos do painel fora do
+            componente — daí saírem com o cinza e a fonte do sistema
+            enquanto todo o resto era neobrutalista. */}
+        <Botao variante="contorno" type="button" onClick={trocarTema}>
+          {tema === "claro" ? "Modo escuro" : "Modo claro"}
+        </Botao>
+        <Botao variante="contorno" type="button" onClick={sair}>
+          Sair
+        </Botao>
+      </div>
+    </aside>
   );
 }

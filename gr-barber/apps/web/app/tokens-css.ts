@@ -45,7 +45,15 @@ const varsDeTexto = varsEmPixels("texto", fontSize);
 // @media venceria. Sem [data-theme="dark"], escolher escuro não faz
 // nada num sistema claro. Quem escreve o atributo é o script inline do
 // layout raiz — ver src/painel/tema.ts.
+// `color-scheme` acompanha cada bloco porque ele é o que manda nas
+// partes que o navegador desenha sozinho: o ícone do relógio do
+// <input type="time">, o calendário do date, a barra de rolagem e o
+// destaque de seleção. Sem ele, o relógio dos horários de
+// funcionamento sai com as cores do modo claro sobre o fundo escuro e
+// some. É a única propriedade daqui que não é custom property — e é de
+// propósito: nenhuma variável alcança esses controles.
 export const cssDeTokens = `:root {
+  color-scheme: light;
 ${varsDeCores(colors.light)}
 ${varsDeRaio}
 ${varsDeEspaco}
@@ -55,10 +63,12 @@ ${varsDeTexto}
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
+    color-scheme: dark;
 ${varsDeCores(colors.dark)}
   }
 }
 
 [data-theme="dark"] {
+  color-scheme: dark;
 ${varsDeCores(colors.dark)}
 }`;

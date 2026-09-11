@@ -1,0 +1,45 @@
+.secao {
+  display: grid;
+  gap: var(--espaco-md);
+  padding: var(--espaco-lg);
+  border: var(--borda-padrao) solid var(--cor-ink);
+  border-radius: var(--raio-lg);
+  background: var(--cor-surface);
+  box-shadow: 0 4px 0 var(--cor-shadow);
+}
+
+/* Título e explicação coladas um no outro, e separadas dos campos —
+   sem isto o `gap` da seção afastava a descrição do próprio título
+   tanto quanto do primeiro campo, e ela lia como legenda solta. */
+.topo {
+  display: grid;
+  gap: var(--espaco-xs);
+}
+
+.titulo {
+  font-size: var(--texto-lg);
+}
+
+.descricao {
+  margin: 0;
+  max-width: 60ch;
+  color: var(--cor-muted);
+  font-size: var(--texto-sm);
+}
+
+.corpo {
+  display: grid;
+  gap: var(--espaco-md);
+}
+
+/* O rodapé segura a ação da seção. A régua acima dele é o que responde
+   "este botão salva o quê": com três formulários independentes na
+   mesma tela, um botão solto no fluxo pertence visualmente ao que vier
+   antes E ao que vier depois. */
+.rodape {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-md);
+  padding-block-start: var(--espaco-md);
+  border-block-start: var(--borda-hairline) solid var(--cor-line);
+}

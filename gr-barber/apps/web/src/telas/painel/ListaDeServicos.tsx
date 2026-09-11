@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { Aviso } from "../../componentes/Aviso";
 import { Botao } from "../../componentes/Botao";
+import { CabecalhoDaPagina } from "../../componentes/CabecalhoDaPagina";
 import { Chip } from "../../componentes/Chip";
 import { formatarPreco } from "../../componentes/ItemDeServico";
 import { Tabela } from "../../componentes/Tabela";
@@ -23,14 +24,25 @@ export function ListaDeServicos() {
 
   return (
     <div className={estilos.pagina}>
-      <div className={estilos.topo}>
-        <h1>Serviços</h1>
-        <Botao onClick={() => router.push("/painel/servicos/novo")}>+ Novo</Botao>
-      </div>
+      <CabecalhoDaPagina
+        titulo="Serviços"
+        apoio="O que a barbearia oferece, com duração e preço."
+        acao={
+          <Botao onClick={() => router.push("/painel/servicos/novo")}>
+            + Novo
+          </Botao>
+        }
+      />
 
       <Tabela
         cabecalho={["Nome", "Duração", "Preço", ""]}
         vazio="Nenhum serviço cadastrado ainda."
+        dicaVazio="Sem serviço cadastrado ninguém consegue agendar — é ele que define quanto tempo o horário ocupa."
+        acaoVazio={
+          <Botao onClick={() => router.push("/painel/servicos/novo")}>
+            Cadastrar primeiro serviço
+          </Botao>
+        }
         aoAbrir={(id) => router.push(`/painel/servicos/${id}`)}
         linhas={(servicos.dados ?? []).map((servico) => ({
           id: servico.id,

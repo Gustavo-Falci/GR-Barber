@@ -1,4 +1,48 @@
-.pagina { display: grid; gap: var(--espaco-lg); padding: var(--espaco-lg); max-width: 720px; }
-.numeros { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--espaco-md); }
-.lista { display: grid; gap: var(--espaco-sm); list-style: none; margin: 0; padding: 0; }
-.lista button { width: 100%; text-align: left; padding: var(--espaco-sm) var(--espaco-md); border: var(--borda-padrao) solid var(--cor-ink); border-radius: var(--raio-md); background: var(--cor-surface); font-size: var(--texto-sm); cursor: pointer; }
+.pagina {
+  display: grid;
+  gap: var(--espaco-lg);
+  align-content: start;
+}
+
+/* `auto-fit` com mínimo em vez de `repeat(3, 1fr)` fixo: em tela
+   estreita os três números empilham sozinhos, sem precisar de uma
+   media query só pra isso. */
+.numeros {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--espaco-md);
+}
+
+.lista {
+  display: grid;
+  gap: var(--espaco-sm);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.lista button {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-md);
+  width: 100%;
+  min-height: 52px;
+  text-align: left;
+  padding: var(--espaco-sm) var(--espaco-md);
+  border: var(--borda-padrao) solid var(--cor-ink);
+  border-radius: var(--raio-md);
+  background: var(--cor-surface);
+  font-size: var(--texto-sm);
+  cursor: pointer;
+  transition: transform 80ms ease, box-shadow 80ms ease;
+}
+
+.lista button:hover {
+  background: var(--cor-paper-soft);
+  box-shadow: 0 3px 0 var(--cor-shadow);
+}
+
+.lista button:active {
+  transform: translateY(3px);
+  box-shadow: 0 0 0 var(--cor-shadow);
+}

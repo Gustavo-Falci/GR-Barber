@@ -1,0 +1,27 @@
+/* Estado vazio: a tela sem conteúdo não pode parecer tela quebrada.
+   Borda tracejada em vez da sólida da casa justamente pra dizer
+   "espaço reservado, ainda sem nada" e não "cartão com conteúdo". */
+.vazio {
+  display: grid;
+  justify-items: center;
+  gap: var(--espaco-md);
+  padding: var(--espaco-xl) var(--espaco-lg);
+  border: var(--borda-padrao) dashed var(--cor-line);
+  border-radius: var(--raio-lg);
+  background: var(--cor-paper-soft);
+  text-align: center;
+}
+
+.mensagem {
+  margin: 0;
+  color: var(--cor-ink-soft);
+  font-family: var(--fonte-display), system-ui, sans-serif;
+  font-size: var(--texto-lg);
+}
+
+.dica {
+  margin: 0;
+  max-width: 46ch;
+  color: var(--cor-muted);
+  font-size: var(--texto-sm);
+}

@@ -41,6 +41,53 @@ describe("configurações da barbearia", () => {
     );
   });
 
+  it("põe o perfil antes do horário no DOM, que é onde ele aparece na tela", async () => {
+    // No desktop a tela é de duas colunas: Barbearia e Seu perfil
+    // empilhados à esquerda, Horário de funcionamento à direita. A ordem
+    // do DOM segue a ordem visual porque é ela que o Tab percorre —
+    // deixar "Horário" no meio faria o foco saltar da coluna esquerda
+    // pra direita e voltar.
+    //
+    // Isto morre se alguém reordenar as seções pela ordem que parece
+    // mais lógica lendo o código (barbearia → horário → perfil), que é
+    // justamente a que descasa do que se vê.
+    montarPainel(<ConfiguracoesDaBarbearia />, criarApiClientFalso());
+
+    await screen.findByRole("heading", { name: "Barbearia" });
+    const titulos = screen
+      .getAllByRole("heading", { level: 2 })
+      .map((h) => h.textContent);
+
+    expect(titulos).toEqual([
+      "Barbearia",
+      "Seu perfil",
+      "Horário de funcionamento",
+    ]);
+  });
+
+  it("dá a cada hora da semana um nome acessível com o dia, apesar do rótulo curto", async () => {
+    // O rótulo que se lê na tela é só "Abre"/"Fecha" — repetir o dia em
+    // cada um fazia a coluna quebrar em duas linhas. O nome acessível
+    // continua trazendo o dia, senão a semana vira uma fileira de
+    // campos "Abre" indistinguíveis pra quem navega por voz.
+    //
+    // Este teste morre se alguém "limpar" o aria-label achando que ele
+    // duplica o rótulo: sem ele o nome acessível vira "Abre", e a busca
+    // pelo dia não acha nada.
+    montarPainel(<ConfiguracoesDaBarbearia />, criarApiClientFalso());
+
+    expect(await screen.findByLabelText("Abre na segunda")).toBeInTheDocument();
+    expect(screen.getByLabelText("Fecha na segunda")).toBeInTheDocument();
+    // Dois dias diferentes, pra provar que o nome acompanha a linha e
+    // não é uma string fixa que passaria igual em qualquer uma.
+    expect(screen.getByLabelText("Abre na terça")).toBeInTheDocument();
+
+    // E o rótulo visível é mesmo o curto — se voltasse a ser o longo,
+    // as duas asserções de cima passariam e o motivo da mudança teria
+    // se perdido sem ninguém notar.
+    expect(screen.getAllByText("Abre").length).toBeGreaterThan(1);
+  });
+
   it("manda a semana inteira, inclusive os dias fechados", async () => {
     // Dia ausente do corpo vira fechado na API, de propósito: "sem
     // linha" e "fechado" são estados diferentes pro cálculo de
