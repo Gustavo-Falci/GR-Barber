@@ -8,6 +8,9 @@ body {
   color: var(--cor-ink);
   font-family: var(--fonte-corpo), Inter, system-ui, -apple-system, sans-serif;
   font-size: var(--texto-md);
+  /* 1.5 é o mínimo confortável pra corpo de texto; os títulos puxam pra
+     baixo no bloco abaixo, senão display de 40px ganha entrelinha de 60. */
+  line-height: 1.5;
 }
 
 h1,
@@ -16,4 +19,63 @@ h3 {
   margin: 0;
   font-family: var(--fonte-display), system-ui, sans-serif;
   letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+/* O <a> do Next é um <a> comum: sem isto ele herda o azul/roxo de
+   visitado do user-agent, que foi o que apareceu na navegação do
+   painel. Cor e sublinhado voltam por componente, quando o link é de
+   corpo de texto e precisa se anunciar como link. */
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* Controles de formulário não herdam fonte por padrão — é a regra que
+   fazia os botões da navegação saírem com a fonte e o cinza do
+   sistema, destoando de todo o resto. */
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+/* `accent-color` pinta checkbox e radio nativos com a cor da marca sem
+   precisar reconstruir o controle — o azul do sistema era o que
+   aparecia na lista de horários das Configurações. */
+input[type="checkbox"],
+input[type="radio"] {
+  accent-color: var(--cor-accent);
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+}
+
+/* Foco visível em tudo que é operável. `:focus-visible` e não `:focus`
+   pra não desenhar o anel em clique de mouse. O `outline-offset`
+   afasta o anel da borda do controle, que é o que o mantém visível
+   mesmo quando o elemento já é amarelo e tem borda escura.
+
+   Sem `border-radius` aqui de propósito: o outline já segue o raio do
+   próprio elemento, e fixar um raio nesta regra deformaria o anel de
+   quem tem outro — o chip em pílula e o cartão perderiam a forma
+   enquanto focados. */
+:focus-visible {
+  outline: 3px solid var(--cor-ink);
+  outline-offset: 2px;
+}
+
+/* A assinatura da casa é sombra deslocada e o botão afundando nela.
+   Quem pediu menos movimento no sistema não deve receber isso. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

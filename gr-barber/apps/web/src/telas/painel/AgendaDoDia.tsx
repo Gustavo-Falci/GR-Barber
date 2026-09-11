@@ -2,6 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { Aviso } from "../../componentes/Aviso";
+import { CabecalhoDaPagina } from "../../componentes/CabecalhoDaPagina";
 import { GradeDeAgenda } from "../../componentes/GradeDeAgenda";
 import { useRequisicao } from "../../api/useRequisicao";
 import { formatarDataLonga, hojeIso } from "../../formato/datas";
@@ -53,7 +54,14 @@ export function AgendaDoDia({ agora = new Date() }: { agora?: Date }) {
 
   return (
     <div className={estilos.pagina}>
-      <h1>{formatarDataLonga(data)}</h1>
+      <CabecalhoDaPagina
+        titulo={formatarDataLonga(data)}
+        apoio={
+          doDia.dados.length === 1
+            ? "1 agendamento"
+            : `${doDia.dados.length} agendamentos`
+        }
+      />
 
       <ul className={estilos.semana}>
         {semana.map((dia, indice) => (

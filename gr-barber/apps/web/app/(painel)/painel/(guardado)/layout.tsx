@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-import { NavegacaoDoPainel } from "../../../../src/painel/NavegacaoDoPainel";
+import { LayoutDoPainel } from "../../../../src/painel/LayoutDoPainel";
 import { ProvedorDoPainel } from "../../../../src/painel/ProvedorDoPainel";
 import { SessaoDoPainel } from "../../../../src/painel/SessaoDoPainel";
 
@@ -11,8 +11,7 @@ export default function LayoutGuardado({ children }: { children: ReactNode }) {
   return (
     <ProvedorDoPainel>
       <SessaoDoPainel>
-        <NavegacaoDoPainel />
-        <main>{children}</main>
+        <LayoutDoPainel>{children}</LayoutDoPainel>
       </SessaoDoPainel>
     </ProvedorDoPainel>
   );

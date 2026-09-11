@@ -3,10 +3,12 @@
 import { useRouter } from "next/navigation";
 import { Aviso } from "../../componentes/Aviso";
 import { Botao } from "../../componentes/Botao";
+import { CabecalhoDaPagina } from "../../componentes/CabecalhoDaPagina";
 import { Estatistica } from "../../componentes/Estatistica";
+import { Vazio } from "../../componentes/Vazio";
 import { formatarPreco } from "../../componentes/ItemDeServico";
 import { useRequisicao } from "../../api/useRequisicao";
-import { hojeIso } from "../../formato/datas";
+import { formatarDataLonga, hojeIso } from "../../formato/datas";
 import { ocupacao, previstoDoDia } from "../../painel/metricas";
 import { useApiDoPainel } from "../../painel/ProvedorDoPainel";
 import { usePainel } from "../../painel/SessaoDoPainel";
@@ -37,7 +39,15 @@ export function DashboardDoDia({ agora = new Date() }: { agora?: Date }) {
 
   return (
     <div className={estilos.pagina}>
-      <h1>Hoje, {perfil.nome}</h1>
+      <CabecalhoDaPagina
+        titulo={`Hoje, ${perfil.nome}`}
+        apoio={formatarDataLonga(hoje)}
+        acao={
+          <Botao onClick={() => router.push("/painel/agendamentos/novo")}>
+            Novo agendamento
+          </Botao>
+        }
+      />
 
       <div className={estilos.numeros}>
         <Estatistica numero={String(doDia.length)} legenda="agendamentos hoje" />
@@ -52,7 +62,10 @@ export function DashboardDoDia({ agora = new Date() }: { agora?: Date }) {
       </div>
 
       {doDia.length === 0 ? (
-        <p>Nenhum agendamento hoje.</p>
+        <Vazio
+          mensagem="Nenhum agendamento hoje."
+          dica="Quando alguém marcar pelo seu link, o horário aparece aqui."
+        />
       ) : (
         <ul className={estilos.lista}>
           {doDia.map((agendamento) => (
@@ -68,10 +81,6 @@ export function DashboardDoDia({ agora = new Date() }: { agora?: Date }) {
           ))}
         </ul>
       )}
-
-      <Botao onClick={() => router.push("/painel/agendamentos/novo")}>
-        Novo agendamento
-      </Botao>
     </div>
   );
 }

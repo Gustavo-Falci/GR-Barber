@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Aviso } from "../../componentes/Aviso";
 import { Botao } from "../../componentes/Botao";
+import { CabecalhoDaPagina } from "../../componentes/CabecalhoDaPagina";
 import { Campo } from "../../componentes/Campo";
 import { Tabela } from "../../componentes/Tabela";
 import { useRequisicao } from "../../api/useRequisicao";
@@ -69,10 +70,15 @@ export function ListaDeClientes({ agora = new Date() }: { agora?: Date }) {
 
   return (
     <div className={estilos.pagina}>
-      <div className={estilos.topo}>
-        <h1>Clientes</h1>
-        <Botao onClick={() => router.push("/painel/clientes/novo")}>+ Novo</Botao>
-      </div>
+      <CabecalhoDaPagina
+        titulo="Clientes"
+        apoio="Quem já passou pela barbearia, com o último atendimento."
+        acao={
+          <Botao onClick={() => router.push("/painel/clientes/novo")}>
+            + Novo
+          </Botao>
+        }
+      />
 
       <Campo
         rotulo="Buscar por nome ou telefone"

@@ -150,6 +150,44 @@ describe("api do barbeiro", () => {
     );
   });
 
+  it("omite a busca vazia em vez de mandar ?busca=", async () => {
+    // O schema da API tem minLength: 1 no `busca` — o contrato é "se
+    // mandar o parâmetro, mande com conteúdo". A lista de clientes abre
+    // com o campo vazio, e o `montarQuery` só pula `undefined`, nunca
+    // `""`. Sem normalizar aqui, abrir /painel/clientes é um 400:
+    // "querystring/busca must NOT have fewer than 1 characters".
+    //
+    // O teste vive no api-client, e não na tela, de propósito: o dublê
+    // do `falso.ts` aceita `""` e devolve todo mundo, então um teste de
+    // ListaDeClientes passa exista o fix ou não.
+    const fetchFalso = vi.fn(async (_url: string, _init?: RequestInit) => respostaJson({ clientes: [] }));
+
+    await clientAutenticado(fetchFalso).barbeiro.clientes("");
+
+    expect(urlEInit(fetchFalso).url).toBe("https://api.exemplo.br/clientes");
+  });
+
+  it("trata busca só de espaços como busca vazia", async () => {
+    // `"   "` passaria o minLength e a API o descartaria no `.trim()`
+    // — mesma resposta, uma ida ao servidor a mais.
+    const fetchFalso = vi.fn(async (_url: string, _init?: RequestInit) => respostaJson({ clientes: [] }));
+
+    await clientAutenticado(fetchFalso).barbeiro.clientes("   ");
+
+    expect(urlEInit(fetchFalso).url).toBe("https://api.exemplo.br/clientes");
+  });
+
+  it("preserva os espaços em volta de uma busca com conteúdo", async () => {
+    // O trim decide se manda; não muda o que a pessoa digitou.
+    const fetchFalso = vi.fn(async (_url: string, _init?: RequestInit) => respostaJson({ clientes: [] }));
+
+    await clientAutenticado(fetchFalso).barbeiro.clientes("  joão  ");
+
+    expect(urlEInit(fetchFalso).url).toBe(
+      "https://api.exemplo.br/clientes?busca=++jo%C3%A3o++"
+    );
+  });
+
   it("lista a agenda de um dia", async () => {
     const fetchFalso = vi.fn(async (_url: string, _init?: RequestInit) => respostaJson({ agendamentos: [] }));
 

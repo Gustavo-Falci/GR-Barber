@@ -1,0 +1,37 @@
+.cabecalho {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--espaco-md);
+  padding-block-end: var(--espaco-md);
+  border-block-end: var(--borda-padrao) solid var(--cor-ink);
+}
+
+.textos {
+  display: grid;
+  gap: var(--espaco-xs);
+  /* `min-width: 0` pra um título longo truncar dentro da coluna em vez
+     de empurrar a ação pra fora da tela. */
+  min-width: 0;
+}
+
+.titulo {
+  font-size: var(--texto-xl);
+}
+
+.apoio {
+  color: var(--cor-muted);
+  font-size: var(--texto-sm);
+}
+
+/* A ação não encolhe: em telas estreitas quem cede é o título. */
+.acao {
+  flex-shrink: 0;
+}
+
+@media (max-width: 560px) {
+  .cabecalho {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

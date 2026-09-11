@@ -14,3 +14,4 @@ expo-env.d.ts
 web-build/
 /apps/mobile/ios
 /apps/mobile/android
+/apps/web/next-env.d.ts
