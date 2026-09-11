@@ -153,9 +153,24 @@ export function criarApiBarbeiro(requisicao: Requisicao) {
     },
 
     async clientes(busca?: string): Promise<ClienteSerializado[]> {
+      // Busca vazia vira `undefined`, que é o único valor que o
+      // `montarQuery` omite — `""` ele serializa, e `?busca=` bate no
+      // `minLength: 1` do schema da API (400 "querystring/busca must
+      // NOT have fewer than 1 characters"). Como as duas telas que
+      // chamam isto abrem com o campo vazio, o filtro sem texto é o
+      // caso comum, não a exceção.
+      //
+      // A normalização mora aqui, e não no `montarQuery`, porque quem
+      // sabe que "sem busca" e "busca vazia" são a mesma coisa é este
+      // endpoint — `""` pode ser um valor legítimo noutro parâmetro.
+      //
+      // O `trim` decide se manda, não o que manda: a API já descarta
+      // espaços em volta, então `"   "` seria uma ida ao servidor pra
+      // receber a lista inteira de volta.
+      const termo = busca?.trim() ? busca : undefined;
       const resposta = await requisicao<{ clientes: ClienteSerializado[] }>(
         "/clientes",
-        { query: { busca }, comToken: true }
+        { query: { busca: termo }, comToken: true }
       );
       return resposta.clientes;
     },
