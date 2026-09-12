@@ -120,6 +120,19 @@
   margin-inline: auto;
 }
 
+/* Uma tela pede largura cheia marcando a própria raiz com
+   `data-largura="cheia"`. É a agenda: grade de sete colunas, que na
+   medida de 1180px fica espremida numa tela larga, enquanto lista e
+   formulário continuam precisando dela para não virar linha longa
+   demais de ler.
+
+   Lido daqui com `:has()` porque a decisão nasce na tela e o limite
+   mora no container, que é o pai — custom property desceria, mas não
+   sobe. */
+.container:has([data-largura="cheia"]) {
+  max-width: none;
+}
+
 /* Abaixo de 900px a lateral vira uma faixa no topo e a navegação rola
    na horizontal — é o mesmo conjunto de links, sem menu escondido. */
 @media (max-width: 900px) {

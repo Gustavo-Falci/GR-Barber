@@ -53,6 +53,18 @@ describe("agenda", () => {
     expect(screen.getByRole("button", { name: "12 de setembro" })).toBeInTheDocument();
   });
 
+  it("pede largura cheia, em vez da medida das telas de leitura", async () => {
+    // A agenda é grade, não texto: a medida de 1180px do container serve
+    // lista e formulário, e aqui só espreme as sete colunas. O atributo
+    // é o que o container lê para abrir mão do limite — sem ele a tela
+    // volta a estreitar sem nada quebrar.
+    montarPainel(<Agenda agora={AGORA} />, semear());
+
+    await screen.findByRole("button", { name: "Semana" });
+
+    expect(screen.getByTestId("agenda").dataset.largura).toBe("cheia");
+  });
+
   it("sem ?data= na URL, mostra hoje", async () => {
     // Herdado da tela antiga: a data padrão sai do relógio, não de uma
     // constante — e `agora` é parâmetro justamente pra isso ser testável.

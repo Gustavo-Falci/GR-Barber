@@ -104,7 +104,11 @@ export function Agenda({ agora = new Date() }: { agora?: Date }) {
       : formatarDataLonga(data);
 
   return (
-    <div className={estilos.pagina}>
+    // `data-largura` é o que o container do painel lê para abrir mão da
+    // medida de 1180px: a agenda é grade, não texto corrido, e naquele
+    // limite as sete colunas ficam estreitas numa tela larga. As telas
+    // de lista e formulário mantêm a medida.
+    <div className={estilos.pagina} data-largura="cheia" data-testid="agenda">
       {/* Uma barra só: ações, período e vista. O contador de
           agendamentos saiu junto com o cabeçalho de página — a agenda
           mostra os agendamentos, e contar o que está à vista é
