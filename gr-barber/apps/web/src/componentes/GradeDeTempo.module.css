@@ -1,14 +1,95 @@
 /* O eixo de tempo e as colunas de dia. A grade tem uma linha por 5
    minutos: `duracaoMinutos` é múltiplo de 5 e os inícios caem na grade
-   de 15 do scheduling, então todo evento alinha exato. */
+   de 15 do scheduling, então todo evento alinha exato.
+
+   Sem `overflow: hidden` de propósito: ele criaria um contexto de
+   rolagem e o cabeçalho grudado nunca colaria. Quem arredonda os cantos
+   agora é o cabeçalho em cima e o corpo embaixo. */
 .quadro {
-  display: grid;
-  grid-template-columns: 3.5rem repeat(auto-fit, minmax(0, 1fr));
   border: var(--borda-padrao) solid var(--cor-ink);
   border-radius: var(--raio-lg);
   background: var(--cor-surface);
   box-shadow: 0 4px 0 var(--cor-shadow);
+}
+
+/* Cabeçalho e corpo são grades irmãs com as MESMAS trilhas — é o que
+   mantém a coluna do dia alinhada com a coluna dos eventos. Por isso o
+   número de colunas vem por custom property e não por `auto-fit`, que
+   contaria os filhos de cada uma separadamente. */
+.cabecalho,
+.corpo {
+  display: grid;
+  grid-template-columns: 3.5rem repeat(var(--colunas), minmax(0, 1fr));
+}
+
+/* Grudado no topo da janela enquanto a agenda desce. Quem rola é a
+   página — a barra lateral do painel já é sticky contra a viewport, e
+   a área de conteúdo não tem overflow próprio. */
+.cabecalho {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  border-block-end: var(--borda-padrao) solid var(--cor-ink);
+  border-start-start-radius: var(--raio-lg);
+  border-start-end-radius: var(--raio-lg);
+  background: var(--cor-paper-soft);
+}
+
+.corpo {
   overflow: hidden;
+  border-end-start-radius: var(--raio-lg);
+  border-end-end-radius: var(--raio-lg);
+}
+
+/* A casa vazia sobre o eixo das horas. Mantém a primeira trilha do
+   cabeçalho ocupada pra que a coluna de domingo comece onde a coluna de
+   domingo do corpo começa. */
+.canto {
+  border-inline-end: var(--borda-hairline) solid var(--cor-line);
+}
+
+.diaDoCabecalho {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: var(--espaco-sm) var(--espaco-xs);
+  border: none;
+  border-inline-end: var(--borda-hairline) solid var(--cor-line);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.diaDoCabecalho:last-child {
+  border-inline-end: none;
+}
+
+/* `span` no lugar do botão na vista de dia: sem clique, sem cursor. */
+span.diaDoCabecalho {
+  cursor: default;
+}
+
+.nomeDoDia {
+  color: var(--cor-muted);
+  font-size: var(--texto-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.numeroDoDia {
+  display: grid;
+  place-items: center;
+  min-width: 2em;
+  min-height: 2em;
+  border-radius: var(--raio-pill);
+  font-family: var(--fonte-display), system-ui, sans-serif;
+  font-size: var(--texto-lg);
+}
+
+button.diaDoCabecalho:hover .numeroDoDia {
+  background: var(--cor-accent);
+  color: var(--cor-dark);
 }
 
 /* 8px por linha de 5 minutos: meia hora dá 48px, que é onde nome e
@@ -95,28 +176,6 @@
   font-family: var(--fonte-display), system-ui, sans-serif;
 }
 
-/* O cabeçalho clicável de cada coluna, só na vista de semana. Fica na
-   linha 1 e por cima das faixas livres, que começam no mesmo lugar. */
-.cabecalhoDoDia {
-  grid-row: 1;
-  grid-column: 1;
-  z-index: 3;
-  align-self: start;
-  justify-self: center;
-  padding: 2px 6px;
-  border: none;
-  border-radius: var(--raio-pill);
-  background: var(--cor-paper-soft);
-  font-family: var(--fonte-display), system-ui, sans-serif;
-  font-size: var(--texto-sm);
-  cursor: pointer;
-}
-
-.cabecalhoDoDia:hover {
-  background: var(--cor-accent);
-  color: var(--cor-dark);
-}
-
 .servicos {
   display: block;
   overflow: hidden;
@@ -181,7 +240,8 @@
     overflow-x: auto;
   }
 
-  .coluna {
+  .coluna,
+  .diaDoCabecalho {
     min-width: 120px;
   }
 }

@@ -127,6 +127,35 @@ describe("GradeDeTempo", () => {
     expect(aoAbrirDia).toHaveBeenCalledWith(TERCA);
   });
 
+  it("põe o cabeçalho fora da área que rola, com o dia da semana", async () => {
+    const aoAbrirDia = vi.fn((_data: string) => {});
+    montar({ dias: ["2026-09-07", TERCA], aoAbrirDia });
+
+    const cabecalho = screen.getByTestId("cabecalho-da-grade");
+
+    // Fora do corpo: se o cabeçalho voltar pra dentro das colunas, ele
+    // volta a rolar junto — foi assim que ele estava.
+    expect(cabecalho).not.toContainElement(screen.getByTestId("corpo-da-grade"));
+    expect(screen.getByTestId("corpo-da-grade")).not.toContainElement(cabecalho);
+
+    // O botão do dia mora no cabeçalho, e leva o dia da semana junto do
+    // número.
+    const botao = screen.getByRole("button", { name: "8 de setembro" });
+    expect(cabecalho).toContainElement(botao);
+    expect(botao).toHaveTextContent("ter.");
+    expect(botao).toHaveTextContent("8");
+  });
+
+  it("sem aoAbrirDia, o cabeçalho ainda mostra os dias, sem virar botão", () => {
+    // A vista de dia não navega, mas continua precisando dizer que dia
+    // está na tela — antes o cabeçalho sumia inteiro junto com o clique.
+    montar({ dias: [TERCA] });
+
+    const cabecalho = screen.getByTestId("cabecalho-da-grade");
+    expect(cabecalho).toHaveTextContent("ter.");
+    expect(cabecalho).toHaveTextContent("8");
+  });
+
   it("sem aoAbrirDia, não há cabeçalho de coluna", () => {
     // A vista de dia não passa a prop: um botão para abrir o dia que já
     // está aberto seria ruído. Este teste morre se o cabeçalho passar a
