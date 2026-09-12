@@ -6,11 +6,6 @@
    rolagem e o cabeçalho grudado nunca colaria. Quem arredonda os cantos
    agora é o cabeçalho em cima e o corpo embaixo. */
 .quadro {
-  /* Quanto o corpo recua no topo para caber o primeiro rótulo de hora.
-     Nomeada porque dois lugares dependem dela: o recuo em si, e a
-     hachura do dia fechado, que precisa subir de volta para preencher. */
-  --folga-do-topo: calc(var(--texto-xs) / 2 + 2px);
-
   border: var(--borda-padrao) solid var(--cor-ink);
   border-radius: var(--raio-lg);
   background: var(--cor-surface);
@@ -103,23 +98,6 @@ button.diaDoCabecalho:hover .numeroDoDia {
 .coluna {
   display: grid;
   grid-template-rows: repeat(var(--total-linhas), 8px);
-  /* Folga no topo para o primeiro rótulo de hora. Cada rótulo sobe meio
-     em do PRÓPRIO tamanho para ficar centrado na sua linha (ver
-     `.hora`), e o primeiro subiria para fora, onde o cabeçalho grudado
-     passa por cima e come metade do "09:00". Os outros têm grade acima
-     e não precisam.
-
-     A conta é sobre `--texto-xs`, que é o tamanho do rótulo: um `0.5em`
-     aqui resolveria contra o texto do corpo, que é maior, e a folga
-     deixaria de ter relação com o que ela compensa. Os 2px são ar entre
-     o rótulo e a borda do cabeçalho.
-
-     Nos DOIS, e não no `.corpo` que os contém: no container, a folga
-     ficaria fora deles, e o fundo do eixo e as divisórias das colunas
-     só começariam abaixo dela — uma faixa da cor do quadro separando o
-     cabeçalho do corpo. Aqui os dois deslocam junto, então o
-     alinhamento entre hora e evento se mantém e nada descola. */
-  padding-block-start: var(--folga-do-topo);
 }
 
 .eixo {
@@ -135,6 +113,19 @@ button.diaDoCabecalho:hover .numeroDoDia {
   font-size: var(--texto-xs);
   /* Sobe meia linha pra régua da hora coincidir com o rótulo. */
   transform: translateY(-0.5em);
+}
+
+/* Menos o que encosta no topo. Acima dele está o cabeçalho grudado, que
+   o cobriria — e empurrar a grade inteira pra baixo para abrir espaço
+   deixava uma faixa vazia entre o cabeçalho e a primeira linha
+   tracejada. Ele fica logo ABAIXO da sua linha em vez de centrado nela,
+   que é como os calendários resolvem a borda de cima.
+
+   O atributo vem do componente e vale `linha === 1`, não "o primeiro da
+   lista": abrindo às 09:30 o primeiro rótulo é 10:00, que fica na linha
+   7 e não encosta em nada — um `:first-child` o desalinharia à toa. */
+.hora[data-no-topo="true"] {
+  transform: none;
 }
 
 .coluna {
@@ -232,10 +223,7 @@ button.diaDoCabecalho:hover .numeroDoDia {
 .fechado {
   grid-row: 1 / -1;
   grid-column: 1;
-  /* Sobe de volta pela folga: `1 / -1` cobre a área da grade, que começa
-     abaixo dela, e sem isto a hachura deixaria uma faixa vazia colada no
-     cabeçalho. */
-  margin: calc(-1 * var(--folga-do-topo)) 0 0;
+  margin: 0;
   padding: var(--espaco-md) var(--espaco-xs);
   background: repeating-linear-gradient(
     45deg,

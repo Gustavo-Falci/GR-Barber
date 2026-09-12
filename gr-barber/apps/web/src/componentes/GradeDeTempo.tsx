@@ -104,6 +104,12 @@ export function GradeDeTempo({
             <span
               key={hora.rotulo}
               className={estilos.hora}
+              // O rótulo da primeira linha fica embaixo do cabeçalho
+              // grudado e não pode subir meia linha como os outros. É
+              // `linha === 1`, e não "o primeiro da lista": abrindo às
+              // 09:30, o primeiro rótulo é 10:00 na linha 7, que não
+              // encosta em nada.
+              data-no-topo={hora.linha === 1 ? "true" : undefined}
               style={{ "--linha": hora.linha } as CSSProperties}
             >
               {hora.rotulo}

@@ -127,6 +127,40 @@ describe("GradeDeTempo", () => {
     expect(aoAbrirDia).toHaveBeenCalledWith(TERCA);
   });
 
+  it("marca só o rótulo de hora que encosta no topo da grade", () => {
+    // O rótulo da linha 1 fica embaixo do cabeçalho grudado, então não
+    // pode subir meia linha como os outros — e a grade não pode descer
+    // pra abrir espaço, senão nasce uma faixa vazia entre o cabeçalho e
+    // a primeira linha tracejada.
+    montar({ dias: [TERCA] });
+
+    // Abrindo às 09:00, o rótulo das 09:00 está na linha 1.
+    expect(screen.getByText("09:00")).toHaveAttribute("data-no-topo", "true");
+    expect(screen.getByText("10:00")).not.toHaveAttribute("data-no-topo");
+  });
+
+  it("não marca rótulo nenhum quando a barbearia abre fora da hora cheia", () => {
+    // Abrindo às 09:30, o primeiro rótulo é 10:00 — que está na linha 7,
+    // e não encosta no cabeçalho. Este é o caso que um `:first-child`
+    // erraria: ele marcaria o primeiro rótulo existisse ou não o
+    // problema que a marca resolve.
+    const meiaHora: HorarioSerializado[] = [
+      { diaSemana: 2, horaAbertura: "09:30", horaFechamento: "18:00", fechado: false },
+    ];
+    const grade = gradeDeTempo({
+      dias: [TERCA],
+      horarios: meiaHora,
+      agendamentos: [],
+      agora: AGORA,
+    });
+
+    render(
+      <GradeDeTempo grade={grade} aoAbrir={() => {}} aoCriar={() => {}} />
+    );
+
+    expect(screen.getByText("10:00")).not.toHaveAttribute("data-no-topo");
+  });
+
   it("põe o cabeçalho fora da área que rola, com o dia da semana", async () => {
     const aoAbrirDia = vi.fn((_data: string) => {});
     montar({ dias: ["2026-09-07", TERCA], aoAbrirDia });
