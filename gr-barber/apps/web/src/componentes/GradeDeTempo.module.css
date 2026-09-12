@@ -171,3 +171,17 @@
   text-align: center;
   color: var(--cor-muted);
 }
+
+/* Abaixo de 900px sete colunas não cabem sem espremer o evento até o
+   ilegível. O quadro rola na horizontal dentro da própria caixa, em vez
+   de empurrar a página — rolagem horizontal no body quebra o layout
+   inteiro. O cliente móvel do barbeiro é o app do Expo, não esta tela. */
+@media (max-width: 900px) {
+  .quadro {
+    overflow-x: auto;
+  }
+
+  .coluna {
+    min-width: 120px;
+  }
+}
