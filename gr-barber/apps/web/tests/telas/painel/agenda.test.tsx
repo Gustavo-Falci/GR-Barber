@@ -2,10 +2,11 @@ import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it } from "vitest";
 import { criarApiClientFalso, ErroDaApi } from "@gr-barber/api-client";
-import { AgendaDoDia } from "../../../src/telas/painel/AgendaDoDia";
+import { Agenda } from "../../../src/telas/painel/Agenda";
 import { navegacaoFalsa } from "../../ajudantes/navegacao";
 import { montarPainel } from "../../ajudantes/painel";
 
+// 2026-09-08 é uma terça-feira.
 const AGORA = new Date("2026-09-08T10:00:00-03:00");
 
 function semear() {
@@ -31,7 +32,7 @@ function semear() {
   });
 }
 
-describe("agenda do dia", () => {
+describe("agenda", () => {
   beforeEach(() => {
     localStorage.clear();
     navegacaoFalsa.redefinir({
@@ -40,58 +41,150 @@ describe("agenda do dia", () => {
     });
   });
 
-  it("mostra o agendamento na faixa em que ele começa", async () => {
-    montarPainel(<AgendaDoDia agora={AGORA} />, semear());
+  it("sem ?vista= na URL, abre na semana", async () => {
+    montarPainel(<Agenda agora={AGORA} />, semear());
 
-    expect(await screen.findByText(/João Silva/)).toBeInTheDocument();
-  });
-
-  it("faixa livre no futuro leva ao novo agendamento com data e hora", async () => {
-    montarPainel(<AgendaDoDia agora={AGORA} />, semear());
-
-    await userEvent.click(await screen.findByRole("button", { name: /11:30/ }));
-
-    expect(navegacaoFalsa.push).toHaveBeenCalledWith(
-      "/painel/agendamentos/novo?data=2026-09-08&hora=11%3A30"
+    expect(await screen.findByRole("button", { name: "Semana" })).toHaveAttribute(
+      "aria-pressed",
+      "true"
     );
-  });
-
-  it("faixa de hoje que já passou não oferece criar", async () => {
-    montarPainel(<AgendaDoDia agora={AGORA} />, semear());
-
-    await screen.findByText(/João Silva/);
-    expect(screen.queryByRole("button", { name: /09:00/ })).not.toBeInTheDocument();
-    expect(screen.getByText("09:00")).toBeInTheDocument();
-  });
-
-  it("clicar num dia da faixa de semana troca a data na URL", async () => {
-    montarPainel(<AgendaDoDia agora={AGORA} />, semear());
-
-    await userEvent.click(await screen.findByRole("button", { name: /quarta/i }));
-
-    expect(navegacaoFalsa.push).toHaveBeenCalledWith("/painel/agenda?data=2026-09-09");
+    // Sete colunas: a semana de 2026-09-08 vai de domingo 06 a sábado 12.
+    expect(screen.getByRole("button", { name: "6 de setembro" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "12 de setembro" })).toBeInTheDocument();
   });
 
   it("sem ?data= na URL, mostra hoje", async () => {
+    // Herdado da tela antiga: a data padrão sai do relógio, não de uma
+    // constante — e `agora` é parâmetro justamente pra isso ser testável.
     navegacaoFalsa.redefinir({ pathname: "/painel/agenda" });
-    montarPainel(<AgendaDoDia agora={AGORA} />, semear());
 
-    expect(await screen.findByText(/João Silva/)).toBeInTheDocument();
+    montarPainel(<Agenda agora={AGORA} />, semear());
+
+    // A semana de hoje (08/09) começa no domingo 06.
+    expect(
+      await screen.findByRole("button", { name: "6 de setembro" })
+    ).toBeInTheDocument();
+  });
+
+  it("mostra o agendamento na vista de dia", async () => {
+    navegacaoFalsa.redefinir({
+      pathname: "/painel/agenda",
+      query: { data: "2026-09-08", vista: "dia" },
+    });
+
+    montarPainel(<Agenda agora={AGORA} />, semear());
+
+    expect(await screen.findByRole("button", { name: /João Silva/ })).toBeInTheDocument();
+  });
+
+  it("clicar numa faixa livre leva ao novo agendamento com data e hora", async () => {
+    navegacaoFalsa.redefinir({
+      pathname: "/painel/agenda",
+      query: { data: "2026-09-08", vista: "dia" },
+    });
+
+    montarPainel(<Agenda agora={AGORA} />, semear());
+
+    await userEvent.click(await screen.findByRole("button", { name: "14:00" }));
+
+    expect(navegacaoFalsa.push).toHaveBeenCalledWith(
+      "/painel/agendamentos/novo?data=2026-09-08&hora=14%3A00"
+    );
+  });
+
+  it("trocar de vista preserva a data", async () => {
+    montarPainel(<Agenda agora={AGORA} />, semear());
+
+    await userEvent.click(await screen.findByRole("button", { name: "Mês" }));
+
+    // Setembro, não o mês corrente do relógio da máquina.
+    expect(navegacaoFalsa.push).toHaveBeenCalledWith(
+      "/painel/agenda?vista=mes&data=2026-09-08"
+    );
+  });
+
+  it("andar na vista de semana pula sete dias", async () => {
+    montarPainel(<Agenda agora={AGORA} />, semear());
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Próximo período" })
+    );
+
+    expect(navegacaoFalsa.push).toHaveBeenCalledWith(
+      "/painel/agenda?vista=semana&data=2026-09-15"
+    );
+  });
+
+  it("andar na vista de mês pula um mês", async () => {
+    navegacaoFalsa.redefinir({
+      pathname: "/painel/agenda",
+      query: { data: "2026-09-08", vista: "mes" },
+    });
+
+    montarPainel(<Agenda agora={AGORA} />, semear());
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Período anterior" })
+    );
+
+    expect(navegacaoFalsa.push).toHaveBeenCalledWith(
+      "/painel/agenda?vista=mes&data=2026-08-08"
+    );
+  });
+
+  it("clicar num dia do mês abre aquele dia", async () => {
+    navegacaoFalsa.redefinir({
+      pathname: "/painel/agenda",
+      query: { data: "2026-09-08", vista: "mes" },
+    });
+
+    montarPainel(<Agenda agora={AGORA} />, semear());
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: "15 de setembro" })
+    );
+
+    expect(navegacaoFalsa.push).toHaveBeenCalledWith(
+      "/painel/agenda?vista=dia&data=2026-09-15"
+    );
+  });
+
+  it("clicar no cabeçalho de um dia da semana abre aquele dia", async () => {
+    // Herdado da faixa de dias da tela antiga, que trocava a data na URL:
+    // a coluna da semana faz o mesmo papel, indo para a vista de dia.
+    montarPainel(<Agenda agora={AGORA} />, semear());
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: "9 de setembro" })
+    );
+
+    expect(navegacaoFalsa.push).toHaveBeenCalledWith(
+      "/painel/agenda?vista=dia&data=2026-09-09"
+    );
+  });
+
+  it("vista inválida na URL cai na semana, sem quebrar", async () => {
+    navegacaoFalsa.redefinir({
+      pathname: "/painel/agenda",
+      query: { data: "2026-09-08", vista: "banana" },
+    });
+
+    montarPainel(<Agenda agora={AGORA} />, semear());
+
+    expect(await screen.findByRole("button", { name: "Semana" })).toHaveAttribute(
+      "aria-pressed",
+      "true"
+    );
   });
 
   it("erro ao carregar horários avisa, em vez de ficar carregando pra sempre", async () => {
-    // Sem este aviso, `!horarios.dados` nunca vira falso e a tela fica
-    // presa em "Carregando…" — pior que um erro, porque não avisa que
-    // algo deu errado.
     const falso = semear();
     falso.barbeiro.horarios = async () => {
-      throw new ErroDaApi(500, "erro_interno", "não foi possível carregar os horários");
+      throw new ErroDaApi(500, "erro_interno", "Falha ao buscar horários.");
     };
 
-    montarPainel(<AgendaDoDia agora={AGORA} />, falso);
+    montarPainel(<Agenda agora={AGORA} />, falso);
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "não foi possível carregar os horários"
-    );
+    expect(await screen.findByText("Falha ao buscar horários.")).toBeInTheDocument();
   });
 });

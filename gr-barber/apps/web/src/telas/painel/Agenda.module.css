@@ -1,0 +1,5 @@
+.pagina {
+  display: grid;
+  gap: var(--espaco-lg);
+  align-content: start;
+}

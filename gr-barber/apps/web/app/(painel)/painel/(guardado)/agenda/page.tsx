@@ -1,7 +1,7 @@
 "use client";
 
-import { AgendaDoDia } from "../../../../../src/telas/painel/AgendaDoDia";
+import { Agenda } from "../../../../../src/telas/painel/Agenda";
 
 export default function Pagina() {
-  return <AgendaDoDia />;
+  return <Agenda />;
 }
