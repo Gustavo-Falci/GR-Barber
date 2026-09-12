@@ -122,7 +122,7 @@ describe("GradeDeTempo", () => {
     const aoAbrirDia = vi.fn((_data: string) => {});
     montar({ dias: ["2026-09-07", TERCA], aoAbrirDia });
 
-    await userEvent.click(screen.getByRole("button", { name: /8 de setembro/ }));
+    await userEvent.click(screen.getByRole("button", { name: "8 de setembro" }));
 
     expect(aoAbrirDia).toHaveBeenCalledWith(TERCA);
   });
@@ -134,7 +134,7 @@ describe("GradeDeTempo", () => {
     montar({ dias: [TERCA] });
 
     expect(
-      screen.queryByRole("button", { name: /8 de setembro/ })
+      screen.queryByRole("button", { name: "8 de setembro" })
     ).not.toBeInTheDocument();
   });
 });

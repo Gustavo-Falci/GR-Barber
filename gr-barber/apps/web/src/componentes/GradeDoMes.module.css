@@ -1,0 +1,91 @@
+.quadro {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: var(--borda-hairline);
+  border: var(--borda-padrao) solid var(--cor-ink);
+  border-radius: var(--raio-lg);
+  /* O fundo é a cor da linha, e o gap de 1px entre células o deixa
+     aparecer — é assim que a grade ganha divisórias sem cada célula
+     precisar de borda própria, que dobraria a espessura no encontro. */
+  background: var(--cor-line);
+  box-shadow: 0 4px 0 var(--cor-shadow);
+  overflow: hidden;
+}
+
+.cabecalho {
+  padding: var(--espaco-sm);
+  background: var(--cor-paper-soft);
+  color: var(--cor-ink-soft);
+  text-align: center;
+  font-size: var(--texto-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.celula {
+  display: grid;
+  align-content: start;
+  gap: 2px;
+  min-height: 104px;
+  padding: var(--espaco-xs);
+  border: none;
+  background: var(--cor-surface);
+  text-align: start;
+  cursor: pointer;
+}
+
+.celula:hover {
+  background: var(--cor-paper-soft);
+}
+
+/* Fora do mês continua clicável e legível, só recua: apagá-lo esconderia
+   agendamentos reais dos meses vizinhos. */
+.celula[data-fora-do-mes="true"] {
+  background: var(--cor-paper-soft);
+  color: var(--cor-muted);
+}
+
+.celula[data-fechado="true"] .numero {
+  text-decoration: line-through;
+  color: var(--cor-muted);
+}
+
+.celula[aria-current="date"] .numero {
+  border-radius: var(--raio-pill);
+  background: var(--cor-accent);
+  color: var(--cor-dark);
+}
+
+.numero {
+  justify-self: start;
+  min-width: 1.6em;
+  padding: 2px 6px;
+  text-align: center;
+  font-family: var(--fonte-display), system-ui, sans-serif;
+  font-size: var(--texto-sm);
+}
+
+.chip {
+  overflow: hidden;
+  padding: 1px var(--espaco-xs);
+  border-radius: var(--raio-sm);
+  background: var(--cor-accent);
+  color: var(--cor-dark);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: var(--texto-xs);
+}
+
+.excedente {
+  padding-inline-start: var(--espaco-xs);
+  color: var(--cor-ink-soft);
+  font-size: var(--texto-xs);
+  font-weight: 600;
+}
+
+@media (max-width: 720px) {
+  .celula {
+    min-height: 72px;
+  }
+}
