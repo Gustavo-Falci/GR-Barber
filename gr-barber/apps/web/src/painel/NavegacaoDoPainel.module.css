@@ -103,15 +103,19 @@
   padding: var(--espaco-xl) var(--espaco-lg);
 }
 
-/* Coluna de altura cheia: uma tela que se ancora na janela (a agenda)
-   precisa de um pai com altura definida para poder limitar a própria. O
-   `min-height: 100%` resolve porque a área de conteúdo tem altura
-   definida pelo shell; e para as telas de altura natural nada muda —
-   elas continuam sendo itens de flex com o tamanho do próprio conteúdo. */
+/* Coluna de altura DEFINIDA, não apenas mínima. É a diferença que faz a
+   agenda rolar por dentro: `min-height` deixa a altura em `auto`, e
+   `flex: 1` num pai de altura automática não distribui espaço nenhum —
+   os filhos voltam a crescer com o conteúdo e a rolagem escapa para
+   fora. Com `height`, a altura desce definida até a grade.
+
+   Para as telas de altura natural nada quebra: o conteúdo mais alto que
+   a janela transborda daqui e quem rola é a área de conteúdo, que é
+   justamente o que ela existe para fazer. */
 .container {
   display: flex;
   flex-direction: column;
-  min-height: 100%;
+  height: 100%;
   max-width: 1180px;
   margin-inline: auto;
 }
