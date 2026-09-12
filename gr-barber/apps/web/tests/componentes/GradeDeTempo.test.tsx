@@ -186,19 +186,21 @@ describe("GradeDeTempo", () => {
     expect(botao).toHaveTextContent("8");
   });
 
-  it("devolve ao cabeçalho a largura que a barra de rolagem ocupa", () => {
-    // Fora do scrollport, o cabeçalho fica mais largo que o corpo pela
-    // largura da barra — uns 15px de desvio entre a coluna do dia e a
-    // coluna dos eventos. A medida é feita no DOM e volta como custom
-    // property, porque o CSS não expõe essa largura em lugar nenhum.
+  it("dá ao cabeçalho e ao corpo as mesmas trilhas de coluna", () => {
+    // As divisórias dos dois só coincidem se as duas grades declararem o
+    // mesmo número de colunas. O valor sai do domínio e desce por custom
+    // property no quadro: ler de lugares diferentes é como eles saem de
+    // sincronia sem nada quebrar até alguém reparar que as linhas
+    // deslizam.
     //
-    // Em jsdom não há layout e a medida dá zero, que é o mesmo valor
-    // correto de um sistema com barra sobreposta. O que este teste
-    // protege é a EXISTÊNCIA da compensação: sem ela a propriedade some.
+    // O que falta aqui é a calha da barra de rolagem, reservada dos dois
+    // lados pela mesma regra CSS (ver o módulo). jsdom não faz layout e
+    // não a enxerga — a conferência dessa parte é no navegador.
     montar({ dias: ["2026-09-07", TERCA] });
 
-    const quadro = screen.getByTestId("quadro-da-grade");
-    expect(quadro.style.getPropertyValue("--largura-da-rolagem")).toBe("0px");
+    expect(
+      screen.getByTestId("quadro-da-grade").style.getPropertyValue("--colunas")
+    ).toBe("2");
   });
 
   it("sem aoAbrirDia, o cabeçalho ainda mostra os dias, sem virar botão", () => {

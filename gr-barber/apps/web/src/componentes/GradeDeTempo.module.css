@@ -35,7 +35,9 @@
 
    `scrollbar-gutter: stable` reserva a calha mesmo quando não há o que
    rolar: sem isso a largura do corpo mudaria conforme o dia tivesse ou
-   não conteúdo suficiente, e as colunas dançariam ao navegar. */
+   não conteúdo suficiente, e as colunas dançariam ao navegar. O
+   cabeçalho reserva a mesma calha, pela mesma regra — é o que mantém as
+   divisórias dos dois alinhadas. */
 .rolagem {
   flex: 1;
   min-height: 0;
@@ -58,12 +60,20 @@
    dele, então não precisa de `sticky`. `flex-shrink: 0` para não ser
    espremido quando a janela encolhe: quem cede é o corpo, que rola.
 
-   O recuo devolve a largura que a barra de rolagem ocupa no invólucro
-   abaixo. Sem ele o cabeçalho é mais largo que o corpo e cada coluna de
-   dia sai uns 15px fora dos seus eventos. */
+   `overflow: hidden` + `scrollbar-gutter: stable` reserva aqui a MESMA
+   calha que o invólucro reserva abaixo, calculada pelo navegador com a
+   mesma regra. Sem isto o cabeçalho é mais largo que o corpo pela
+   largura da barra de rolagem, e cada divisória de dia sai fora da
+   divisória das colunas — o desvio cresce coluna a coluna.
+
+   Reservar dos dois lados pela mesma regra, em vez de medir a barra no
+   DOM e devolver o número, é o que torna o alinhamento exato por
+   construção: não há medida para chegar tarde nem para errar. O
+   `hidden` não esconde nada — nada transborda daqui. */
 .cabecalho {
   flex-shrink: 0;
-  padding-inline-end: var(--largura-da-rolagem, 0px);
+  overflow: hidden;
+  scrollbar-gutter: stable;
   border-block-end: var(--borda-padrao) solid var(--cor-ink);
   background: var(--cor-paper-soft);
 }

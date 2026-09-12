@@ -1,6 +1,6 @@
 "use client";
 
-import { useLayoutEffect, useRef, useState, type CSSProperties } from "react";
+import type { CSSProperties } from "react";
 // O tipo e o componente têm o mesmo nome de propósito — um descreve o
 // que o outro desenha. O alias existe só para os dois conviverem aqui.
 import type { GradeDeTempo as Grade } from "../painel/grade";
@@ -45,25 +45,6 @@ export function GradeDeTempo({
   // Só a vista de semana passa: é o cabeçalho clicável de cada coluna.
   aoAbrirDia?: (data: string) => void;
 }) {
-  const rolagem = useRef<HTMLDivElement>(null);
-  // Largura que a barra de rolagem ocupa. O cabeçalho fica fora do
-  // scrollport — para a barra começar abaixo dele — e por isso sobra
-  // mais largo que o corpo exatamente por esta medida. O CSS não a
-  // expõe em lugar nenhum, então ela é medida no DOM e devolvida como
-  // custom property.
-  //
-  // Em sistema de barra sobreposta a conta dá zero, que é o valor certo:
-  // lá a barra não ocupa largura e não há o que compensar.
-  const [larguraDaRolagem, setLarguraDaRolagem] = useState(0);
-
-  // `useLayoutEffect` e não `useEffect`: medir depois da pintura deixaria
-  // um quadro com o cabeçalho deslocado, visível como um tranco.
-  useLayoutEffect(() => {
-    const elemento = rolagem.current;
-    if (!elemento) return;
-    setLarguraDaRolagem(elemento.offsetWidth - elemento.clientWidth);
-  }, [grade.totalLinhas, grade.colunas.length]);
-
   if (grade.totalLinhas === 0) {
     return <p className={estilos.vazio}>Fechado neste dia.</p>;
   }
@@ -75,7 +56,6 @@ export function GradeDeTempo({
   const estiloDaGrade = {
     "--total-linhas": grade.totalLinhas,
     "--colunas": grade.colunas.length,
-    "--largura-da-rolagem": `${larguraDaRolagem}px`,
   } as CSSProperties;
 
   return (
@@ -86,9 +66,9 @@ export function GradeDeTempo({
     >
       {/* Fora do invólucro que rola, e não dentro: assim a barra de
           rolagem começa abaixo do cabeçalho em vez de correr ao lado dos
-          dias. O preço é o cabeçalho sobrar mais largo que o corpo pela
-          largura da barra — devolvida a ele por
-          `--largura-da-rolagem`, medida acima. */}
+          dias. O preço seria o cabeçalho sobrar mais largo que o corpo
+          pela largura da barra — e quem paga é o CSS, reservando a mesma
+          calha nos dois (ver `.cabecalho` e `.rolagem`). */}
       <div className={estilos.cabecalho} data-testid="cabecalho-da-grade">
         <span className={estilos.canto} />
         {grade.colunas.map((coluna) =>
@@ -124,11 +104,7 @@ export function GradeDeTempo({
         )}
       </div>
 
-      <div
-        className={estilos.rolagem}
-        ref={rolagem}
-        data-testid="rolagem-da-grade"
-      >
+      <div className={estilos.rolagem} data-testid="rolagem-da-grade">
         <div className={estilos.corpo} data-testid="corpo-da-grade">
           <div className={estilos.eixo}>
             {horasCheias(grade).map((hora) => (
