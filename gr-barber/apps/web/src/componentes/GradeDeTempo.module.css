@@ -29,12 +29,17 @@
   grid-template-columns: 3.5rem repeat(var(--colunas), minmax(0, 1fr));
 }
 
-/* Grudado no topo da janela enquanto a agenda desce. Quem rola é a
-   página — a barra lateral do painel já é sticky contra a viewport, e
-   a área de conteúdo não tem overflow próprio. */
+/* Grudado enquanto a agenda desce. Quem rola é a página — a barra
+   lateral do painel já é sticky contra a viewport, e a área de conteúdo
+   não tem overflow próprio.
+
+   Não em `top: 0`, e sim abaixo da barra de cabeçalho da tela, que
+   também gruda: em zero as duas se sobreporiam. O fallback é zero para
+   o componente continuar correto onde não existe barra acima — a vista
+   de dia isolada e os testes. */
 .cabecalho {
   position: sticky;
-  top: 0;
+  top: var(--altura-da-barra, 0px);
   z-index: 4;
   border-block-end: var(--borda-padrao) solid var(--cor-ink);
   border-start-start-radius: var(--raio-lg);

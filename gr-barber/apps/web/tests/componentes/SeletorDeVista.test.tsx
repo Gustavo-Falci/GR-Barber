@@ -5,6 +5,7 @@ import { SeletorDeVista } from "../../src/componentes/SeletorDeVista";
 
 function montar(entrada: {
   vista?: "dia" | "semana" | "mes";
+  titulo?: string;
   aoTrocarVista?: (vista: "dia" | "semana" | "mes") => void;
   aoAndar?: (passos: number) => void;
   aoVoltarAHoje?: () => void;
@@ -12,6 +13,7 @@ function montar(entrada: {
   render(
     <SeletorDeVista
       vista={entrada.vista ?? "semana"}
+      titulo={entrada.titulo ?? "Setembro de 2026"}
       aoTrocarVista={entrada.aoTrocarVista ?? (() => {})}
       aoAndar={entrada.aoAndar ?? (() => {})}
       aoVoltarAHoje={entrada.aoVoltarAHoje ?? (() => {})}
@@ -51,6 +53,17 @@ describe("SeletorDeVista", () => {
 
     expect(aoAndar).toHaveBeenNthCalledWith(1, -1);
     expect(aoAndar).toHaveBeenNthCalledWith(2, 1);
+  });
+
+  it("carrega o título do período, como cabeçalho da tela", () => {
+    // O título mora aqui, e não num bloco acima: a barra inteira gruda no
+    // topo, e um título fora dela sumiria ao rolar — justo o mês, que é o
+    // que diz onde se está.
+    montar({ titulo: "Setembro de 2026" });
+
+    expect(
+      screen.getByRole("heading", { name: "Setembro de 2026" })
+    ).toBeInTheDocument();
   });
 
   it("volta a hoje", async () => {

@@ -1,4 +1,11 @@
 .pagina {
+  /* Altura da barra de cabeçalho, declarada aqui porque DOIS
+     componentes irmãos dependem dela: a barra, que a usa como altura
+     mínima, e o cabeçalho da grade, que gruda logo abaixo com ela como
+     deslocamento. Declarada em um deles, não chegaria ao outro — e dois
+     literais divergiriam, sobrepondo as duas barras. */
+  --altura-da-barra: 68px;
+
   display: grid;
   gap: var(--espaco-lg);
   align-content: start;

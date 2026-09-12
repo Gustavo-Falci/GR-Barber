@@ -1,16 +1,44 @@
+/* A barra de cabeçalho da agenda: ações e período à esquerda, vista à
+   direita. Gruda no topo da janela — rolando a agenda, o mês e o
+   seletor continuam à mão, que é quando mais se precisa deles.
+
+   `--altura-da-barra` vem da tela (ver Agenda.module.css), porque o
+   cabeçalho da grade também a lê para grudar logo abaixo desta — e uma
+   variável declarada aqui não chegaria lá, que é irmão e não
+   descendente. O fallback mantém o componente utilizável sozinho. */
 .barra {
+  position: sticky;
+  top: 0;
+  z-index: 5;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: var(--espaco-md);
+  min-height: var(--altura-da-barra, 68px);
+  /* Só recuo vertical: a barra tem a largura do container, e o conteúdo
+     que passa por baixo tem a mesma — nada escapa pelas laterais. O
+     fundo é opaco porque a agenda desliza por baixo dela. */
+  padding-block: var(--espaco-sm);
+  background: var(--cor-paper);
 }
 
-.vistas,
-.navegacao {
+.navegacao,
+.vistas {
   display: flex;
   align-items: center;
   gap: var(--espaco-xs);
+}
+
+.titulo {
+  margin-inline-start: var(--espaco-sm);
+  font-size: var(--texto-xl);
+  /* O título cede primeiro quando a barra aperta: as ações à volta têm
+     largura fixa e não têm pra onde encolher. */
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .vista,
@@ -34,9 +62,31 @@
   color: var(--cor-dark);
 }
 
+.hoje {
+  border-radius: var(--raio-pill);
+}
+
+/* As setas são redondas e sem moldura: na referência elas são navegação
+   discreta ao lado do "Hoje", não três botões de mesmo peso. */
 .passo {
+  display: grid;
+  place-items: center;
   min-width: 40px;
-  padding-inline: var(--espaco-sm);
+  padding: 0;
+  border-color: transparent;
+  border-radius: var(--raio-pill);
+  background: transparent;
   font-size: var(--texto-lg);
   line-height: 1;
+}
+
+.passo:hover {
+  background: var(--cor-paper-soft);
+  border-color: var(--cor-line);
+}
+
+@media (max-width: 720px) {
+  .titulo {
+    font-size: var(--texto-lg);
+  }
 }

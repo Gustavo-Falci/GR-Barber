@@ -2,7 +2,6 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { Aviso } from "../../componentes/Aviso";
-import { CabecalhoDaPagina } from "../../componentes/CabecalhoDaPagina";
 import { GradeDeTempo } from "../../componentes/GradeDeTempo";
 import { GradeDoMes } from "../../componentes/GradeDoMes";
 import { SeletorDeVista, type Vista } from "../../componentes/SeletorDeVista";
@@ -106,17 +105,13 @@ export function Agenda({ agora = new Date() }: { agora?: Date }) {
 
   return (
     <div className={estilos.pagina}>
-      <CabecalhoDaPagina
-        titulo={titulo}
-        apoio={
-          agendamentos.dados.length === 1
-            ? "1 agendamento no período"
-            : `${agendamentos.dados.length} agendamentos no período`
-        }
-      />
-
+      {/* Uma barra só: ações, período e vista. O contador de
+          agendamentos saiu junto com o cabeçalho de página — a agenda
+          mostra os agendamentos, e contar o que está à vista é
+          informação repetida. */}
       <SeletorDeVista
         vista={vista}
+        titulo={titulo}
         aoTrocarVista={(proxima) => irPara(proxima, data)}
         aoAndar={(passos) =>
           irPara(
