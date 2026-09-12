@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { AgendamentoComCliente, HorarioSerializado } from "@gr-barber/types";
-import { diasDaSemana, gradeDeTempo, MINUTOS_POR_LINHA } from "../../src/painel/grade";
+import {
+  diasDaSemana,
+  gradeDeTempo,
+  gradeDoMes,
+  MINUTOS_POR_LINHA,
+} from "../../src/painel/grade";
 
 const CLIENTE = {
   id: "c1",
@@ -329,6 +334,103 @@ describe("gradeDeTempo", () => {
     // Amanhã às 09:00 não passou, por mais tarde que seja agora.
     const amanha = grade.colunas[1];
     expect(amanha.livres.find((f) => f.hora === "09:00")?.passada).toBe(false);
+  });
+});
+
+describe("gradeDoMes", () => {
+  it("fecha sempre em semanas completas, começando no domingo", () => {
+    // Setembro de 2026 começa numa terça e tem 30 dias.
+    const celulas = gradeDoMes({
+      mes: "2026-09",
+      horarios: HORARIOS,
+      agendamentos: [],
+    });
+
+    expect(celulas.length % 7).toBe(0);
+    expect(new Date(`${celulas[0].data}T12:00:00Z`).getUTCDay()).toBe(0);
+    expect(
+      new Date(`${celulas[celulas.length - 1].data}T12:00:00Z`).getUTCDay()
+    ).toBe(6);
+  });
+
+  it("marca as bordas com datas reais, não com buracos", () => {
+    // É a diferença para `diasDoMes` de src/formato/datas.ts, que devolve
+    // null antes do dia 1. Aqui a borda precisa de data real: ela mostra
+    // agendamentos dos meses vizinhos, e um null os esconderia.
+    const celulas = gradeDoMes({
+      mes: "2026-09",
+      horarios: HORARIOS,
+      agendamentos: [],
+    });
+
+    const primeira = celulas[0];
+    expect(primeira.data).toBe("2026-08-30");
+    expect(primeira.doMes).toBe(false);
+    expect(celulas.find((c) => c.data === "2026-09-01")?.doMes).toBe(true);
+  });
+
+  it("põe cada agendamento na célula do seu dia", () => {
+    const celulas = gradeDoMes({
+      mes: "2026-09",
+      horarios: HORARIOS,
+      agendamentos: [
+        agendamento({ id: "a1", data: "2026-09-08", horaInicio: "10:00", horaFim: "11:00" }),
+        agendamento({ id: "a2", data: "2026-09-08", horaInicio: "14:00", horaFim: "15:00" }),
+        agendamento({ id: "a3", data: "2026-09-09", horaInicio: "10:00", horaFim: "11:00" }),
+      ],
+    });
+
+    const dia8 = celulas.find((c) => c.data === "2026-09-08");
+    expect(dia8?.agendamentos.map((a) => a.id)).toEqual(["a1", "a2"]);
+    expect(
+      celulas.find((c) => c.data === "2026-09-09")?.agendamentos.map((a) => a.id)
+    ).toEqual(["a3"]);
+  });
+
+  it("mostra na borda o agendamento do mês vizinho", () => {
+    const celulas = gradeDoMes({
+      mes: "2026-09",
+      horarios: HORARIOS,
+      agendamentos: [
+        agendamento({ id: "a1", data: "2026-08-31", horaInicio: "10:00", horaFim: "11:00" }),
+      ],
+    });
+
+    const borda = celulas.find((c) => c.data === "2026-08-31");
+    expect(borda?.doMes).toBe(false);
+    expect(borda?.agendamentos.map((a) => a.id)).toEqual(["a1"]);
+  });
+
+  it("ordena os agendamentos do dia por hora", () => {
+    const celulas = gradeDoMes({
+      mes: "2026-09",
+      horarios: HORARIOS,
+      agendamentos: [
+        agendamento({ id: "tarde", data: "2026-09-08", horaInicio: "16:00", horaFim: "17:00" }),
+        agendamento({ id: "cedo", data: "2026-09-08", horaInicio: "09:00", horaFim: "10:00" }),
+      ],
+    });
+
+    expect(
+      celulas.find((c) => c.data === "2026-09-08")?.agendamentos.map((a) => a.id)
+    ).toEqual(["cedo", "tarde"]);
+  });
+
+  it("marca domingo como fechado e descarta cancelado", () => {
+    const cancelado = {
+      ...agendamento({ id: "x", data: "2026-09-08", horaInicio: "10:00", horaFim: "11:00" }),
+      status: "cancelado",
+    };
+
+    const celulas = gradeDoMes({
+      mes: "2026-09",
+      horarios: HORARIOS,
+      agendamentos: [cancelado],
+    });
+
+    expect(celulas.find((c) => c.data === "2026-09-06")?.fechado).toBe(true);
+    expect(celulas.find((c) => c.data === "2026-09-08")?.fechado).toBe(false);
+    expect(celulas.find((c) => c.data === "2026-09-08")?.agendamentos).toHaveLength(0);
   });
 });
 

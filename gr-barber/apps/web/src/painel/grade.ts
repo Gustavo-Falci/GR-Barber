@@ -229,6 +229,57 @@ export function gradeDeTempo(entrada: {
   };
 }
 
+export interface CelulaDoMes {
+  data: string;
+  doMes: boolean; // false nas células de preenchimento das bordas
+  fechado: boolean;
+  agendamentos: AgendamentoComCliente[];
+}
+
+function somarDias(data: string, dias: number): string {
+  const d = new Date(`${data}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + dias);
+  return d.toISOString().slice(0, 10);
+}
+
+// Semanas completas de domingo a sábado, com datas REAIS nas bordas.
+//
+// Diferente de `diasDoMes` (src/formato/datas.ts), que devolve null antes
+// do dia 1 e serve o Calendario do fluxo do cliente: aqui a borda mostra
+// agendamentos dos meses vizinhos, e um buraco os esconderia. Não troque
+// uma pela outra.
+export function gradeDoMes(entrada: {
+  mes: string; // "YYYY-MM"
+  horarios: HorarioSerializado[];
+  agendamentos: AgendamentoComCliente[];
+}): CelulaDoMes[] {
+  const { mes, horarios, agendamentos } = entrada;
+  const [ano, numero] = mes.split("-").map(Number);
+
+  const primeiroDoMes = `${mes}-01`;
+  const diasNoMes = new Date(Date.UTC(ano, numero, 0)).getUTCDate();
+  const ultimoDoMes = `${mes}-${String(diasNoMes).padStart(2, "0")}`;
+
+  const inicio = somarDias(primeiroDoMes, -diaDaSemanaDe(primeiroDoMes));
+  const fim = somarDias(ultimoDoMes, 6 - diaDaSemanaDe(ultimoDoMes));
+
+  const validos = agendamentos.filter((a) => a.status !== "cancelado");
+
+  const celulas: CelulaDoMes[] = [];
+  for (let data = inicio; data <= fim; data = somarDias(data, 1)) {
+    celulas.push({
+      data,
+      doMes: data >= primeiroDoMes && data <= ultimoDoMes,
+      fechado: !aberto(horarioDe(data, horarios)),
+      agendamentos: validos
+        .filter((a) => a.data === data)
+        .sort((um, outro) => um.horaInicio.localeCompare(outro.horaInicio)),
+    });
+  }
+
+  return celulas;
+}
+
 // ---------------------------------------------------------------------
 // Legado: a lista plana de faixas que a tela `AgendaDoDia` consome.
 // Substituída por `gradeDeTempo` acima, e removida junto com aquela tela
