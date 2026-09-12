@@ -1,0 +1,173 @@
+/* O eixo de tempo e as colunas de dia. A grade tem uma linha por 5
+   minutos: `duracaoMinutos` é múltiplo de 5 e os inícios caem na grade
+   de 15 do scheduling, então todo evento alinha exato. */
+.quadro {
+  display: grid;
+  grid-template-columns: 3.5rem repeat(auto-fit, minmax(0, 1fr));
+  border: var(--borda-padrao) solid var(--cor-ink);
+  border-radius: var(--raio-lg);
+  background: var(--cor-surface);
+  box-shadow: 0 4px 0 var(--cor-shadow);
+  overflow: hidden;
+}
+
+/* 8px por linha de 5 minutos: meia hora dá 48px, que é onde nome e
+   serviço ainda cabem em duas linhas. */
+.eixo,
+.coluna {
+  display: grid;
+  grid-template-rows: repeat(var(--total-linhas), 8px);
+}
+
+.eixo {
+  border-inline-end: var(--borda-hairline) solid var(--cor-line);
+  background: var(--cor-paper-soft);
+}
+
+.hora {
+  grid-row: var(--linha);
+  padding-inline-end: var(--espaco-xs);
+  text-align: end;
+  color: var(--cor-muted);
+  font-size: var(--texto-xs);
+  /* Sobe meia linha pra régua da hora coincidir com o rótulo. */
+  transform: translateY(-0.5em);
+}
+
+.coluna {
+  position: relative;
+  border-inline-end: var(--borda-hairline) solid var(--cor-line);
+}
+
+.coluna:last-child {
+  border-inline-end: none;
+}
+
+.livre {
+  grid-row: var(--linha) / span var(--linhas);
+  grid-column: 1;
+  border: none;
+  border-block-start: var(--borda-hairline) dashed var(--cor-line);
+  background: transparent;
+  color: transparent;
+  font-size: var(--texto-xs);
+  cursor: pointer;
+}
+
+/* A hora só aparece ao passar o mouse ou pelo teclado: escrita sempre,
+   a grade vira uma parede de números. */
+.livre:hover,
+.livre:focus-visible {
+  background: var(--cor-pale-yellow);
+  color: var(--cor-ink-soft);
+}
+
+.passada {
+  grid-row: var(--linha) / span var(--linhas);
+  grid-column: 1;
+  border-block-start: var(--borda-hairline) dashed var(--cor-line);
+  background: var(--cor-paper-soft);
+}
+
+/* O evento entra na mesma célula da grade que as faixas livres e fica
+   por cima — daí o z-index. A pista divide a largura quando há
+   sobreposição; com pista única a conta dá 0% e 100%. */
+.evento {
+  grid-row: var(--linha) / span var(--linhas);
+  grid-column: 1;
+  z-index: 1;
+  display: block;
+  overflow: hidden;
+  width: calc(100% / var(--pistas));
+  margin-inline-start: calc(100% / var(--pistas) * var(--pista));
+  padding: 2px var(--espaco-xs);
+  border: var(--borda-hairline) solid var(--cor-ink);
+  border-radius: var(--raio-sm);
+  background: var(--cor-accent);
+  color: var(--cor-dark);
+  text-align: start;
+  font-size: var(--texto-xs);
+  line-height: 1.25;
+  cursor: pointer;
+}
+
+.horaDoEvento {
+  font-family: var(--fonte-display), system-ui, sans-serif;
+}
+
+/* O cabeçalho clicável de cada coluna, só na vista de semana. Fica na
+   linha 1 e por cima das faixas livres, que começam no mesmo lugar. */
+.cabecalhoDoDia {
+  grid-row: 1;
+  grid-column: 1;
+  z-index: 3;
+  align-self: start;
+  justify-self: center;
+  padding: 2px 6px;
+  border: none;
+  border-radius: var(--raio-pill);
+  background: var(--cor-paper-soft);
+  font-family: var(--fonte-display), system-ui, sans-serif;
+  font-size: var(--texto-sm);
+  cursor: pointer;
+}
+
+.cabecalhoDoDia:hover {
+  background: var(--cor-accent);
+  color: var(--cor-dark);
+}
+
+.servicos {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  opacity: 0.8;
+}
+
+/* A régua do agora. Não usa --cor-accent, que já significa
+   "selecionado" no painel, nem o vermelho de erro, que significa falha. */
+.agora {
+  grid-row: var(--linha);
+  grid-column: 1;
+  z-index: 2;
+  align-self: start;
+  height: 0;
+  border-block-start: var(--borda-padrao) solid var(--cor-ink);
+  pointer-events: none;
+}
+
+.agora::before {
+  content: "";
+  position: absolute;
+  inset-inline-start: 0;
+  margin-block-start: -4px;
+  width: 7px;
+  height: 7px;
+  border-radius: var(--raio-pill);
+  background: var(--cor-ink);
+}
+
+.fechado {
+  grid-row: 1 / -1;
+  grid-column: 1;
+  margin: 0;
+  padding: var(--espaco-md) var(--espaco-xs);
+  background: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 6px,
+    var(--cor-line) 6px,
+    var(--cor-line) 7px
+  );
+  color: var(--cor-muted);
+  text-align: center;
+  font-size: var(--texto-xs);
+}
+
+.vazio {
+  margin: 0;
+  padding: var(--espaco-xl);
+  text-align: center;
+  color: var(--cor-muted);
+}
