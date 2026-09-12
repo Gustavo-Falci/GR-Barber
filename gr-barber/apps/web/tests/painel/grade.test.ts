@@ -242,6 +242,79 @@ describe("gradeDeTempo", () => {
     expect(grade.agora).toBeNull();
   });
 
+  it("põe agendamentos sobrepostos em pistas, sem descartar nenhum", () => {
+    const grade = gradeDeTempo({
+      dias: [TERCA],
+      horarios: HORARIOS,
+      agendamentos: [
+        agendamento({ id: "a1", data: TERCA, horaInicio: "10:00", horaFim: "11:00" }),
+        agendamento({ id: "a2", data: TERCA, horaInicio: "10:30", horaFim: "11:30" }),
+      ],
+      agora: AGORA,
+    });
+
+    const eventos = grade.colunas[0].eventos;
+    // Os dois sobrevivem: a grade antiga usava .find() e ficava só com
+    // o primeiro, sumindo com o segundo em silêncio.
+    expect(eventos).toHaveLength(2);
+    expect(eventos.map((e) => e.pista)).toEqual([0, 1]);
+    expect(eventos.every((e) => e.pistas === 2)).toBe(true);
+  });
+
+  it("devolve pista única quando os agendamentos apenas se encostam", () => {
+    // 11:00 começa exatamente quando 10:00–11:00 termina: encostar não é
+    // sobrepor. Sem esta distinção, um dia cheio viraria uma coluna
+    // espremida em N pistas.
+    const grade = gradeDeTempo({
+      dias: [TERCA],
+      horarios: HORARIOS,
+      agendamentos: [
+        agendamento({ id: "a1", data: TERCA, horaInicio: "10:00", horaFim: "11:00" }),
+        agendamento({ id: "a2", data: TERCA, horaInicio: "11:00", horaFim: "12:00" }),
+      ],
+      agora: AGORA,
+    });
+
+    expect(grade.colunas[0].eventos.every((e) => e.pistas === 1)).toBe(true);
+  });
+
+  it("agrupa em três pistas quando três se cruzam", () => {
+    const grade = gradeDeTempo({
+      dias: [TERCA],
+      horarios: HORARIOS,
+      agendamentos: [
+        agendamento({ id: "a1", data: TERCA, horaInicio: "10:00", horaFim: "11:00" }),
+        agendamento({ id: "a2", data: TERCA, horaInicio: "10:15", horaFim: "11:15" }),
+        agendamento({ id: "a3", data: TERCA, horaInicio: "10:30", horaFim: "11:30" }),
+      ],
+      agora: AGORA,
+    });
+
+    const eventos = grade.colunas[0].eventos;
+    expect(eventos.map((e) => e.pista)).toEqual([0, 1, 2]);
+    expect(eventos.every((e) => e.pistas === 3)).toBe(true);
+  });
+
+  it("reaproveita a pista livre depois que o grupo se fecha", () => {
+    // a3 não cruza com a1 nem com a2, então abre grupo novo e volta pra
+    // pista 0 ocupando a coluna inteira. Sem fechar o grupo, a tela
+    // inteira herdaria a largura do pior momento do dia.
+    const grade = gradeDeTempo({
+      dias: [TERCA],
+      horarios: HORARIOS,
+      agendamentos: [
+        agendamento({ id: "a1", data: TERCA, horaInicio: "10:00", horaFim: "11:00" }),
+        agendamento({ id: "a2", data: TERCA, horaInicio: "10:30", horaFim: "11:30" }),
+        agendamento({ id: "a3", data: TERCA, horaInicio: "14:00", horaFim: "15:00" }),
+      ],
+      agora: AGORA,
+    });
+
+    const a3 = grade.colunas[0].eventos.find((e) => e.agendamento.id === "a3");
+    expect(a3?.pista).toBe(0);
+    expect(a3?.pistas).toBe(1);
+  });
+
   it("marca como passada só a faixa de hoje que já passou", () => {
     const grade = gradeDeTempo({
       dias: [TERCA, "2026-09-09"],

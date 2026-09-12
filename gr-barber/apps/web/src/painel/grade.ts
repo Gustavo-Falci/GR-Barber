@@ -81,6 +81,49 @@ function aberto(
   );
 }
 
+// Agrupa os eventos que se cruzam e distribui cada grupo em pistas.
+// Recebe a lista já ordenada por início, e escreve `pista` e `pistas`
+// nela.
+//
+// Encostar não é sobrepor: um evento que começa exatamente no fim do
+// anterior fecha o grupo. Sem essa distinção, um dia cheio de
+// atendimentos seguidos viraria uma coluna espremida em dezenas de
+// pistas de um pixel.
+function distribuirEmPistas(eventos: EventoPosicionado[]): void {
+  const pistasUsadas = (doGrupo: EventoPosicionado[]) =>
+    doGrupo.reduce((maior, e) => Math.max(maior, e.pista + 1), 0);
+
+  let grupo: EventoPosicionado[] = [];
+  let fimDoGrupo = -1;
+
+  const fecharGrupo = () => {
+    const total = pistasUsadas(grupo);
+    for (const evento of grupo) evento.pistas = total;
+    grupo = [];
+    fimDoGrupo = -1;
+  };
+
+  for (const evento of eventos) {
+    const inicio = evento.linha;
+    const fim = evento.linha + evento.linhas;
+
+    if (grupo.length > 0 && inicio >= fimDoGrupo) fecharGrupo();
+
+    // Primeira pista em que nenhum evento do grupo ainda está no ar.
+    const ocupadas = new Set(
+      grupo.filter((e) => e.linha + e.linhas > inicio).map((e) => e.pista)
+    );
+    let pista = 0;
+    while (ocupadas.has(pista)) pista += 1;
+
+    evento.pista = pista;
+    grupo.push(evento);
+    fimDoGrupo = Math.max(fimDoGrupo, fim);
+  }
+
+  if (grupo.length > 0) fecharGrupo();
+}
+
 export function gradeDeTempo(entrada: {
   dias: string[];
   horarios: HorarioSerializado[];
@@ -137,6 +180,8 @@ export function gradeDeTempo(entrada: {
         pistas: 1,
       };
     });
+
+    distribuirEmPistas(eventos);
 
     const livres: FaixaLivre[] = [];
     if (aberto(horario)) {
