@@ -1,0 +1,42 @@
+.barra {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--espaco-md);
+}
+
+.vistas,
+.navegacao {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-xs);
+}
+
+.vista,
+.passo,
+.hoje {
+  min-height: 40px;
+  padding: var(--espaco-xs) var(--espaco-md);
+  border: var(--borda-padrao) solid var(--cor-ink);
+  border-radius: var(--raio-md);
+  background: var(--cor-surface);
+  font-family: var(--fonte-display), system-ui, sans-serif;
+  font-size: var(--texto-sm);
+  cursor: pointer;
+}
+
+/* A vista corrente usa o amarelo com a sombra deslocada, igual ao item
+   ativo da barra lateral — mesmo significado, mesmo desenho. */
+.vista[aria-pressed="true"] {
+  background: var(--cor-accent);
+  box-shadow: 0 3px 0 var(--cor-shadow);
+  color: var(--cor-dark);
+}
+
+.passo {
+  min-width: 40px;
+  padding-inline: var(--espaco-sm);
+  font-size: var(--texto-lg);
+  line-height: 1;
+}
