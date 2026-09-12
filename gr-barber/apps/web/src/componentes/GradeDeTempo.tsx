@@ -1,6 +1,6 @@
 "use client";
 
-import type { CSSProperties } from "react";
+import { useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 // O tipo e o componente têm o mesmo nome de propósito — um descreve o
 // que o outro desenha. O alias existe só para os dois conviverem aqui.
 import type { GradeDeTempo as Grade } from "../painel/grade";
@@ -45,6 +45,25 @@ export function GradeDeTempo({
   // Só a vista de semana passa: é o cabeçalho clicável de cada coluna.
   aoAbrirDia?: (data: string) => void;
 }) {
+  const rolagem = useRef<HTMLDivElement>(null);
+  // Largura que a barra de rolagem ocupa. O cabeçalho fica fora do
+  // scrollport — para a barra começar abaixo dele — e por isso sobra
+  // mais largo que o corpo exatamente por esta medida. O CSS não a
+  // expõe em lugar nenhum, então ela é medida no DOM e devolvida como
+  // custom property.
+  //
+  // Em sistema de barra sobreposta a conta dá zero, que é o valor certo:
+  // lá a barra não ocupa largura e não há o que compensar.
+  const [larguraDaRolagem, setLarguraDaRolagem] = useState(0);
+
+  // `useLayoutEffect` e não `useEffect`: medir depois da pintura deixaria
+  // um quadro com o cabeçalho deslocado, visível como um tranco.
+  useLayoutEffect(() => {
+    const elemento = rolagem.current;
+    if (!elemento) return;
+    setLarguraDaRolagem(elemento.offsetWidth - elemento.clientWidth);
+  }, [grade.totalLinhas, grade.colunas.length]);
+
   if (grade.totalLinhas === 0) {
     return <p className={estilos.vazio}>Fechado neste dia.</p>;
   }
@@ -56,57 +75,60 @@ export function GradeDeTempo({
   const estiloDaGrade = {
     "--total-linhas": grade.totalLinhas,
     "--colunas": grade.colunas.length,
+    "--largura-da-rolagem": `${larguraDaRolagem}px`,
   } as CSSProperties;
 
   return (
-    <div className={estilos.quadro} style={estiloDaGrade}>
-      {/* A rolagem vive aqui, um nível dentro da borda: o quadro fica com
-          a moldura e o `border-radius`, e recorta a barra de rolagem nos
-          cantos. Com a rolagem no próprio quadro, a barra é um retângulo
-          que atravessa a curva.
-
-          Cabeçalho e corpo dividem este mesmo scrollport de propósito —
-          separá-los deixaria o cabeçalho mais largo que o corpo pela
-          largura da barra, desalinhando a coluna do dia dos eventos. */}
-      <div className={estilos.rolagem} data-testid="rolagem-da-grade">
-        {/* Fora do corpo que rola, e grudado no topo: a linha dos dias
-          tem que continuar visível enquanto se desce a agenda. Dentro
-          das colunas, como estava, ela subia junto. */}
-        <div className={estilos.cabecalho} data-testid="cabecalho-da-grade">
-          <span className={estilos.canto} />
-          {grade.colunas.map((coluna) =>
-            aoAbrirDia ? (
-              <button
-                key={coluna.data}
-                type="button"
-                className={estilos.diaDoCabecalho}
-                // A data por extenso é o nome acessível: "8" sozinho não
-                // distingue uma coluna da outra numa lista de sete.
-                aria-label={formatarDataLonga(coluna.data)}
-                onClick={() => aoAbrirDia(coluna.data)}
-              >
-                <span className={estilos.nomeDoDia}>
-                  {nomeDoDia(coluna.data)}
-                </span>
-                <span className={estilos.numeroDoDia}>
-                  {Number(coluna.data.slice(8))}
-                </span>
-              </button>
-            ) : (
-              // Sem navegação a vista de dia ainda precisa dizer que dia
-              // está na tela — o que some é o clique, não o rótulo.
-              <span key={coluna.data} className={estilos.diaDoCabecalho}>
-                <span className={estilos.nomeDoDia}>
-                  {nomeDoDia(coluna.data)}
-                </span>
-                <span className={estilos.numeroDoDia}>
-                  {Number(coluna.data.slice(8))}
-                </span>
+    <div
+      className={estilos.quadro}
+      style={estiloDaGrade}
+      data-testid="quadro-da-grade"
+    >
+      {/* Fora do invólucro que rola, e não dentro: assim a barra de
+          rolagem começa abaixo do cabeçalho em vez de correr ao lado dos
+          dias. O preço é o cabeçalho sobrar mais largo que o corpo pela
+          largura da barra — devolvida a ele por
+          `--largura-da-rolagem`, medida acima. */}
+      <div className={estilos.cabecalho} data-testid="cabecalho-da-grade">
+        <span className={estilos.canto} />
+        {grade.colunas.map((coluna) =>
+          aoAbrirDia ? (
+            <button
+              key={coluna.data}
+              type="button"
+              className={estilos.diaDoCabecalho}
+              // A data por extenso é o nome acessível: "8" sozinho não
+              // distingue uma coluna da outra numa lista de sete.
+              aria-label={formatarDataLonga(coluna.data)}
+              onClick={() => aoAbrirDia(coluna.data)}
+            >
+              <span className={estilos.nomeDoDia}>
+                {nomeDoDia(coluna.data)}
               </span>
-            ),
-          )}
-        </div>
+              <span className={estilos.numeroDoDia}>
+                {Number(coluna.data.slice(8))}
+              </span>
+            </button>
+          ) : (
+            // Sem navegação a vista de dia ainda precisa dizer que dia
+            // está na tela — o que some é o clique, não o rótulo.
+            <span key={coluna.data} className={estilos.diaDoCabecalho}>
+              <span className={estilos.nomeDoDia}>
+                {nomeDoDia(coluna.data)}
+              </span>
+              <span className={estilos.numeroDoDia}>
+                {Number(coluna.data.slice(8))}
+              </span>
+            </span>
+          ),
+        )}
+      </div>
 
+      <div
+        className={estilos.rolagem}
+        ref={rolagem}
+        data-testid="rolagem-da-grade"
+      >
         <div className={estilos.corpo} data-testid="corpo-da-grade">
           <div className={estilos.eixo}>
             {horasCheias(grade).map((hora) => (

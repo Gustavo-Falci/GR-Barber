@@ -128,10 +128,10 @@ describe("GradeDeTempo", () => {
   });
 
   it("marca só o rótulo de hora que encosta no topo da grade", () => {
-    // O rótulo da linha 1 fica embaixo do cabeçalho grudado, então não
-    // pode subir meia linha como os outros — e a grade não pode descer
-    // pra abrir espaço, senão nasce uma faixa vazia entre o cabeçalho e
-    // a primeira linha tracejada.
+    // O rótulo da linha 1 seria recortado pela borda de cima do invólucro
+    // que rola, então não pode subir meia linha como os outros — e a
+    // grade não pode descer pra abrir espaço, senão nasce uma faixa
+    // vazia antes da primeira linha tracejada.
     montar({ dias: [TERCA] });
 
     // Abrindo às 09:00, o rótulo das 09:00 está na linha 1.
@@ -172,12 +172,10 @@ describe("GradeDeTempo", () => {
     expect(cabecalho).not.toContainElement(screen.getByTestId("corpo-da-grade"));
     expect(screen.getByTestId("corpo-da-grade")).not.toContainElement(cabecalho);
 
-    // E os dois dentro do MESMO container de rolagem. Separá-los deixaria
-    // o cabeçalho fora do scrollport e mais largo que o corpo pela
-    // largura da barra de rolagem — uns 15px de desvio entre a coluna do
-    // dia e a coluna dos eventos.
+    // O cabeçalho fica FORA do container de rolagem, para a barra começar
+    // abaixo dele em vez de correr ao lado dos dias.
     const rolagem = screen.getByTestId("rolagem-da-grade");
-    expect(rolagem).toContainElement(cabecalho);
+    expect(rolagem).not.toContainElement(cabecalho);
     expect(rolagem).toContainElement(screen.getByTestId("corpo-da-grade"));
 
     // O botão do dia mora no cabeçalho, e leva o dia da semana junto do
@@ -186,6 +184,21 @@ describe("GradeDeTempo", () => {
     expect(cabecalho).toContainElement(botao);
     expect(botao).toHaveTextContent("ter.");
     expect(botao).toHaveTextContent("8");
+  });
+
+  it("devolve ao cabeçalho a largura que a barra de rolagem ocupa", () => {
+    // Fora do scrollport, o cabeçalho fica mais largo que o corpo pela
+    // largura da barra — uns 15px de desvio entre a coluna do dia e a
+    // coluna dos eventos. A medida é feita no DOM e volta como custom
+    // property, porque o CSS não expõe essa largura em lugar nenhum.
+    //
+    // Em jsdom não há layout e a medida dá zero, que é o mesmo valor
+    // correto de um sistema com barra sobreposta. O que este teste
+    // protege é a EXISTÊNCIA da compensação: sem ela a propriedade some.
+    montar({ dias: ["2026-09-07", TERCA] });
+
+    const quadro = screen.getByTestId("quadro-da-grade");
+    expect(quadro.style.getPropertyValue("--largura-da-rolagem")).toBe("0px");
   });
 
   it("sem aoAbrirDia, o cabeçalho ainda mostra os dias, sem virar botão", () => {

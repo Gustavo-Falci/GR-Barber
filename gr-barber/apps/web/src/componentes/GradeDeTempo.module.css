@@ -7,10 +7,9 @@
    rolagem dentro do calendário em vez de na beira da janela.
 
    O quadro fica com a moldura e o raio, e a rolagem vai para um
-   invólucro um nível dentro (`.rolagem`). Assim o `overflow: hidden`
-   daqui recorta a barra de rolagem pela curva dos cantos — com a
-   rolagem no próprio quadro, a barra é um retângulo que atravessa o
-   arredondado e sobra para fora da moldura. */
+   invólucro abaixo do cabeçalho (`.rolagem`). Assim o `overflow: hidden`
+   daqui recorta a barra pela curva dos cantos, e ela começa abaixo do
+   cabeçalho em vez de correr ao lado dos dias. */
 .quadro {
   display: flex;
   flex-direction: column;
@@ -31,13 +30,17 @@
   box-shadow: 0 4px 0 var(--cor-shadow);
 }
 
-/* O único que rola. Cabeçalho e corpo ficam os dois aqui dentro: num
-   scrollport só, eles têm a mesma largura e nada precisa compensar a
-   barra de rolagem. */
+/* O único que rola, e só o corpo mora aqui — o cabeçalho fica acima,
+   fora do scrollport, para a barra não subir até ele.
+
+   `scrollbar-gutter: stable` reserva a calha mesmo quando não há o que
+   rolar: sem isso a largura do corpo mudaria conforme o dia tivesse ou
+   não conteúdo suficiente, e as colunas dançariam ao navegar. */
 .rolagem {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  scrollbar-gutter: stable;
 }
 
 /* Cabeçalho e corpo são grades irmãs com as MESMAS trilhas — é o que
@@ -51,13 +54,16 @@
 }
 
 
-/* Grudado no topo do QUADRO, que é quem rola — não da janela. Por isso
-   `top: 0` e não mais um deslocamento pela barra de cabeçalho da tela:
-   aquela barra está fora do scrollport e não passa por aqui. */
+/* Fixo por estar fora do invólucro que rola — nada passa por baixo
+   dele, então não precisa de `sticky`. `flex-shrink: 0` para não ser
+   espremido quando a janela encolhe: quem cede é o corpo, que rola.
+
+   O recuo devolve a largura que a barra de rolagem ocupa no invólucro
+   abaixo. Sem ele o cabeçalho é mais largo que o corpo e cada coluna de
+   dia sai uns 15px fora dos seus eventos. */
 .cabecalho {
-  position: sticky;
-  top: 0;
-  z-index: 4;
+  flex-shrink: 0;
+  padding-inline-end: var(--largura-da-rolagem, 0px);
   border-block-end: var(--borda-padrao) solid var(--cor-ink);
   background: var(--cor-paper-soft);
 }
@@ -134,11 +140,11 @@ button.diaDoCabecalho:hover .numeroDoDia {
   transform: translateY(-0.5em);
 }
 
-/* Menos o que encosta no topo. Acima dele está o cabeçalho grudado, que
-   o cobriria — e empurrar a grade inteira pra baixo para abrir espaço
-   deixava uma faixa vazia entre o cabeçalho e a primeira linha
-   tracejada. Ele fica logo ABAIXO da sua linha em vez de centrado nela,
-   que é como os calendários resolvem a borda de cima.
+/* Menos o que encosta no topo. Subindo, ele passaria da borda de cima do
+   invólucro que rola e seria recortado — e empurrar a grade inteira pra
+   baixo para abrir espaço deixava uma faixa vazia antes da primeira
+   linha tracejada. Ele fica logo ABAIXO da sua linha em vez de centrado
+   nela, que é como os calendários resolvem a borda de cima.
 
    O atributo vem do componente e vale `linha === 1`, não "o primeiro da
    lista": abrindo às 09:30 o primeiro rótulo é 10:00, que fica na linha
