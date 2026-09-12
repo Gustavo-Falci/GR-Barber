@@ -6,6 +6,13 @@
    rolagem e o cabeçalho grudado nunca colaria. Quem arredonda os cantos
    agora é o cabeçalho em cima e o corpo embaixo. */
 .quadro {
+  /* Altura de uma linha de 5 minutos — o único número que muda a escala
+     vertical da agenda inteira. Em 12px, a faixa de 15 minutos fica com
+     36px e a hora com 144px; um corte de meia hora ocupa 72px, que é
+     onde nome e serviços cabem confortáveis. Mexer aqui redimensiona
+     faixa, evento e régua juntos, porque todos se medem em linhas. */
+  --altura-da-linha: 12px;
+
   border: var(--borda-padrao) solid var(--cor-ink);
   border-radius: var(--raio-lg);
   background: var(--cor-surface);
@@ -92,12 +99,10 @@ button.diaDoCabecalho:hover .numeroDoDia {
   color: var(--cor-dark);
 }
 
-/* 8px por linha de 5 minutos: meia hora dá 48px, que é onde nome e
-   serviço ainda cabem em duas linhas. */
 .eixo,
 .coluna {
   display: grid;
-  grid-template-rows: repeat(var(--total-linhas), 8px);
+  grid-template-rows: repeat(var(--total-linhas), var(--altura-da-linha));
 }
 
 .eixo {
