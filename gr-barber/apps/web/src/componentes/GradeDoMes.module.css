@@ -1,6 +1,11 @@
 .quadro {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
+  /* A tela não rola mais: numa janela baixa, seis semanas de células não
+     cabem, e sem rolagem própria a grade seria cortada. */
+  align-content: start;
+  min-height: 0;
+  overflow-y: auto;
   gap: var(--borda-hairline);
   border: var(--borda-padrao) solid var(--cor-ink);
   border-radius: var(--raio-lg);

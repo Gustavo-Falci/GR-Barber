@@ -1,12 +1,31 @@
-.pagina {
-  /* Altura da barra de cabeçalho, declarada aqui porque DOIS
-     componentes irmãos dependem dela: a barra, que a usa como altura
-     mínima, e o cabeçalho da grade, que gruda logo abaixo com ela como
-     deslocamento. Declarada em um deles, não chegaria ao outro — e dois
-     literais divergiriam, sobrepondo as duas barras. */
-  --altura-da-barra: 68px;
+/* A tela ocupa exatamente a altura disponível e NÃO rola. Quem rola é o
+   corpo da grade, lá dentro — é o que põe a barra de rolagem junto do
+   calendário em vez de na beira da janela.
 
+   `auto 1fr` e não `auto auto`: a barra fica com a altura que pede, e a
+   grade recebe o que sobra. Com `auto`, a grade cresceria com o conteúdo
+   e a rolagem escaparia de volta para a área de conteúdo.
+
+   `minmax(0, 1fr)` e não `1fr`: filho de grid não encolhe abaixo do
+   próprio conteúdo por padrão, e sem o zero a rolagem interna
+   simplesmente não acontece. É o erro clássico deste arranjo. */
+.pagina {
   display: grid;
-  gap: var(--espaco-lg);
-  align-content: start;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: var(--espaco-md);
+  /* `flex: 1` contra o container de altura cheia, e não `height: 100%`:
+     a porcentagem resolveria contra a altura do container, que é
+     automática, e o limite nunca chegaria à grade. */
+  flex: 1;
+  min-height: 0;
+}
+
+/* Empilhado, a tela volta a crescer e a rolagem é a da área de conteúdo:
+   numa janela de celular, prender cabeçalho e grade deixaria uma nesga
+   de agenda visível. */
+@media (max-width: 900px) {
+  .pagina {
+    grid-template-rows: auto auto;
+    flex: 0 1 auto;
+  }
 }

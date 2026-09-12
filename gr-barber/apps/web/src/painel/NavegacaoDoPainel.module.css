@@ -1,11 +1,20 @@
-/* O shell do painel: barra lateral fixa e a área de conteúdo rolando ao
-   lado. Grid e não flex porque a lateral tem largura fixa e o conteúdo
-   fica com `minmax(0, 1fr)` — sem o `0`, uma tabela larga empurraria a
-   coluna em vez de rolar dentro dela. */
+/* O shell do painel ocupa a janela inteira e NÃO rola: quem rola é a
+   área de conteúdo, ou — na agenda — o corpo da grade dentro dela. É o
+   que põe a barra de rolagem junto do conteúdo em vez de na beira da
+   janela, e o que permite uma tela prender o próprio cabeçalho por
+   layout em vez de por `sticky`.
+
+   Grid e não flex porque a lateral tem largura fixa e o conteúdo fica
+   com `minmax(0, 1fr)` — sem o `0`, uma tabela larga empurraria a coluna
+   em vez de rolar dentro dela. O `minmax(0, 1fr)` na LINHA faz o mesmo
+   pela vertical: sem ele a linha cresceria com o conteúdo e a rolagem
+   interna nunca aconteceria. */
 .shell {
   display: grid;
   grid-template-columns: 260px minmax(0, 1fr);
-  min-height: 100vh;
+  grid-template-rows: minmax(0, 1fr);
+  height: 100vh;
+  overflow: hidden;
 }
 
 .barra {
@@ -15,11 +24,10 @@
   padding: var(--espaco-lg) var(--espaco-md);
   border-inline-end: var(--borda-padrao) solid var(--cor-ink);
   background: var(--cor-paper-soft);
-  /* A lateral acompanha a rolagem do conteúdo: numa agenda longa, sair
-     e trocar de tema continuam à mão sem voltar ao topo. */
-  position: sticky;
-  top: 0;
-  height: 100vh;
+  /* Sem `sticky`: o shell não rola mais, então a lateral já fica parada
+     por construção. Ela rola por dentro se a lista de seções crescer
+     além da janela. */
+  overflow-y: auto;
 }
 
 .marca {
@@ -86,11 +94,24 @@
    sem `margin-inline: auto`, e numa tela de 1920 sobravam 1200px de
    vazio. 1180px é largura de dashboard — cabe a agenda de sete
    colunas sem virar linha de texto longa demais pra ler. */
+/* A rolagem que era da página. `min-height: 0` para o item de grid poder
+   encolher abaixo do próprio conteúdo — sem ele a área cresce e a
+   rolagem volta para a janela, que é o que se quer evitar. */
 .conteudo {
+  min-height: 0;
+  overflow-y: auto;
   padding: var(--espaco-xl) var(--espaco-lg);
 }
 
+/* Coluna de altura cheia: uma tela que se ancora na janela (a agenda)
+   precisa de um pai com altura definida para poder limitar a própria. O
+   `min-height: 100%` resolve porque a área de conteúdo tem altura
+   definida pelo shell; e para as telas de altura natural nada muda —
+   elas continuam sendo itens de flex com o tamanho do próprio conteúdo. */
 .container {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
   max-width: 1180px;
   margin-inline: auto;
 }
@@ -98,13 +119,24 @@
 /* Abaixo de 900px a lateral vira uma faixa no topo e a navegação rola
    na horizontal — é o mesmo conjunto de links, sem menu escondido. */
 @media (max-width: 900px) {
+  /* Empilhado, o shell volta a rolar como página: faixa no topo e
+     conteúdo abaixo não cabem numa janela de celular sem espremer os
+     dois. */
   .shell {
     grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+    height: auto;
+    min-height: 100vh;
+    overflow: visible;
+  }
+
+  .conteudo {
+    overflow-y: visible;
   }
 
   .barra {
-    position: static;
     height: auto;
+    overflow-y: visible;
     flex-direction: row;
     flex-wrap: wrap;
     align-items: center;

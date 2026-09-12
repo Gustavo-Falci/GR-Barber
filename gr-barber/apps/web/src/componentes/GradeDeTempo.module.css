@@ -2,10 +2,21 @@
    minutos: `duracaoMinutos` é múltiplo de 5 e os inícios caem na grade
    de 15 do scheduling, então todo evento alinha exato.
 
-   Sem `overflow: hidden` de propósito: ele criaria um contexto de
-   rolagem e o cabeçalho grudado nunca colaria. Quem arredonda os cantos
-   agora é o cabeçalho em cima e o corpo embaixo. */
+   O quadro é uma coluna de altura limitada: cabeçalho no topo, corpo
+   ocupando o resto e rolando por dentro. É isso que põe a barra de
+   rolagem dentro do calendário em vez de na beira da janela.
+
+   A rolagem é DO QUADRO, e o cabeçalho gruda dentro dele. Pôr a rolagem
+   um nível abaixo, no corpo, deixaria o cabeçalho fora do scrollport e
+   mais largo que o corpo pela largura da barra de rolagem — um desvio de
+   uns 15px entre a coluna do dia e a coluna dos eventos, do tipo que se
+   nota sem se saber de onde vem. Aqui os dois dividem o mesmo
+   scrollport e a conta não existe. */
 .quadro {
+  /* `min-height: 0` para poder encolher abaixo do conteúdo: sem ele o
+     quadro cresce e a rolagem escapa para a janela. */
+  min-height: 0;
+  overflow-y: auto;
   /* Altura de uma linha de 5 minutos — o único número que muda a escala
      vertical da agenda inteira. Em 12px, a faixa de 15 minutos fica com
      36px e a hora com 144px; um corte de meia hora ocupa 72px, que é
@@ -29,17 +40,13 @@
   grid-template-columns: 3.5rem repeat(var(--colunas), minmax(0, 1fr));
 }
 
-/* Grudado enquanto a agenda desce. Quem rola é a página — a barra
-   lateral do painel já é sticky contra a viewport, e a área de conteúdo
-   não tem overflow próprio.
 
-   Não em `top: 0`, e sim abaixo da barra de cabeçalho da tela, que
-   também gruda: em zero as duas se sobreporiam. O fallback é zero para
-   o componente continuar correto onde não existe barra acima — a vista
-   de dia isolada e os testes. */
+/* Grudado no topo do QUADRO, que é quem rola — não da janela. Por isso
+   `top: 0` e não mais um deslocamento pela barra de cabeçalho da tela:
+   aquela barra está fora do scrollport e não passa por aqui. */
 .cabecalho {
   position: sticky;
-  top: var(--altura-da-barra, 0px);
+  top: 0;
   z-index: 4;
   border-block-end: var(--borda-padrao) solid var(--cor-ink);
   border-start-start-radius: var(--raio-lg);
@@ -48,7 +55,6 @@
 }
 
 .corpo {
-  overflow: hidden;
   border-end-start-radius: var(--raio-lg);
   border-end-end-radius: var(--raio-lg);
 }

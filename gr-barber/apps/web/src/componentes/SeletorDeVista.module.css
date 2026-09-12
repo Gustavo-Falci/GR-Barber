@@ -2,25 +2,15 @@
    direita. Gruda no topo da janela — rolando a agenda, o mês e o
    seletor continuam à mão, que é quando mais se precisa deles.
 
-   `--altura-da-barra` vem da tela (ver Agenda.module.css), porque o
-   cabeçalho da grade também a lê para grudar logo abaixo desta — e uma
-   variável declarada aqui não chegaria lá, que é irmão e não
-   descendente. O fallback mantém o componente utilizável sozinho. */
+   Sem `sticky`: a tela não rola mais, então a barra fica parada por
+   construção. Quem rola é o corpo da grade, abaixo. */
 .barra {
-  position: sticky;
-  top: 0;
-  z-index: 5;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: var(--espaco-md);
-  min-height: var(--altura-da-barra, 68px);
-  /* Só recuo vertical: a barra tem a largura do container, e o conteúdo
-     que passa por baixo tem a mesma — nada escapa pelas laterais. O
-     fundo é opaco porque a agenda desliza por baixo dela. */
-  padding-block: var(--espaco-sm);
-  background: var(--cor-paper);
+  padding-block: var(--espaco-xs);
 }
 
 .navegacao,
