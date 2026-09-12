@@ -6,6 +6,11 @@
    rolagem e o cabeçalho grudado nunca colaria. Quem arredonda os cantos
    agora é o cabeçalho em cima e o corpo embaixo. */
 .quadro {
+  /* Quanto o corpo recua no topo para caber o primeiro rótulo de hora.
+     Nomeada porque dois lugares dependem dela: o recuo em si, e a
+     hachura do dia fechado, que precisa subir de volta para preencher. */
+  --folga-do-topo: calc(var(--texto-xs) / 2 + 2px);
+
   border: var(--borda-padrao) solid var(--cor-ink);
   border-radius: var(--raio-lg);
   background: var(--cor-surface);
@@ -39,20 +44,6 @@
   overflow: hidden;
   border-end-start-radius: var(--raio-lg);
   border-end-end-radius: var(--raio-lg);
-  /* Folga no topo para o primeiro rótulo de hora. Cada um sobe meio em
-     do PRÓPRIO tamanho para ficar centrado na sua linha (ver `.hora`),
-     e o primeiro subiria para fora do corpo, onde o cabeçalho grudado
-     passa por cima e come metade do "09:00". Os outros têm corpo acima
-     e não precisam.
-
-     A conta é sobre `--texto-xs`, que é o tamanho do rótulo: um `0.5em`
-     aqui resolveria contra o texto do corpo, que é maior, e a folga
-     deixaria de ter relação com o que ela compensa. Os 2px são ar entre
-     o rótulo e a borda do cabeçalho.
-
-     Fica no corpo, e não só no eixo: as colunas são irmãs do eixo nesta
-     grade, e deslocar um sem o outro desalinharia o evento da sua hora. */
-  padding-block-start: calc(var(--texto-xs) / 2 + 2px);
 }
 
 /* A casa vazia sobre o eixo das horas. Mantém a primeira trilha do
@@ -112,6 +103,23 @@ button.diaDoCabecalho:hover .numeroDoDia {
 .coluna {
   display: grid;
   grid-template-rows: repeat(var(--total-linhas), 8px);
+  /* Folga no topo para o primeiro rótulo de hora. Cada rótulo sobe meio
+     em do PRÓPRIO tamanho para ficar centrado na sua linha (ver
+     `.hora`), e o primeiro subiria para fora, onde o cabeçalho grudado
+     passa por cima e come metade do "09:00". Os outros têm grade acima
+     e não precisam.
+
+     A conta é sobre `--texto-xs`, que é o tamanho do rótulo: um `0.5em`
+     aqui resolveria contra o texto do corpo, que é maior, e a folga
+     deixaria de ter relação com o que ela compensa. Os 2px são ar entre
+     o rótulo e a borda do cabeçalho.
+
+     Nos DOIS, e não no `.corpo` que os contém: no container, a folga
+     ficaria fora deles, e o fundo do eixo e as divisórias das colunas
+     só começariam abaixo dela — uma faixa da cor do quadro separando o
+     cabeçalho do corpo. Aqui os dois deslocam junto, então o
+     alinhamento entre hora e evento se mantém e nada descola. */
+  padding-block-start: var(--folga-do-topo);
 }
 
 .eixo {
@@ -224,7 +232,10 @@ button.diaDoCabecalho:hover .numeroDoDia {
 .fechado {
   grid-row: 1 / -1;
   grid-column: 1;
-  margin: 0;
+  /* Sobe de volta pela folga: `1 / -1` cobre a área da grade, que começa
+     abaixo dela, e sem isto a hachura deixaria uma faixa vazia colada no
+     cabeçalho. */
+  margin: calc(-1 * var(--folga-do-topo)) 0 0;
   padding: var(--espaco-md) var(--espaco-xs);
   background: repeating-linear-gradient(
     45deg,
