@@ -39,6 +39,20 @@
   overflow: hidden;
   border-end-start-radius: var(--raio-lg);
   border-end-end-radius: var(--raio-lg);
+  /* Folga no topo para o primeiro rótulo de hora. Cada um sobe meio em
+     do PRÓPRIO tamanho para ficar centrado na sua linha (ver `.hora`),
+     e o primeiro subiria para fora do corpo, onde o cabeçalho grudado
+     passa por cima e come metade do "09:00". Os outros têm corpo acima
+     e não precisam.
+
+     A conta é sobre `--texto-xs`, que é o tamanho do rótulo: um `0.5em`
+     aqui resolveria contra o texto do corpo, que é maior, e a folga
+     deixaria de ter relação com o que ela compensa. Os 2px são ar entre
+     o rótulo e a borda do cabeçalho.
+
+     Fica no corpo, e não só no eixo: as colunas são irmãs do eixo nesta
+     grade, e deslocar um sem o outro desalinharia o evento da sua hora. */
+  padding-block-start: calc(var(--texto-xs) / 2 + 2px);
 }
 
 /* A casa vazia sobre o eixo das horas. Mantém a primeira trilha do
