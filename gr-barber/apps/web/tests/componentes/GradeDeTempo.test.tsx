@@ -172,6 +172,14 @@ describe("GradeDeTempo", () => {
     expect(cabecalho).not.toContainElement(screen.getByTestId("corpo-da-grade"));
     expect(screen.getByTestId("corpo-da-grade")).not.toContainElement(cabecalho);
 
+    // E os dois dentro do MESMO container de rolagem. Separá-los deixaria
+    // o cabeçalho fora do scrollport e mais largo que o corpo pela
+    // largura da barra de rolagem — uns 15px de desvio entre a coluna do
+    // dia e a coluna dos eventos.
+    const rolagem = screen.getByTestId("rolagem-da-grade");
+    expect(rolagem).toContainElement(cabecalho);
+    expect(rolagem).toContainElement(screen.getByTestId("corpo-da-grade"));
+
     // O botão do dia mora no cabeçalho, e leva o dia da semana junto do
     // número.
     const botao = screen.getByRole("button", { name: "8 de setembro" });

@@ -60,141 +60,151 @@ export function GradeDeTempo({
 
   return (
     <div className={estilos.quadro} style={estiloDaGrade}>
-      {/* Fora do corpo que rola, e grudado no topo: a linha dos dias
+      {/* A rolagem vive aqui, um nível dentro da borda: o quadro fica com
+          a moldura e o `border-radius`, e recorta a barra de rolagem nos
+          cantos. Com a rolagem no próprio quadro, a barra é um retângulo
+          que atravessa a curva.
+
+          Cabeçalho e corpo dividem este mesmo scrollport de propósito —
+          separá-los deixaria o cabeçalho mais largo que o corpo pela
+          largura da barra, desalinhando a coluna do dia dos eventos. */}
+      <div className={estilos.rolagem} data-testid="rolagem-da-grade">
+        {/* Fora do corpo que rola, e grudado no topo: a linha dos dias
           tem que continuar visível enquanto se desce a agenda. Dentro
           das colunas, como estava, ela subia junto. */}
-      <div className={estilos.cabecalho} data-testid="cabecalho-da-grade">
-        <span className={estilos.canto} />
-        {grade.colunas.map((coluna) =>
-          aoAbrirDia ? (
-            <button
-              key={coluna.data}
-              type="button"
-              className={estilos.diaDoCabecalho}
-              // A data por extenso é o nome acessível: "8" sozinho não
-              // distingue uma coluna da outra numa lista de sete.
-              aria-label={formatarDataLonga(coluna.data)}
-              onClick={() => aoAbrirDia(coluna.data)}
-            >
-              <span className={estilos.nomeDoDia}>
-                {nomeDoDia(coluna.data)}
+        <div className={estilos.cabecalho} data-testid="cabecalho-da-grade">
+          <span className={estilos.canto} />
+          {grade.colunas.map((coluna) =>
+            aoAbrirDia ? (
+              <button
+                key={coluna.data}
+                type="button"
+                className={estilos.diaDoCabecalho}
+                // A data por extenso é o nome acessível: "8" sozinho não
+                // distingue uma coluna da outra numa lista de sete.
+                aria-label={formatarDataLonga(coluna.data)}
+                onClick={() => aoAbrirDia(coluna.data)}
+              >
+                <span className={estilos.nomeDoDia}>
+                  {nomeDoDia(coluna.data)}
+                </span>
+                <span className={estilos.numeroDoDia}>
+                  {Number(coluna.data.slice(8))}
+                </span>
+              </button>
+            ) : (
+              // Sem navegação a vista de dia ainda precisa dizer que dia
+              // está na tela — o que some é o clique, não o rótulo.
+              <span key={coluna.data} className={estilos.diaDoCabecalho}>
+                <span className={estilos.nomeDoDia}>
+                  {nomeDoDia(coluna.data)}
+                </span>
+                <span className={estilos.numeroDoDia}>
+                  {Number(coluna.data.slice(8))}
+                </span>
               </span>
-              <span className={estilos.numeroDoDia}>
-                {Number(coluna.data.slice(8))}
-              </span>
-            </button>
-          ) : (
-            // Sem navegação a vista de dia ainda precisa dizer que dia
-            // está na tela — o que some é o clique, não o rótulo.
-            <span key={coluna.data} className={estilos.diaDoCabecalho}>
-              <span className={estilos.nomeDoDia}>
-                {nomeDoDia(coluna.data)}
-              </span>
-              <span className={estilos.numeroDoDia}>
-                {Number(coluna.data.slice(8))}
-              </span>
-            </span>
-          ),
-        )}
-      </div>
-
-      <div className={estilos.corpo} data-testid="corpo-da-grade">
-        <div className={estilos.eixo}>
-          {horasCheias(grade).map((hora) => (
-            <span
-              key={hora.rotulo}
-              className={estilos.hora}
-              // O rótulo da primeira linha fica embaixo do cabeçalho
-              // grudado e não pode subir meia linha como os outros. É
-              // `linha === 1`, e não "o primeiro da lista": abrindo às
-              // 09:30, o primeiro rótulo é 10:00 na linha 7, que não
-              // encosta em nada.
-              data-no-topo={hora.linha === 1 ? "true" : undefined}
-              style={{ "--linha": hora.linha } as CSSProperties}
-            >
-              {hora.rotulo}
-            </span>
-          ))}
+            ),
+          )}
         </div>
 
-        {grade.colunas.map((coluna) => (
-          <div key={coluna.data} className={estilos.coluna}>
-            {coluna.fechado ? (
-              <p className={estilos.fechado}>Fechado neste dia.</p>
-            ) : null}
-
-            {coluna.livres.map((faixa) =>
-              // Faixa passada não vira botão: oferecer 09:00 às 10h é
-              // ruído. A linha continua ocupada pra grade não ganhar
-              // buraco.
-              faixa.passada ? (
-                <span
-                  key={faixa.hora}
-                  className={estilos.passada}
-                  style={
-                    {
-                      "--linha": faixa.linha,
-                      "--linhas": faixa.linhas,
-                    } as CSSProperties
-                  }
-                />
-              ) : (
-                <button
-                  key={faixa.hora}
-                  type="button"
-                  className={estilos.livre}
-                  style={
-                    {
-                      "--linha": faixa.linha,
-                      "--linhas": faixa.linhas,
-                    } as CSSProperties
-                  }
-                  onClick={() => aoCriar(coluna.data, faixa.hora)}
-                >
-                  {faixa.hora}
-                </button>
-              ),
-            )}
-
-            {coluna.eventos.map((evento) => (
-              <button
-                key={evento.agendamento.id}
-                type="button"
-                className={estilos.evento}
-                style={
-                  {
-                    "--linha": evento.linha,
-                    "--linhas": evento.linhas,
-                    "--pista": evento.pista,
-                    "--pistas": evento.pistas,
-                  } as CSSProperties
-                }
-                onClick={() => aoAbrir(evento.agendamento.id)}
+        <div className={estilos.corpo} data-testid="corpo-da-grade">
+          <div className={estilos.eixo}>
+            {horasCheias(grade).map((hora) => (
+              <span
+                key={hora.rotulo}
+                className={estilos.hora}
+                // O rótulo da primeira linha fica embaixo do cabeçalho
+                // grudado e não pode subir meia linha como os outros. É
+                // `linha === 1`, e não "o primeiro da lista": abrindo às
+                // 09:30, o primeiro rótulo é 10:00 na linha 7, que não
+                // encosta em nada.
+                data-no-topo={hora.linha === 1 ? "true" : undefined}
+                style={{ "--linha": hora.linha } as CSSProperties}
               >
-                {/* O nome completo entra no texto, e quem encurta é o CSS:
+                {hora.rotulo}
+              </span>
+            ))}
+          </div>
+
+          {grade.colunas.map((coluna) => (
+            <div key={coluna.data} className={estilos.coluna}>
+              {coluna.fechado ? (
+                <p className={estilos.fechado}>Fechado neste dia.</p>
+              ) : null}
+
+              {coluna.livres.map((faixa) =>
+                // Faixa passada não vira botão: oferecer 09:00 às 10h é
+                // ruído. A linha continua ocupada pra grade não ganhar
+                // buraco.
+                faixa.passada ? (
+                  <span
+                    key={faixa.hora}
+                    className={estilos.passada}
+                    style={
+                      {
+                        "--linha": faixa.linha,
+                        "--linhas": faixa.linhas,
+                      } as CSSProperties
+                    }
+                  />
+                ) : (
+                  <button
+                    key={faixa.hora}
+                    type="button"
+                    className={estilos.livre}
+                    style={
+                      {
+                        "--linha": faixa.linha,
+                        "--linhas": faixa.linhas,
+                      } as CSSProperties
+                    }
+                    onClick={() => aoCriar(coluna.data, faixa.hora)}
+                  >
+                    {faixa.hora}
+                  </button>
+                ),
+              )}
+
+              {coluna.eventos.map((evento) => (
+                <button
+                  key={evento.agendamento.id}
+                  type="button"
+                  className={estilos.evento}
+                  style={
+                    {
+                      "--linha": evento.linha,
+                      "--linhas": evento.linhas,
+                      "--pista": evento.pista,
+                      "--pistas": evento.pistas,
+                    } as CSSProperties
+                  }
+                  onClick={() => aoAbrir(evento.agendamento.id)}
+                >
+                  {/* O nome completo entra no texto, e quem encurta é o CSS:
                   na coluna larga da vista de dia ele cabe inteiro, na
                   coluna estreita da semana trunca com reticências.
                   Cortar no JavaScript esconderia o sobrenome também na
                   vista de dia, onde há espaço de sobra. */}
-                <strong className={estilos.horaDoEvento}>
-                  {evento.agendamento.horaInicio}
-                </strong>{" "}
-                {evento.agendamento.cliente.nome}
-                <span className={estilos.servicos}>
-                  {evento.agendamento.servicos.map((s) => s.nome).join(" + ")}
-                </span>
-              </button>
-            ))}
+                  <strong className={estilos.horaDoEvento}>
+                    {evento.agendamento.horaInicio}
+                  </strong>{" "}
+                  {evento.agendamento.cliente.nome}
+                  <span className={estilos.servicos}>
+                    {evento.agendamento.servicos.map((s) => s.nome).join(" + ")}
+                  </span>
+                </button>
+              ))}
 
-            {grade.agora?.data === coluna.data ? (
-              <span
-                data-testid="regua-do-agora"
-                className={estilos.agora}
-                style={{ "--linha": grade.agora.linha } as CSSProperties}
-              />
-            ) : null}
-          </div>
-        ))}
+              {grade.agora?.data === coluna.data ? (
+                <span
+                  data-testid="regua-do-agora"
+                  className={estilos.agora}
+                  style={{ "--linha": grade.agora.linha } as CSSProperties}
+                />
+              ) : null}
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
