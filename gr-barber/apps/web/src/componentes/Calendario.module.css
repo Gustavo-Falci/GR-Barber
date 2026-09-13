@@ -1,6 +1,116 @@
-.calendario { display: grid; gap: var(--espaco-sm); }
-.cabecalho { display: flex; align-items: center; justify-content: space-between; font-weight: 600; }
-.grade { display: grid; grid-template-columns: repeat(7, 1fr); gap: var(--espaco-xs); }
-.dia { padding: var(--espaco-sm); border: var(--borda-padrao) solid var(--cor-ink); border-radius: var(--raio-sm); background: var(--cor-surface); font-size: var(--texto-sm); cursor: pointer; }
-.dia:disabled { opacity: 0.35; cursor: not-allowed; }
-.vazio { border: none; background: transparent; }
+.calendario {
+  display: grid;
+  gap: var(--espaco-sm);
+  /* Teto de largura: a celula e quadrada (`aspect-ratio: 1`) sobre
+     coluna `1fr`, entao num container largo cada dia virava um botao de
+     100px e o mes ocupava a tela toda. */
+  max-width: 26rem;
+}
+
+.cabecalho {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--espaco-sm);
+}
+
+.mes {
+  font-family: var(--fonte-display), system-ui, sans-serif;
+  font-size: var(--texto-md);
+}
+
+/* O mês vem do Intl em minúscula ("setembro de 2026"); a maiúscula
+   inicial é de apresentação e não pertence ao dado. `::first-letter` e
+   não `capitalize`, que maiusculiza toda palavra e escreve
+   "Setembro De 2026". */
+.mes::first-letter {
+  text-transform: uppercase;
+}
+
+/* As setas são alvo de clique, não texto: sem tamanho próprio ficavam
+   dois caracteres soltos difíceis de acertar. */
+.navegar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: var(--borda-padrao) solid var(--cor-ink);
+  border-radius: var(--raio-sm);
+  background: var(--cor-surface);
+  color: var(--cor-ink);
+  font-size: var(--texto-md);
+  line-height: 1;
+  cursor: pointer;
+}
+
+.navegar:hover {
+  background: var(--cor-accent);
+  color: var(--cor-dark);
+}
+
+.grade {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: var(--espaco-xs);
+}
+
+/* Mesma marcação de coluna da grade do mês da Agenda: é o mesmo produto
+   mostrando o mesmo mês, e duas convenções de cabeçalho dariam a
+   impressão de duas grades diferentes. */
+.diaDaSemana {
+  padding-block-end: var(--espaco-xs);
+  color: var(--cor-ink-soft);
+  text-align: center;
+  font-size: var(--texto-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.dia {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* Quadrado: a coluna manda na largura e a altura acompanha, então a
+     grade não muda de proporção entre um mês de cinco e um de seis
+     linhas. */
+  aspect-ratio: 1;
+  border: var(--borda-padrao) solid var(--cor-ink);
+  border-radius: var(--raio-sm);
+  background: var(--cor-surface);
+  color: var(--cor-ink);
+  font-size: var(--texto-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.dia:hover:enabled {
+  background: var(--cor-accent);
+  color: var(--cor-dark);
+}
+
+/* Dia sem vaga (ou já passado) parecia dia inexistente: a opacidade
+   apagava a borda junto com o número, e um mês inteiro sem vaga lia
+   como calendário quebrado. Aqui ele continua visivelmente um dia —
+   só sem a borda forte e o fundo de quem aceita clique. */
+.dia:disabled {
+  border-color: transparent;
+  background: var(--cor-paper-soft);
+  color: var(--cor-muted);
+  cursor: not-allowed;
+}
+
+/* O dia escolhido usa a mesma marca do resto da casa: fundo amarelo,
+   borda escura e sombra deslocada. Não depende só de cor — continua
+   distinguível em escala de cinza. */
+.dia[aria-current="date"] {
+  background: var(--cor-accent);
+  box-shadow: 0 3px 0 var(--cor-shadow);
+  color: var(--cor-dark);
+}
+
+.vazio {
+  border: none;
+  background: transparent;
+}

@@ -18,6 +18,9 @@ function montar(diasComVaga: Record<string, boolean>) {
   );
 }
 
+// Os dias são consultados pela data por extenso porque é o nome
+// acessível que o Calendario passou a expor: "10" sozinho se repete em
+// todo mês e não diz de qual grade é.
 describe("escolha da data", () => {
   beforeEach(() => {
     navegacaoFalsa.redefinir({ query: { servicos: "s1" } });
@@ -25,10 +28,10 @@ describe("escolha da data", () => {
 
   it("desabilita dia sem vaga", async () => {
     montar({ "2026-09-10": true, "2026-09-11": false });
-    await waitFor(() => screen.getByRole("button", { name: "10" }));
+    await waitFor(() => screen.getByRole("button", { name: "10 de setembro" }));
 
-    expect(screen.getByRole("button", { name: "11" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "10" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "11 de setembro" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "10 de setembro" })).toBeEnabled();
   });
 
   it("desabilita dia passado mesmo quando a API diz que tem vaga", async () => {
@@ -36,23 +39,23 @@ describe("escolha da data", () => {
     // como disponível. Quem barra é esta tela — sem isso o cliente
     // agenda no passado e tranca a própria conta.
     montar({ "2026-09-08": true, "2026-09-10": true });
-    await waitFor(() => screen.getByRole("button", { name: "10" }));
+    await waitFor(() => screen.getByRole("button", { name: "10 de setembro" }));
 
-    expect(screen.getByRole("button", { name: "8" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "8 de setembro" })).toBeDisabled();
   });
 
   it("hoje continua escolhível", async () => {
     montar({ "2026-09-09": true });
-    await waitFor(() => screen.getByRole("button", { name: "9" }));
+    await waitFor(() => screen.getByRole("button", { name: "9 de setembro" }));
 
-    expect(screen.getByRole("button", { name: "9" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "9 de setembro" })).toBeEnabled();
   });
 
   it("leva pro passo de horário com a data escolhida", async () => {
     montar({ "2026-09-10": true });
-    await waitFor(() => screen.getByRole("button", { name: "10" }));
+    await waitFor(() => screen.getByRole("button", { name: "10 de setembro" }));
 
-    await userEvent.click(screen.getByRole("button", { name: "10" }));
+    await userEvent.click(screen.getByRole("button", { name: "10 de setembro" }));
 
     expect(navegacaoFalsa.push).toHaveBeenCalledWith(
       "/gr-barber/agendar/horario?servicos=s1&data=2026-09-10"
@@ -102,7 +105,7 @@ describe("escolha da data", () => {
         <EscolhaDaData agora={MANHA} />
       </ProvedorDaApi>
     );
-    await waitFor(() => screen.getByRole("button", { name: "10" }));
+    await waitFor(() => screen.getByRole("button", { name: "10 de setembro" }));
     expect(screen.getByText(/setembro/i)).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: "Próximo mês" }));
@@ -111,7 +114,7 @@ describe("escolha da data", () => {
     // Confirma que a disponibilidade usada é a de outubro, não a
     // resposta antiga de setembro ainda pendurada no estado.
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: "15" })).toBeEnabled()
+      expect(screen.getByRole("button", { name: "15 de outubro" })).toBeEnabled()
     );
 
     expect(mesesPedidos).toEqual(["2026-09", "2026-10"]);
@@ -122,7 +125,7 @@ describe("escolha da data", () => {
     // mesmo com um dia marcado como disponível na semente — o passado
     // desabilita antes de a disponibilidade da API importar.
     montar({ "2026-08-15": true });
-    await waitFor(() => screen.getByRole("button", { name: "9" }));
+    await waitFor(() => screen.getByRole("button", { name: "9 de setembro" }));
 
     await userEvent.click(screen.getByRole("button", { name: "Mês anterior" }));
 

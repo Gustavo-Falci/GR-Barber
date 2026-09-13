@@ -92,9 +92,7 @@ export function BuscaDeCliente({
   }
 
   return (
-    <section className={estilos.bloco}>
-      <h2>Cliente</h2>
-
+    <>
       {/* "Buscar cliente", e não "Buscar por nome ou telefone": esse
           rótulo mais longo contém as duas palavras que também nomeiam
           os campos do cadastro embutido ("Nome", "Telefone"), e
@@ -140,6 +138,6 @@ export function BuscaDeCliente({
           + Cadastrar novo
         </Botao>
       )}
-    </section>
+    </>
   );
 }

@@ -17,6 +17,10 @@ function semear() {
   });
 }
 
+async function abrirPasso(titulo: string) {
+  await userEvent.click(await screen.findByRole("button", { name: titulo }));
+}
+
 describe("novo agendamento no painel", () => {
   beforeEach(() => {
     localStorage.clear();
@@ -210,9 +214,10 @@ describe("novo agendamento no painel", () => {
 
     await userEvent.click(await screen.findByRole("button", { name: /João Silva/ }));
     await userEvent.click(screen.getByRole("checkbox", { name: /Corte/ }));
+    await abrirPasso("Data");
 
-    await waitFor(() => expect(screen.getByRole("button", { name: "10" })).toBeEnabled());
-    await userEvent.click(screen.getByRole("button", { name: "10" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "10 de setembro" })).toBeEnabled());
+    await userEvent.click(screen.getByRole("button", { name: "10 de setembro" }));
 
     const ultimaChamada = navegacaoFalsa.push.mock.calls.at(-1);
     expect(ultimaChamada?.[0]).toContain("data=2026-09-10");
@@ -258,5 +263,207 @@ describe("novo agendamento no painel", () => {
     liberar();
     await waitFor(() => expect(criar).toHaveBeenCalled());
     expect(criar).toHaveBeenCalledTimes(1);
+  });
+  describe("o que a tela diz quando ainda falta escolher", () => {
+    it("sem serviço, a data explica o que falta em vez de um mês todo apagado", async () => {
+      // Sem serviço, /disponibilidade/mes nem é chamada e o mapa vem
+      // vazio — o calendário saía com todos os dias desabilitados, o que
+      // se lê como tela quebrada e não como "falta um passo".
+      montarPainel(<NovoAgendamento agora={AGORA} />, semear());
+      await abrirPasso("Data");
+
+      expect(await screen.findByText(/escolha um serviço/i)).toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: /de setembro$/ })
+      ).not.toBeInTheDocument();
+    });
+
+    it("sem hora na URL, data e horário dizem coisas diferentes", async () => {
+      // Sem serviço escolhido os dois passos estão vazios. Repetir a
+      // mesma frase nos dois faria o quadro virar um eco: quem abre o
+      // horário depois da data não descobre nada novo.
+      navegacaoFalsa.redefinir({
+        pathname: "/painel/agendamentos/novo",
+        query: { data: "2026-09-09" },
+      });
+
+      montarPainel(<NovoAgendamento agora={AGORA} />, semear());
+
+      await abrirPasso("Data");
+      expect(screen.getByText(/escolha um serviço/i)).toBeInTheDocument();
+
+      await abrirPasso("Horário");
+      expect(screen.getByText(/os horários aparecem/i)).toBeInTheDocument();
+    });
+
+    it("com serviço escolhido, o calendário aparece", async () => {
+      montarPainel(<NovoAgendamento agora={AGORA} />, semear());
+
+      await abrirPasso("Serviços");
+      await userEvent.click(screen.getByRole("checkbox", { name: /Corte/ }));
+      await abrirPasso("Data");
+
+      expect(
+        await screen.findByRole("button", { name: "10 de setembro" })
+      ).toBeInTheDocument();
+    });
+
+    it("marca no calendário o dia que veio na URL", async () => {
+      montarPainel(<NovoAgendamento agora={AGORA} />, semear());
+
+      await abrirPasso("Serviços");
+      await userEvent.click(screen.getByRole("checkbox", { name: /Corte/ }));
+      await abrirPasso("Data");
+
+      expect(
+        await screen.findByRole("button", { name: "9 de setembro", current: "date" })
+      ).toBeInTheDocument();
+    });
+
+    it("o botão desligado diz o que falta", async () => {
+      // Cinco condições compõem `pronto` e nenhuma aparecia na tela: o
+      // botão desabilitava calado.
+      montarPainel(<NovoAgendamento agora={AGORA} />, semear());
+
+      expect(await screen.findByText(/falta escolher/i)).toHaveTextContent(/cliente/i);
+      expect(screen.getByText(/falta escolher/i)).toHaveTextContent(/serviço/i);
+    });
+
+    it("escolhido o cliente, ele sai da lista do que falta", async () => {
+      montarPainel(<NovoAgendamento agora={AGORA} />, semear());
+
+      await userEvent.click(await screen.findByRole("button", { name: /João Silva/ }));
+
+      expect(screen.getByText(/falta escolher/i)).not.toHaveTextContent(/cliente/i);
+    });
+
+    it("o resumo soma duração e preço dos serviços escolhidos", async () => {
+      montarPainel(<NovoAgendamento agora={AGORA} />, semear());
+
+      await abrirPasso("Serviços");
+      await userEvent.click(screen.getByRole("checkbox", { name: /Corte/ }));
+
+      const resumo = await screen.findByTestId("resumo-do-pedido");
+      expect(resumo).toHaveTextContent("30 min");
+      expect(resumo).toHaveTextContent("R$ 40,00");
+    });
+  });
+  describe("os passos numerados", () => {
+    it("numera os quatro passos", async () => {
+      montarPainel(<NovoAgendamento agora={AGORA} />, semear());
+
+      const quadro = await screen.findByTestId("passos");
+      for (const titulo of ["Cliente", "Serviços", "Data", "Horário"]) {
+        expect(quadro).toHaveTextContent(titulo);
+      }
+    });
+
+    it("escolhido o cliente, o passo recolhe e mostra quem ficou", async () => {
+      // Cliente é escolha única: depois de escolher não há o que fazer
+      // ali, e o corpo (busca, lista e cadastro) é o mais volumoso da
+      // tela. Serviços não recolhe — lá a escolha é múltipla e recolher
+      // no primeiro clique tiraria o segundo serviço do alcance.
+      montarPainel(<NovoAgendamento agora={AGORA} />, semear());
+
+      await userEvent.click(await screen.findByRole("button", { name: /João Silva/ }));
+
+      expect(screen.queryByLabelText(/buscar cliente/i)).not.toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /João Silva/, current: true })
+      ).toBeInTheDocument();
+    });
+
+    it("clicar em quem está escolhido reabre a busca", async () => {
+      montarPainel(<NovoAgendamento agora={AGORA} />, semear());
+
+      await userEvent.click(await screen.findByRole("button", { name: /João Silva/ }));
+      await userEvent.click(screen.getByRole("button", { name: /João Silva/ }));
+
+      expect(screen.getByLabelText(/buscar cliente/i)).toBeInTheDocument();
+    });
+
+    it("passo recolhido resume a escolha ao lado do título", async () => {
+      // É o que faz o quadro responder "o que já está decidido" com
+      // tudo fechado, sem abrir um passo de cada vez para conferir.
+      montarPainel(<NovoAgendamento agora={AGORA} />, semear());
+
+      await abrirPasso("Serviços");
+      await userEvent.click(screen.getByRole("checkbox", { name: /Corte/ }));
+      // Abrir outro passo é o que recolhe Serviços — não há recolhimento
+      // automático ali, senão o segundo serviço sairia do alcance.
+      await abrirPasso("Data");
+
+      expect(screen.getByTestId("resumo-servicos")).toHaveTextContent("30 min");
+      expect(screen.getByTestId("resumo-horario")).toHaveTextContent("11:00");
+      expect(screen.queryByTestId("resumo-data")).not.toBeInTheDocument();
+    });
+
+    it("a confirmação da data no passado mora no fecho, não numa caixa à parte", async () => {
+      // Solta entre o quadro e o fecho, ela virava um terceiro retângulo
+      // empilhado dizendo o mesmo que o "Falta escolher" logo abaixo.
+      navegacaoFalsa.redefinir({
+        pathname: "/painel/agendamentos/novo",
+        query: { data: "2026-09-02", hora: "11:00" },
+      });
+
+      montarPainel(<NovoAgendamento agora={AGORA} />, semear());
+
+      await userEvent.click(await screen.findByRole("button", { name: /João Silva/ }));
+      await userEvent.click(screen.getByRole("checkbox", { name: /Corte/ }));
+
+      const fecho = screen.getByTestId("fecho");
+      expect(fecho).toHaveTextContent(/data no passado/i);
+      expect(fecho).toContainElement(
+        screen.getByRole("checkbox", { name: /registrar mesmo assim/i })
+      );
+    });
+
+    it("o que falta não repete o que a caixa de confirmação já pede", async () => {
+      navegacaoFalsa.redefinir({
+        pathname: "/painel/agendamentos/novo",
+        query: { data: "2026-09-02", hora: "11:00" },
+      });
+
+      montarPainel(<NovoAgendamento agora={AGORA} />, semear());
+
+      await userEvent.click(await screen.findByRole("button", { name: /João Silva/ }));
+      await userEvent.click(screen.getByRole("checkbox", { name: /Corte/ }));
+
+      // Só a confirmação do passado falta, e ela tem controle próprio à
+      // vista — então não há lista de pendências a mostrar.
+      expect(screen.queryByText(/falta escolher/i)).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /^agendar$/i })).toBeDisabled();
+    });
+
+    it("o erro do envio aparece dentro do fecho, junto do botão que o causou", async () => {
+      // Com o fecho numa coluna à parte, um aviso que ficasse na coluna
+      // do quadro apareceria longe do botão que o disparou — e, com a
+      // página rolada, possivelmente fora da vista.
+      const falso = semear();
+      falso.barbeiro.criarAgendamento = vi.fn(async () => {
+        throw new ErroDaApi(409, "horario_ocupado", "Horário ocupado");
+      });
+      montarPainel(<NovoAgendamento agora={AGORA} />, falso);
+
+      await userEvent.click(await screen.findByRole("button", { name: /João Silva/ }));
+      await userEvent.click(screen.getByRole("checkbox", { name: /Corte/ }));
+      await userEvent.click(screen.getByRole("button", { name: /^agendar$/i }));
+
+      const fecho = await screen.findByTestId("fecho");
+      expect(fecho).toHaveTextContent(/acabou de ser ocupado/i);
+    });
+
+    it("o fecho junta tempo, preço, data e horário acima do botão", async () => {
+      montarPainel(<NovoAgendamento agora={AGORA} />, semear());
+
+      await abrirPasso("Serviços");
+      await userEvent.click(screen.getByRole("checkbox", { name: /Corte/ }));
+
+      const fecho = await screen.findByTestId("resumo-do-pedido");
+      expect(fecho).toHaveTextContent("30 min");
+      expect(fecho).toHaveTextContent("R$ 40,00");
+      expect(fecho).toHaveTextContent("9 de setembro");
+      expect(fecho).toHaveTextContent("11:00");
+    });
   });
 });

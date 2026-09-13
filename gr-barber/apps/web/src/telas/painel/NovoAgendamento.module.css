@@ -2,8 +2,248 @@
   display: grid;
   gap: var(--espaco-lg);
   align-content: start;
-  max-width: 900px;
+  max-width: 1120px;
 }
-.grade { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--espaco-lg); }
-.bloco { display: grid; gap: var(--espaco-sm); padding: var(--espaco-md); border: var(--borda-padrao) solid var(--cor-ink); border-radius: var(--raio-md); background: var(--cor-surface); align-content: start; }
-.passado { display: grid; gap: var(--espaco-xs); padding: var(--espaco-md); border: var(--borda-padrao) solid var(--cor-ink); border-radius: var(--raio-md); background: var(--cor-pale-yellow); }
+
+/* A sequência de passos ocupa a coluna de leitura e o fecho fica ao
+   lado. `align-items: start` para o fecho ter a altura do próprio
+   conteúdo — sem isso ele esticaria até o pé do quadro e o botão
+   flutuaria no meio de um retângulo vazio. */
+.colunas {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  align-items: start;
+  gap: var(--espaco-lg);
+}
+
+/* Um quadro só, não quatro cartões: eram quatro retângulos de borda
+   grossa competindo entre si, sem dizer por onde começar. Aqui a
+   moldura é externa e os passos se separam por régua fina. */
+.quadro {
+  border: var(--borda-padrao) solid var(--cor-ink);
+  border-radius: var(--raio-lg);
+  background: var(--cor-surface);
+  box-shadow: 0 4px 0 var(--cor-shadow);
+  overflow: hidden;
+}
+
+.passo {
+  display: grid;
+  gap: var(--espaco-md);
+  padding: var(--espaco-sm) var(--espaco-lg);
+}
+
+/* Só o passo aberto respira embaixo: recolhido, o espaço extra separava
+   linhas que são só uma lista de títulos. */
+.passo[data-aberto="true"] {
+  padding-block-end: var(--espaco-lg);
+}
+
+.passo + .passo {
+  border-block-start: var(--borda-hairline) solid var(--cor-line);
+}
+
+.linha {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-md);
+}
+
+/* O cabeçalho inteiro é o botão que abre e fecha — alvo grande, e não
+   um ícone de seta de 16px no canto. */
+.cabecalho {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-md);
+  padding-block: var(--espaco-sm);
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+/* A seta diz qual passo está aberto. `::after` e não um ícone: é um
+   triângulo, e um arquivo de componente para isto seria desproporção. */
+.cabecalho::after {
+  content: "";
+  width: 0;
+  height: 0;
+  border-inline: 4px solid transparent;
+  border-block-start: 5px solid var(--cor-ink-soft);
+}
+
+.cabecalho[aria-expanded="true"]::after {
+  transform: rotate(180deg);
+}
+
+.numero {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* `flex: none` senão o número achata quando o resumo é longo. */
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border: var(--borda-padrao) solid var(--cor-ink);
+  border-radius: var(--raio-pill);
+  background: var(--cor-paper-soft);
+  font-family: var(--fonte-display), system-ui, sans-serif;
+  font-size: var(--texto-sm);
+}
+
+/* Passo resolvido acende o número. Não é só cor: ganha também a sombra
+   deslocada da casa, então continua distinguível em escala de cinza. */
+.passo[data-feito="true"] .numero {
+  background: var(--cor-accent);
+  box-shadow: 0 3px 0 var(--cor-shadow);
+  color: var(--cor-dark);
+}
+
+/* O <h2> permanece pelo sumário de cabeçalhos; o botão por dentro é
+   quem desenha. */
+.titulo {
+  margin: 0;
+  font-size: var(--texto-md);
+}
+
+/* O resumo da escolha, ao lado do título do passo recolhido: é o que
+   deixa o quadro responder "o que já está decidido" com tudo fechado.
+   Também é botão, e reabre o passo — é nele que a mão vai quando a
+   intenção é rever o que ficou. */
+.valor {
+  margin-inline-start: auto;
+  overflow: hidden;
+  max-width: 60%;
+  padding: var(--espaco-xs) var(--espaco-md);
+  border: var(--borda-hairline) solid var(--cor-line);
+  border-radius: var(--raio-pill);
+  background: var(--cor-paper-soft);
+  color: var(--cor-ink);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: var(--texto-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.valor:hover {
+  border-color: var(--cor-ink);
+  background: var(--cor-accent);
+  color: var(--cor-dark);
+}
+
+.valor::first-letter {
+  text-transform: uppercase;
+}
+
+/* Alinhado ao título, não ao número: o corpo é conteúdo da seção, e
+   recuá-lo junto com o título é o que forma a coluna de leitura. */
+.corpo {
+  display: grid;
+  gap: var(--espaco-sm);
+  padding-block-start: var(--espaco-sm);
+  padding-inline-start: calc(30px + var(--espaco-md));
+}
+
+/* Dentro do fecho, e não numa caixa própria entre o quadro e ele: solta
+   ali no meio, virava um terceiro retângulo empilhado repetindo o que a
+   linha de pendências logo abaixo já dizia. */
+.passado {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-sm);
+  padding: var(--espaco-sm) var(--espaco-md);
+  border: var(--borda-hairline) solid var(--cor-ink);
+  border-radius: var(--raio-md);
+  background: var(--cor-pale-yellow);
+  font-size: var(--texto-sm);
+  cursor: pointer;
+}
+
+/* O fecho: tempo, preço, dia e hora empilhados sobre o botão, que ocupa
+   a largura. Antes o resumo ficava sem rótulo dentro de Serviços e o
+   botão desabilitava calado. */
+.fecho {
+  /* Desce junto com o passo aberto: a tela mede o topo dele e escreve o
+     valor aqui. Quem calcula o número é telas/painel/fecho.ts.
+
+     `margin-block-start` e não `transform`: a margem entra no fluxo, e é
+     o que mantém a coluna do fecho com a altura certa em vez de deixar
+     um vão no topo e transbordar embaixo. */
+  margin-block-start: var(--deslocamento, 0px);
+  transition: margin-block-start 180ms ease;
+
+  /* E continua grudando no topo se a rolagem passar dele: com o
+     calendário aberto o quadro passa da altura da janela, e o que vai
+     ser criado não pode sumir da vista justamente aí. Quem rola é a
+     área de conteúdo do painel, e é contra ela que o `sticky` resolve. */
+  position: sticky;
+  top: 0;
+  display: grid;
+  gap: var(--espaco-sm);
+  padding: var(--espaco-lg);
+  border: var(--borda-padrao) solid var(--cor-ink);
+  border-radius: var(--raio-lg);
+  background: var(--cor-paper-soft);
+  box-shadow: 0 4px 0 var(--cor-shadow);
+}
+
+.resumo {
+  display: grid;
+  gap: 2px;
+}
+
+.total {
+  font-family: var(--fonte-display), system-ui, sans-serif;
+  font-size: var(--texto-xl);
+}
+
+.quando {
+  color: var(--cor-ink-soft);
+  font-size: var(--texto-sm);
+}
+
+/* Mesma razão do mês no calendário: `capitalize` escreveria
+   "9 De Setembro". */
+.quando::first-letter {
+  text-transform: uppercase;
+}
+
+.falta {
+  margin: 0;
+  color: var(--cor-ink-soft);
+  font-size: var(--texto-sm);
+}
+
+/* Empilhado, o fecho volta para baixo do quadro: 320px ao lado de uma
+   coluna de passos não cabem juntos numa janela estreita. */
+@media (max-width: 900px) {
+  .colunas {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* Empilhado não há coluna ao lado para acompanhar, e a margem medida
+     viraria um vão entre o quadro e o fecho. */
+  .fecho {
+    position: static;
+    margin-block-start: 0;
+  }
+}
+
+/* Numa janela estreita o resumo do passo não cabe na mesma linha do
+   título — vai para baixo em vez de espremer os dois. */
+@media (max-width: 620px) {
+  .linha {
+    flex-wrap: wrap;
+  }
+
+  .valor {
+    margin-inline-start: calc(30px + var(--espaco-md));
+    white-space: normal;
+  }
+
+  .corpo {
+    padding-inline-start: 0;
+  }
+}
