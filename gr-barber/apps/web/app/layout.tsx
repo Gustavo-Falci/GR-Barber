@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 
 import { clashGrotesk, inter } from "./fontes";
 import { cssDeTokens } from "./tokens-css";
+import { SCRIPT_DA_BARRA } from "../src/painel/barra";
 import { SCRIPT_DE_TEMA } from "../src/painel/tema";
 import "./globals.css";
 
@@ -38,6 +39,10 @@ export default function RootLayout({
     >
       <head>
         <script dangerouslySetInnerHTML={{ __html: SCRIPT_DE_TEMA }} />
+        {/* Mesma razão do script acima, para a largura da lateral: o
+            atributo precisa estar no <html> antes de o CSS que o lê ser
+            aplicado, senão a barra pisca de larga para estreita. */}
+        <script dangerouslySetInnerHTML={{ __html: SCRIPT_DA_BARRA }} />
         <style dangerouslySetInnerHTML={{ __html: cssDeTokens }} />
       </head>
       <body>{children}</body>

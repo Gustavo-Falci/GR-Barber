@@ -10,8 +10,15 @@
    pela vertical: sem ele a linha cresceria com o conteúdo e a rolagem
    interna nunca aconteceria. */
 .shell {
+  /* A largura da lateral é token e não número solto: o estado recolhido
+     troca só este valor, e a grade continua sendo a mesma regra. Sem
+     transição de propósito — `grid-template-columns` não interpola com
+     `var()` sem `@property`, e a casa é de sombra dura, não de
+     movimento. */
+  --largura-da-barra: 260px;
+
   display: grid;
-  grid-template-columns: 260px minmax(0, 1fr);
+  grid-template-columns: var(--largura-da-barra) minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr);
   height: 100vh;
   overflow: hidden;
@@ -57,7 +64,9 @@
 }
 
 .links a {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-sm);
   padding: var(--espaco-sm) var(--espaco-md);
   border: var(--borda-padrao) solid transparent;
   border-radius: var(--raio-md);
@@ -79,6 +88,16 @@
   background: var(--cor-accent);
   box-shadow: 0 3px 0 var(--cor-shadow);
   color: var(--cor-dark);
+}
+
+/* Os dois botões do rodapé passaram a levar ícone além do texto. O
+   alinhamento mora aqui e não no Botao: é esta barra que põe ícone
+   dentro deles, e nenhum outro uso do componente no painel faz isso. */
+.rodape button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--espaco-sm);
 }
 
 .rodape {
@@ -133,6 +152,109 @@
   max-width: none;
 }
 
+/* O botão que recolhe. Fica no topo, logo abaixo da marca, porque é de
+   lá que a barra cresce e encolhe — no rodapé ele ficaria longe do que
+   controla. */
+.alternador {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-sm);
+  align-self: flex-start;
+  padding: var(--espaco-xs) var(--espaco-sm);
+  border: var(--borda-padrao) solid transparent;
+  border-radius: var(--raio-md);
+  background: none;
+  color: var(--cor-ink-soft);
+  font-size: var(--texto-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.alternador:hover {
+  border-color: var(--cor-line);
+  background: var(--cor-surface);
+  color: var(--cor-ink);
+}
+
+/* Uma seta só no arquivo de ícones, girada aqui: desenhar as duas
+   direções seria o mesmo caminho espelhado duas vezes. */
+:global(html[data-barra="recolhida"]) .seta {
+  transform: rotate(180deg);
+}
+
+/* ------------------------------------------------------------------ */
+/* Barra recolhida.
+
+   O seletor pende de `html[data-barra]` e não de uma classe do React de
+   propósito: é o mesmo atributo que o script do <head> escreve antes da
+   primeira pintura. Com uma classe, o primeiro quadro viria largo e
+   saltaria para estreito assim que o React montasse. Uma fonte de
+   verdade só, e ela chega antes do React. */
+
+:global(html[data-barra="recolhida"]) .shell {
+  --largura-da-barra: 76px;
+}
+
+:global(html[data-barra="recolhida"]) .barra {
+  align-items: center;
+  padding-inline: var(--espaco-sm);
+}
+
+/* O rótulo sai da vista, não do DOM. É o que mantém o nome acessível de
+   cada link e de cada botão: com `display: none` a barra recolhida
+   viraria cinco links sem nome nenhum pra quem usa leitor de tela. */
+:global(html[data-barra="recolhida"]) .rotulo {
+  /* Sem `position: absolute` de propósito: nenhum destes botões é
+     ancestral posicionado, e o rótulo resolveria contra a .marca (a
+     única que é) ou contra o bloco inicial. 1px mais o clip já o tiram
+     da vista sem sair do fluxo. */
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+:global(html[data-barra="recolhida"]) .links a,
+:global(html[data-barra="recolhida"]) .rodape button,
+:global(html[data-barra="recolhida"]) .alternador {
+  justify-content: center;
+  /* Quadrado: sem o texto, o padding lateral da versão larga deixaria
+     alvos de clique de larguras diferentes lado a lado. */
+  gap: 0;
+  padding-inline: 0;
+  width: 44px;
+  height: 44px;
+}
+
+:global(html[data-barra="recolhida"]) .alternador {
+  align-self: center;
+}
+
+/* A marca troca o slug pela inicial. O texto continua no elemento, só
+   escondido — o `::after` desenha a letra que o atributo carrega. */
+:global(html[data-barra="recolhida"]) .marca {
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  font-size: var(--texto-lg);
+  color: transparent;
+}
+
+:global(html[data-barra="recolhida"]) .marca::after {
+  position: absolute;
+  content: attr(data-inicial);
+  color: var(--cor-dark);
+}
+
+/* `relative` para o ::after acima se ancorar nela, e não na página. */
+.marca {
+  position: relative;
+}
+
 /* Abaixo de 900px a lateral vira uma faixa no topo e a navegação rola
    na horizontal — é o mesmo conjunto de links, sem menu escondido. */
 @media (max-width: 900px) {
@@ -140,7 +262,11 @@
      conteúdo abaixo não cabem numa janela de celular sem espremer os
      dois. */
   .shell {
-    grid-template-columns: 1fr;
+    /* `minmax(0, 1fr)` e não `1fr`: item de grid não encolhe abaixo do
+       próprio conteúdo, e sem o zero a faixa de navegação esticava a
+       coluna e quem rolava na horizontal era a janela inteira, não a
+       lista de seções. É o mesmo motivo do `minmax` na versão larga. */
+    grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto 1fr;
     height: auto;
     min-height: 100vh;
@@ -167,6 +293,12 @@
     flex-wrap: nowrap;
     margin-block-end: 0;
     margin-inline-end: auto;
+    /* `min-width: 0` e não só `overflow-x`: item de flex não encolhe
+       abaixo do próprio conteúdo por padrão, então a faixa empurrava a
+       página inteira e quem rolava na horizontal era a janela, não a
+       lista. Com os ícones a diferença ficou grande demais pra
+       ignorar. */
+    min-width: 0;
     overflow-x: auto;
   }
 
@@ -182,5 +314,47 @@
 
   .conteudo {
     padding: var(--espaco-lg) var(--espaco-md);
+  }
+
+  /* Recolher não faz sentido numa faixa horizontal que já é compacta, e
+     o estado gravado no desktop não pode encolher os links aqui. O
+     botão sai de cena e tudo volta ao tamanho de sempre. */
+  .alternador {
+    display: none;
+  }
+
+  :global(html[data-barra="recolhida"]) .shell {
+    --largura-da-barra: 260px;
+  }
+
+  :global(html[data-barra="recolhida"]) .barra {
+    align-items: center;
+    padding-inline: var(--espaco-md);
+  }
+
+  :global(html[data-barra="recolhida"]) .rotulo {
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip-path: none;
+  }
+
+  :global(html[data-barra="recolhida"]) .links a,
+  :global(html[data-barra="recolhida"]) .rodape button {
+    gap: var(--espaco-sm);
+    width: auto;
+    height: auto;
+    padding: var(--espaco-sm) var(--espaco-md);
+  }
+
+  :global(html[data-barra="recolhida"]) .marca {
+    width: auto;
+    height: auto;
+    padding: var(--espaco-sm) var(--espaco-md);
+    color: var(--cor-dark);
+  }
+
+  :global(html[data-barra="recolhida"]) .marca::after {
+    content: none;
   }
 }

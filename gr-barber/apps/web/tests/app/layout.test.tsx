@@ -42,14 +42,43 @@ describe("layout raiz", () => {
     expect(htmlDoLayout().props.suppressHydrationWarning).toBe(true);
   });
 
-  it("mantém o script de tema antes do estilo dos tokens", () => {
-    // A ordem importa: o atributo precisa estar no <html> antes de o
-    // CSS que o lê ser aplicado, senão pisca o tema errado.
+  it("injeta o script da barra lateral, também antes do estilo dos tokens", () => {
+    // Sem ele a barra nasce com 260px e salta pra 76px quando o React
+    // monta — o mesmo pisca que o script do tema existe pra evitar.
+    const filhos = htmlDoLayout().props.children as ElementoSolto[];
+    const dentroDoHead = filhos[0].props.children as ElementoSolto[];
+
+    const scripts = dentroDoHead
+      .filter((filho) => filho.type === "script")
+      .map((filho) => {
+        const html = filho.props.dangerouslySetInnerHTML as { __html: string };
+        return html.__html;
+      });
+
+    expect(scripts.some((texto) => texto.includes("data-barra"))).toBe(true);
+    // O estilo dos tokens continua por último: os dois scripts escrevem
+    // atributos no <html> que o CSS abaixo lê.
+    expect(dentroDoHead[dentroDoHead.length - 1].type).toBe("style");
+  });
+
+  it("mantém todo script antes do estilo dos tokens", () => {
+    // A ordem importa: os atributos precisam estar no <html> antes de o
+    // CSS que os lê ser aplicado, senão pisca o tema (ou a largura da
+    // barra) errado.
+    //
+    // Comparação por tipo e não por índice: eram um script e um estilo,
+    // e a checagem posicional quebrava a cada script novo no <head> sem
+    // que a ordem tivesse regredido.
     const filhos = htmlDoLayout().props.children as ElementoSolto[];
     const head = filhos[0];
     const dentroDoHead = head.props.children as ElementoSolto[];
 
-    expect(dentroDoHead[0].type).toBe("script");
-    expect(dentroDoHead[1].type).toBe("style");
+    // `findLastIndex` não existe no lib que este projeto compila.
+    const tipos = dentroDoHead.map((filho) => filho.type);
+    const ultimoScript = tipos.lastIndexOf("script");
+    const primeiroEstilo = tipos.indexOf("style");
+
+    expect(ultimoScript).toBeGreaterThanOrEqual(0);
+    expect(primeiroEstilo).toBeGreaterThan(ultimoScript);
   });
 });

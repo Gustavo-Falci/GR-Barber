@@ -5,6 +5,7 @@ import { criarApiClientFalso } from "@gr-barber/api-client";
 import { NavegacaoDoPainel } from "../../src/painel/NavegacaoDoPainel";
 import { ProvedorDoPainel } from "../../src/painel/ProvedorDoPainel";
 import { SessaoDoPainel } from "../../src/painel/SessaoDoPainel";
+import { CHAVE_DA_BARRA } from "../../src/painel/barra";
 import { CHAVE_DO_TEMA } from "../../src/painel/tema";
 import {
   sessaoDaBarbearia,
@@ -43,6 +44,7 @@ describe("navegação do painel", () => {
   beforeEach(() => {
     localStorage.clear();
     document.documentElement.removeAttribute("data-theme");
+    document.documentElement.removeAttribute("data-barra");
     stubMatchMedia(false);
     sessaoDoBarbeiro.gravar("jwt");
     sessaoDaBarbearia.gravar("gr-barber");
@@ -92,5 +94,79 @@ describe("navegação do painel", () => {
     ).toBeInTheDocument();
     expect(document.documentElement.getAttribute("data-theme")).toBe("dark");
     expect(localStorage.getItem(CHAVE_DO_TEMA)).toBe("escuro");
+  });
+  describe("recolher a barra", () => {
+    it("começa expandida e o botão anuncia o que faz", async () => {
+      navegacaoFalsa.redefinir({ pathname: "/painel" });
+
+      montar();
+
+      const botao = await screen.findByRole("button", { name: "Recolher barra" });
+      expect(botao).toHaveAttribute("aria-expanded", "true");
+    });
+
+    it("clicar recolhe: troca o rótulo, marca o <html> e grava a escolha", async () => {
+      navegacaoFalsa.redefinir({ pathname: "/painel" });
+      montar();
+      const botao = await screen.findByRole("button", { name: "Recolher barra" });
+
+      await userEvent.click(botao);
+
+      const expandir = screen.getByRole("button", { name: "Expandir barra" });
+      expect(expandir).toHaveAttribute("aria-expanded", "false");
+      // O atributo mora no <html> porque o CSS o lê de lá, e porque é
+      // onde o script do <head> escreve antes da primeira pintura.
+      expect(document.documentElement.getAttribute("data-barra")).toBe("recolhida");
+      expect(localStorage.getItem(CHAVE_DA_BARRA)).toBe("recolhida");
+    });
+
+    it("clicar de novo expande e limpa o atributo", async () => {
+      navegacaoFalsa.redefinir({ pathname: "/painel" });
+      montar();
+
+      await userEvent.click(await screen.findByRole("button", { name: "Recolher barra" }));
+      await userEvent.click(screen.getByRole("button", { name: "Expandir barra" }));
+
+      expect(screen.getByRole("button", { name: "Recolher barra" })).toBeInTheDocument();
+      expect(document.documentElement.hasAttribute("data-barra")).toBe(false);
+      expect(localStorage.getItem(CHAVE_DA_BARRA)).toBe("expandida");
+    });
+
+    it("com 'recolhida' gravado, monta já recolhida", async () => {
+      navegacaoFalsa.redefinir({ pathname: "/painel" });
+      localStorage.setItem(CHAVE_DA_BARRA, "recolhida");
+
+      montar();
+
+      expect(
+        await screen.findByRole("button", { name: "Expandir barra" })
+      ).toBeInTheDocument();
+    });
+
+    it("recolhida, os links continuam com o nome acessível — o ícone não substitui o rótulo", async () => {
+      // Recolhida, só o ícone aparece. Se o rótulo saísse do DOM em vez
+      // de ser escondido visualmente, cada link viraria um <a> sem nome
+      // e a barra ficaria inutilizável por leitor de tela.
+      navegacaoFalsa.redefinir({ pathname: "/painel" });
+      localStorage.setItem(CHAVE_DA_BARRA, "recolhida");
+
+      montar();
+
+      for (const rotulo of ["Hoje", "Agenda", "Clientes", "Serviços", "Configurações"]) {
+        expect(await screen.findByRole("link", { name: rotulo })).toBeInTheDocument();
+      }
+    });
+
+    it("recolhida, o botão de tema mantém o nome acessível", async () => {
+      navegacaoFalsa.redefinir({ pathname: "/painel" });
+      localStorage.setItem(CHAVE_DA_BARRA, "recolhida");
+
+      montar();
+
+      expect(
+        await screen.findByRole("button", { name: "Modo escuro" })
+      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Sair" })).toBeInTheDocument();
+    });
   });
 });

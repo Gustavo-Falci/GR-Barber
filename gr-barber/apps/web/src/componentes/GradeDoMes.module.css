@@ -1,11 +1,21 @@
 .quadro {
+  --altura-minima-da-celula: 104px;
+
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
-  /* A tela não rola mais: numa janela baixa, seis semanas de células não
-     cabem, e sem rolagem própria a grade seria cortada. */
-  align-content: start;
+  /* O cabeçalho pede a própria altura e as semanas dividem o que sobra —
+     é isso que faz a última linha encostar no rodapé do quadro em vez de
+     deixar uma faixa vazia embaixo.
+
+     `minmax(..., 1fr)` e não `1fr` seco: o piso é o que segura a célula
+     legível numa janela baixa, onde seis semanas não cabem. Aí a fração
+     colapsa no mínimo e quem rola é o quadro.
+
+     A tela não rola mais: sem rolagem própria aqui, a grade seria
+     cortada. */
+  grid-template-rows: auto;
+  grid-auto-rows: minmax(var(--altura-minima-da-celula), 1fr);
   min-height: 0;
-  overflow-y: auto;
   gap: var(--borda-hairline);
   border: var(--borda-padrao) solid var(--cor-ink);
   border-radius: var(--raio-lg);
@@ -14,10 +24,15 @@
      precisar de borda própria, que dobraria a espessura no encontro. */
   background: var(--cor-line);
   box-shadow: 0 4px 0 var(--cor-shadow);
-  overflow: hidden;
+  overflow: auto;
 }
 
 .cabecalho {
+  /* O quadro rola quando as semanas chegam ao piso; preso no topo, o
+     cabeçalho não some junto e a coluna do dia continua identificável. */
+  position: sticky;
+  top: 0;
+  z-index: 1;
   padding: var(--espaco-sm);
   background: var(--cor-paper-soft);
   color: var(--cor-ink-soft);
@@ -32,7 +47,11 @@
   display: grid;
   align-content: start;
   gap: 2px;
-  min-height: 104px;
+  /* A linha tem mínimo fixo e não cresce mais com o conteúdo: os quatro
+     chips cabem nos 104px sem folga nenhuma, e sem o corte um chip a
+     mais vazaria por cima da divisória em vez de sumir. O rótulo "+N"
+     já é quem limita o conteúdo de propósito. */
+  overflow: hidden;
   padding: var(--espaco-xs);
   border: none;
   background: var(--cor-surface);
@@ -90,7 +109,7 @@
 }
 
 @media (max-width: 720px) {
-  .celula {
-    min-height: 72px;
+  .quadro {
+    --altura-minima-da-celula: 72px;
   }
 }
