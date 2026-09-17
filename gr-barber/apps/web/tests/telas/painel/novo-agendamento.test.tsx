@@ -36,6 +36,24 @@ describe("novo agendamento no painel", () => {
     expect(await screen.findByRole("button", { name: "11:00", current: true })).toBeInTheDocument();
   });
 
+  it("com ?cliente= na URL, chega com o cliente já escolhido", async () => {
+    // É a ação "Agendar" de cada linha da lista de clientes. Sem isto,
+    // quem clicou lá tinha que procurar de novo a pessoa que acabou de
+    // escolher.
+    navegacaoFalsa.redefinir({
+      pathname: "/painel/agendamentos/novo",
+      query: { data: "2026-09-09", cliente: "c1" },
+    });
+    montarPainel(<NovoAgendamento agora={AGORA} />, semear());
+
+    // O passo Cliente só escreve o resumo quando está recolhido E com
+    // escolha feita — é a prova de que a URL preencheu a escolha, e de
+    // que a tela avançou em vez de parar no primeiro passo.
+    expect(
+      await screen.findByText("João Silva · (11) 99999-0001")
+    ).toBeInTheDocument();
+  });
+
   it("agenda com cliente, serviço, data e hora", async () => {
     const falso = semear();
     // `falso.barbeiro` é o mesmo objeto que a tela recebe (montarPainel

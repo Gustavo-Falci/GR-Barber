@@ -70,7 +70,123 @@ describe("clientes no painel", () => {
     // dias a partir de AGORA; o de Marcos (05/01) fica de fora e mostra
     // "—". Sem isso, apagar a janela e buscar tudo passaria igual.
     expect(await screen.findByText("30 de agosto")).toBeInTheDocument();
-    expect(screen.getByText("—")).toBeInTheDocument();
+    // O traço de antes servia às duas respostas opostas — "nunca veio" e
+    // "sumiu faz mais de três meses". Marcos é o segundo caso, e a
+    // célula agora diz só o que a janela de 90 dias sabe.
+    expect(screen.getByText("Sem registro nos últimos 90 dias")).toBeInTheDocument();
+    expect(screen.queryByText("—")).not.toBeInTheDocument();
+  });
+
+  it("diz quantos está mostrando, e muda a frase quando há busca", async () => {
+    // Uma lista curta não se distingue de um filtro que comeu o resto
+    // sem alguém dizer o número.
+    montarPainel(<ListaDeClientes agora={AGORA} />, semear());
+
+    expect(await screen.findByText("2 clientes")).toBeInTheDocument();
+
+    navegacaoFalsa.redefinir({
+      pathname: "/painel/clientes",
+      query: { busca: "marcos" },
+    });
+    montarPainel(<ListaDeClientes agora={AGORA} />, semear());
+
+    expect(await screen.findByText("1 encontrado para “marcos”")).toBeInTheDocument();
+  });
+
+  it("o botão de criar diz do que é", async () => {
+    // "+ Novo" é o rótulo de todas as listas do painel; com a barra
+    // lateral recolhida, nada na tela diz novo o quê.
+    montarPainel(<ListaDeClientes agora={AGORA} />, semear());
+
+    expect(
+      await screen.findByRole("button", { name: /novo cliente/i })
+    ).toBeInTheDocument();
+  });
+
+  it("enquanto carrega não anuncia lista vazia", async () => {
+    // `clientes.dados ?? []` entregava zero linhas à Tabela antes da
+    // resposta chegar, e a Tabela vazia afirma "Nenhum cliente por aqui
+    // ainda" — a base inteira sumindo por meio segundo a cada abertura.
+    const falso = semear();
+    let liberar: () => void = () => {};
+    const pendente = new Promise<void>((resolve) => {
+      liberar = resolve;
+    });
+    const original = falso.barbeiro.clientes;
+    falso.barbeiro.clientes = async (busca?: string) => {
+      await pendente;
+      return original(busca);
+    };
+
+    montarPainel(<ListaDeClientes agora={AGORA} />, falso);
+
+    expect(await screen.findByText(/carregando/i)).toBeInTheDocument();
+    expect(screen.queryByText(/nenhum cliente/i)).not.toBeInTheDocument();
+    // O campo de busca continua de pé: desmontá-lo levaria o foco junto
+    // de quem já estivesse digitando.
+    expect(screen.getByLabelText(/buscar/i)).toBeInTheDocument();
+
+    liberar();
+    expect(await screen.findByText("João Silva")).toBeInTheDocument();
+  });
+
+  // O filtro entra pela URL, e o `replace` do dublê de navegação é só um
+  // espião — ele não devolve a query nova pro `useSearchParams`. Por isso
+  // a busca já montada vem de `redefinir`, e não de digitar.
+  it("busca sem resultado diz o que aconteceu e oferece a saída", async () => {
+    // "Nenhum cliente por aqui ainda" para uma busca que não achou
+    // ninguém anuncia base vazia a quem só digitou o nome errado.
+    navegacaoFalsa.redefinir({
+      pathname: "/painel/clientes",
+      query: { busca: "zzz" },
+    });
+    montarPainel(<ListaDeClientes agora={AGORA} />, semear());
+
+    expect(await screen.findByText(/nenhum cliente para “zzz”/i)).toBeInTheDocument();
+    expect(screen.queryByText(/por aqui ainda/i)).not.toBeInTheDocument();
+
+    // E a saída: sem ela, o único jeito de voltar à lista inteira é
+    // apagar o campo letra por letra.
+    await userEvent.click(screen.getByRole("button", { name: /limpar busca/i }));
+
+    await waitFor(() =>
+      expect(navegacaoFalsa.replace).toHaveBeenCalledWith("/painel/clientes")
+    );
+  });
+
+  it("a lista vazia de verdade orienta em vez de só informar", async () => {
+    montarPainel(
+      <ListaDeClientes agora={AGORA} />,
+      criarApiClientFalso({ clientes: [], agendamentos: [] })
+    );
+
+    expect(await screen.findByText("Nenhum cliente por aqui ainda.")).toBeInTheDocument();
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /cadastrar primeiro cliente/i })
+    );
+
+    expect(navegacaoFalsa.push).toHaveBeenCalledWith("/painel/clientes/novo");
+  });
+
+  it("digitar navega uma vez por pausa, não uma por tecla", async () => {
+    // `?busca=` é dependência da requisição, então cada tecla custava uma
+    // navegação E uma ida à API: "marcos" eram seis de cada.
+    //
+    // E continua sendo replace, não push: ?busca= na URL mantém a busca
+    // linkável e recarregável — a mesma razão que fez o fluxo do cliente
+    // pôr o passo na rota — mas um push empilharia histórico, e voltar
+    // viraria desfazer a digitação letra por letra.
+    montarPainel(<ListaDeClientes agora={AGORA} />, semear());
+
+    await userEvent.type(await screen.findByLabelText(/buscar/i), "marcos");
+
+    await waitFor(() =>
+      expect(navegacaoFalsa.replace).toHaveBeenCalledWith("/painel/clientes?busca=marcos")
+    );
+    // Uma só, e com o termo inteiro — não seis, uma por letra.
+    expect(navegacaoFalsa.replace).toHaveBeenCalledTimes(1);
+    expect(navegacaoFalsa.push).not.toHaveBeenCalled();
   });
 
   it("a busca da URL chega na chamada", async () => {
@@ -84,30 +200,68 @@ describe("clientes no painel", () => {
     expect(await screen.findByLabelText(/buscar/i)).toHaveValue("marcos");
   });
 
-  it("digitar na busca põe o termo na URL, sem empilhar histórico", async () => {
-    // replace, e não push: ?busca= na URL mantém a busca linkável e
-    // recarregável — a mesma razão que fez o fluxo do cliente pôr o
-    // passo na rota — mas um push por tecla empilharia uma entrada de
-    // histórico por tecla, e "joão" custaria quatro apertos de voltar
-    // só pra sair da tela. Atualizado de `push` pra `replace` pela
-    // revisão de branch (item 3): a asserção antiga cobria exatamente o
-    // comportamento que o fix remove.
-    montarPainel(<ListaDeClientes agora={AGORA} />, semear());
-
-    await userEvent.type(await screen.findByLabelText(/buscar/i), "marcos");
-
-    await waitFor(() =>
-      expect(navegacaoFalsa.replace).toHaveBeenCalledWith("/painel/clientes?busca=marcos")
-    );
-    expect(navegacaoFalsa.push).not.toHaveBeenCalled();
-  });
-
   it("abrir uma linha vai pro detalhe", async () => {
     montarPainel(<ListaDeClientes agora={AGORA} />, semear());
 
-    await userEvent.click(await screen.findByRole("button", { name: /João Silva/ }));
+    // Nome exato: as ações da linha se chamam "Agendar para João Silva"
+    // e "Conversar com João Silva no WhatsApp", e um /João Silva/ solto
+    // casaria com as três.
+    await userEvent.click(await screen.findByRole("button", { name: "João Silva" }));
 
     expect(navegacaoFalsa.push).toHaveBeenCalledWith("/painel/clientes/c1");
+  });
+
+  it("a ação de agendar leva o cliente junto, sem abrir o detalhe", async () => {
+    montarPainel(<ListaDeClientes agora={AGORA} />, semear());
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: /agendar para joão silva/i })
+    );
+
+    expect(navegacaoFalsa.push).toHaveBeenCalledWith(
+      "/painel/agendamentos/novo?cliente=c1"
+    );
+    // A linha inteira abre o detalhe; sem `stopPropagation`, clicar na
+    // ação faria as duas coisas.
+    expect(navegacaoFalsa.push).toHaveBeenCalledTimes(1);
+  });
+
+  it("a ação do WhatsApp aponta pro número com código do país", async () => {
+    montarPainel(<ListaDeClientes agora={AGORA} />, semear());
+
+    const zap = await screen.findByRole("link", {
+      name: /conversar com joão silva no whatsapp/i,
+    });
+
+    // O telefone guardado é nacional: "(11) 99999-0001" precisa do 55 na
+    // frente, senão o link abre outro número.
+    expect(zap).toHaveAttribute("href", "https://wa.me/5511999990001");
+    expect(zap).toHaveAttribute("target", "_blank");
+
+    await userEvent.click(zap);
+    expect(navegacaoFalsa.push).not.toHaveBeenCalled();
+  });
+
+  it("as faixas separam quem está vindo de quem sumiu", async () => {
+    // João veio em 30/08 (dentro dos 30 dias contados de AGORA) e Marcos
+    // em 05/01, fora até da janela de 90.
+    montarPainel(<ListaDeClientes agora={AGORA} />, semear());
+
+    await screen.findByText("João Silva");
+
+    await userEvent.click(screen.getByRole("button", { name: /vieram em 30 dias/i }));
+    expect(screen.getByText("João Silva")).toBeInTheDocument();
+    expect(screen.queryByText("Marcos Reis")).not.toBeInTheDocument();
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /sem registro em 90 dias/i })
+    );
+    expect(screen.getByText("Marcos Reis")).toBeInTheDocument();
+    expect(screen.queryByText("João Silva")).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /^todos/i }));
+    expect(screen.getByText("João Silva")).toBeInTheDocument();
+    expect(screen.getByText("Marcos Reis")).toBeInTheDocument();
   });
 
   it("cadastra cliente e vai pro detalhe dele", async () => {

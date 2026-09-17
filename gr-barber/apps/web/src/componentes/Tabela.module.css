@@ -45,6 +45,12 @@
   background: var(--cor-paper-soft);
 }
 
+/* O realce do hover vale pra linha toda, então o cursor também: sem
+   isto, o ponteiro só vira mãozinha sobre o nome e desmente o realce. */
+.tabela tbody tr.clicavel {
+  cursor: pointer;
+}
+
 /* A primeira célula é o alvo de abrir a linha: o botão ocupa a célula
    inteira pra que a área clicável case com o que se vê. */
 .tabela td:first-child {

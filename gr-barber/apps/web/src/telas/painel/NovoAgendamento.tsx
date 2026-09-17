@@ -1,7 +1,7 @@
 "use client";
 
 import type { CSSProperties, ReactNode } from "react";
-import { useCallback, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { ErroDaApi } from "@gr-barber/api-client";
 import type { ClienteSerializado } from "@gr-barber/types";
@@ -42,6 +42,30 @@ export function NovoAgendamento({ agora = new Date() }: { agora?: Date }) {
   const [enviando, setEnviando] = useState(false);
 
   const servicos = useRequisicao(() => api.barbeiro.servicos(), []);
+
+  // A lista de clientes manda um cliente pronto pela URL (a ação
+  // "Agendar" de cada linha). Sem isto, quem clicou lá chegava aqui e
+  // tinha que procurar de novo a pessoa que acabou de escolher.
+  const clienteDaUrl = query.get("cliente");
+  const clientePedido = useRequisicao(
+    () =>
+      clienteDaUrl
+        ? api.barbeiro.cliente(clienteDaUrl)
+        : Promise.resolve(null),
+    [clienteDaUrl]
+  );
+
+  // Efeito, e não sincronização durante o render: `setCliente` no corpo
+  // do componente dispararia a cada render enquanto os dados
+  // estivessem em mãos. Roda uma vez por resposta, e só enquanto
+  // ninguém escolheu nada — reabrir o passo por baixo de uma escolha
+  // manual seria a tela desfazendo o que a pessoa fez.
+  const pedido = clientePedido.dados;
+  useEffect(() => {
+    if (!pedido) return;
+    setCliente((atual) => atual ?? pedido);
+    setAberto((atual) => (atual === "cliente" ? "servicos" : atual));
+  }, [pedido]);
 
   // Só com serviço escolhido a pergunta faz sentido: /disponibilidade
   // exige `servicoIds` não vazio (minItems: 1 no schema da API) porque

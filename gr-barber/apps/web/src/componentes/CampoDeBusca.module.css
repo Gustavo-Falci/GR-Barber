@@ -1,0 +1,101 @@
+/* Busca não ocupa a largura da tela: o termo tem dez caracteres, e um
+   campo de 1180px lê como campo de formulário, não como filtro. 420px é
+   onde cabe "Fernando Nascimento Junior" sem sobra. */
+.campo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-xs);
+  max-width: 420px;
+}
+
+/* Escondido só para os olhos: continua nomeando o campo para leitor de
+   tela e para o clique que joga o foco pra dentro. `clip-path` em vez de
+   `display: none`, que tiraria o rótulo da árvore de acessibilidade
+   junto. */
+.rotulo {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.caixa {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-sm);
+  padding-inline: var(--espaco-md);
+  border: var(--borda-padrao) solid var(--cor-ink);
+  border-radius: var(--raio-pill);
+  background: var(--cor-surface);
+}
+
+/* O anel de foco vai na caixa, e não no <input>: é a caixa que tem a
+   borda e o raio que se vê. O input perde o dele para não desenhar dois. */
+.caixa:focus-within {
+  outline: 3px solid var(--cor-ink);
+  outline-offset: 2px;
+}
+
+.lupa {
+  display: flex;
+  color: var(--cor-muted);
+}
+
+.entrada {
+  flex: 1;
+  min-width: 0;
+  padding-block: var(--espaco-sm);
+  border: none;
+  background: none;
+  color: var(--cor-ink);
+  font-family: var(--fonte-corpo), system-ui, sans-serif;
+  font-size: var(--texto-md);
+}
+
+.entrada:focus {
+  outline: none;
+}
+
+.entrada::placeholder {
+  color: var(--cor-muted);
+}
+
+/* O X nativo do type="search" no WebKit apareceria ao lado do nosso
+   botão de apagar — dois controles para a mesma coisa. */
+.entrada::-webkit-search-cancel-button {
+  appearance: none;
+}
+
+.apagar {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: var(--raio-pill);
+  background: none;
+  color: var(--cor-muted);
+  font-size: var(--texto-lg);
+  line-height: 1;
+  cursor: pointer;
+}
+
+.apagar:hover {
+  background: var(--cor-paper-soft);
+  color: var(--cor-ink);
+}
+
+/* A dica da tecla: discreta o bastante para não competir com o texto de
+   exemplo, visível o bastante para ensinar o atalho a quem repara. */
+.atalho {
+  padding: 2px 8px;
+  border: var(--borda-hairline) solid var(--cor-line);
+  border-radius: var(--raio-sm);
+  color: var(--cor-muted);
+  font-family: var(--fonte-corpo), system-ui, sans-serif;
+  font-size: var(--texto-xs);
+}
