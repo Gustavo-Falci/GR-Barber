@@ -11,7 +11,7 @@
    flutuaria no meio de um retângulo vazio. */
 .colunas {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 320px;
+  grid-template-columns: minmax(0, 1fr) 400px;
   align-items: start;
   gap: var(--espaco-lg);
 }
@@ -216,9 +216,12 @@
   font-size: var(--texto-sm);
 }
 
-/* Empilhado, o fecho volta para baixo do quadro: 320px ao lado de uma
-   coluna de passos não cabem juntos numa janela estreita. */
-@media (max-width: 900px) {
+/* Empilhado, o fecho volta para baixo do quadro: 400px ao lado de uma
+   coluna de passos não cabem juntos numa janela estreita. O limite subiu
+   junto com a largura do fecho — em 900px, com 400 do fecho e o vão, a
+   coluna dos passos ficava com 476px, e é nela que mora o calendário de
+   sete colunas. */
+@media (max-width: 980px) {
   .colunas {
     grid-template-columns: minmax(0, 1fr);
   }

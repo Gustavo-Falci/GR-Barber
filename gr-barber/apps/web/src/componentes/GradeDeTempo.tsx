@@ -16,19 +16,66 @@ function nomeDoDia(data: string): string {
   return NOMES_CURTOS[new Date(`${data}T12:00:00Z`).getUTCDay()];
 }
 
-// Rótulos de hora cheia no eixo da esquerda.
-function horasCheias(grade: Grade): { rotulo: string; linha: number }[] {
-  const horas: { rotulo: string; linha: number }[] = [];
-  const primeira = Math.ceil(grade.minutoInicial / 60) * 60;
+function emHora(minuto: number): string {
+  const h = String(Math.floor(minuto / 60)).padStart(2, "0");
+  const m = String(minuto % 60).padStart(2, "0");
+  return `${h}:${m}`;
+}
 
-  for (let minuto = primeira; minuto < grade.minutoFinal; minuto += 60) {
-    horas.push({
-      rotulo: `${String(minuto / 60).padStart(2, "0")}:00`,
-      linha: (minuto - grade.minutoInicial) / MINUTOS_POR_LINHA + 1,
-    });
+// De quanto em quanto tempo o eixo se marca entre as pontas. Em 30, a
+// distância entre dois rótulos é de 6 linhas — 72px em
+// `--altura-da-linha: 12px`, folgado para dois textos de --texto-xs.
+// Descer para 15 encostaria um no outro.
+const PASSO_DO_EIXO = 30;
+
+// Perto demais de uma ponta, o rótulo do meio colide com ela: em
+// `--altura-da-linha: 12px`, duas linhas são 24px para dois textos de
+// --texto-xs. Quem cede é o do meio, que é a informação repetida.
+const FOLGA_EM_MINUTOS = MINUTOS_POR_LINHA * 2;
+
+// Rótulos do eixo da esquerda: as duas pontas da janela, SEMPRE, mais as
+// marcas de meia em meia hora que couberem entre elas.
+//
+// As pontas são o que abre e o que fecha — abrindo 09:30 e fechando
+// 18:30, só as horas cheias deixavam o barbeiro sem nenhuma marca de
+// quando o dia começa e termina, justo os dois números que ele procura.
+// Quando um agendamento cai fora do horário a janela estica pra cobri-lo
+// (ver grade.ts), e aí a ponta mostra o limite dele, não o da barbearia:
+// é a mesma verdade que a grade desenha, e o rótulo não pode mentir
+// sobre onde a primeira linha está.
+function rotulosDoEixo(
+  grade: Grade
+): { minuto: number; rotulo: string; linha: number }[] {
+  const linhaDe = (minuto: number) =>
+    (minuto - grade.minutoInicial) / MINUTOS_POR_LINHA + 1;
+
+  const pontas = [grade.minutoInicial, grade.minutoFinal];
+  const minutos = [...pontas];
+
+  const primeira =
+    Math.ceil(grade.minutoInicial / PASSO_DO_EIXO) * PASSO_DO_EIXO;
+  for (
+    let minuto = primeira;
+    minuto < grade.minutoFinal;
+    minuto += PASSO_DO_EIXO
+  ) {
+    const encosta = pontas.some(
+      (ponta) => Math.abs(ponta - minuto) < FOLGA_EM_MINUTOS
+    );
+    if (!encosta) minutos.push(minuto);
   }
 
-  return horas;
+  return minutos
+    .sort((um, outro) => um - outro)
+    .map((minuto) => ({
+      minuto,
+      rotulo: emHora(minuto),
+      // O fechamento cai na linha DEPOIS da última, que não existe na
+      // grade: pedi-la abriria uma linha implícita só no eixo, e ele
+      // ficaria mais alto que as colunas irmãs. Fica na última linha,
+      // empurrado para a base dela pelo CSS.
+      linha: minuto === grade.minutoFinal ? grade.totalLinhas : linhaDe(minuto),
+    }));
 }
 
 export function GradeDeTempo({
@@ -107,16 +154,22 @@ export function GradeDeTempo({
       <div className={estilos.rolagem} data-testid="rolagem-da-grade">
         <div className={estilos.corpo} data-testid="corpo-da-grade">
           <div className={estilos.eixo}>
-            {horasCheias(grade).map((hora) => (
+            {rotulosDoEixo(grade).map((hora) => (
               <span
-                key={hora.rotulo}
+                key={hora.minuto}
                 className={estilos.hora}
                 // O rótulo da primeira linha fica embaixo do cabeçalho
-                // grudado e não pode subir meia linha como os outros. É
-                // `linha === 1`, e não "o primeiro da lista": abrindo às
-                // 09:30, o primeiro rótulo é 10:00 na linha 7, que não
-                // encosta em nada.
+                // grudado e não pode subir meia linha como os outros.
+                // Continua sendo `linha === 1`, e não "o primeiro da
+                // lista": a abertura sempre abre a lista, mas a marca é
+                // sobre encostar no topo, não sobre ser o primeiro.
                 data-no-topo={hora.linha === 1 ? "true" : undefined}
+                // O fechamento é o único que se mede pela base da linha
+                // em vez do topo — é o fim da janela, não o começo de
+                // mais uma faixa.
+                data-no-fim={
+                  hora.minuto === grade.minutoFinal ? "true" : undefined
+                }
                 style={{ "--linha": hora.linha } as CSSProperties}
               >
                 {hora.rotulo}

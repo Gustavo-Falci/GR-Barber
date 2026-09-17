@@ -163,6 +163,20 @@ button.diaDoCabecalho:hover .numeroDoDia {
   transform: none;
 }
 
+/* O fechamento é o espelho do topo na outra ponta: ele marca o FIM da
+   última linha, não o começo de uma linha seguinte — que nem existe na
+   grade. Encosta na base da última (`align-self: end`) e fica ACIMA da
+   sua régua, como o da primeira fica abaixo da dele.
+
+   Sem o `translateY(0.5em)` que centraria o texto na régua: medido no
+   Chrome, ele punha a base do rótulo 6px além do fim da grade, o que
+   dava ao invólucro 6px de rolagem que não existiam antes — rolar
+   depois do último minuto do dia para ler o horário de fechamento. */
+.hora[data-no-fim="true"] {
+  align-self: end;
+  transform: none;
+}
+
 .coluna {
   position: relative;
   border-inline-end: var(--borda-hairline) solid var(--cor-line);
