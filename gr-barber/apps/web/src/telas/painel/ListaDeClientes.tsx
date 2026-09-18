@@ -41,12 +41,24 @@ function linkDoZap(telefone: string): string {
   return `https://wa.me/55${digitos}`;
 }
 
+// Desenhado aqui, e não em painel/icones.tsx, pelo mesmo motivo da lupa
+// do CampoDeBusca: aquele arquivo é a família da barra lateral, e este é
+// uma ação de linha de uma tela só. Mesmo esqueleto mesmo assim — 24x24,
+// traço, currentColor, espessura 2 — e 20px, que é o tamanho com que o
+// IconeCalendario ao lado sai: os dois dividem a mesma caixa de 32px, e
+// 18 contra 20 fazia o par parecer desalinhado antes de qualquer um
+// olhar o desenho.
+//
+// O fone é um arco de canto com um nó em cada ponta, e não o fone da
+// marca: dentro da bolha sobram ~10px, e ali um fone literal com traço
+// de 2 fecha os vãos e vira borrão — o mesmo que levou a engrenagem a
+// seis dentes. O arco é a silhueta que sobrevive ao tamanho real.
 function IconeZap() {
   return (
     <svg
       viewBox="0 0 24 24"
-      width="18"
-      height="18"
+      width="20"
+      height="20"
       fill="none"
       stroke="currentColor"
       strokeWidth="2"
@@ -56,7 +68,8 @@ function IconeZap() {
       focusable="false"
     >
       <path d="M21 11.5a8.5 8.5 0 0 1-12.6 7.4L3 20.5l1.7-5.2A8.5 8.5 0 1 1 21 11.5Z" />
-      <path d="M8.8 9.2c0 3.3 2.7 6 6 6 .7-.6 1-1 1-1l-1.8-1.2-1.1.9a5.6 5.6 0 0 1-1.8-1.8l.9-1.1L11.8 9s-.4.2-1 1c0 0-2 0-2-.8Z" />
+      <path d="M9.9 9.4a5.6 5.6 0 0 0 5.2 5.2" />
+      <path d="M9.9 9.4 11.3 8M15.1 14.6l1.4-1.4" />
     </svg>
   );
 }
