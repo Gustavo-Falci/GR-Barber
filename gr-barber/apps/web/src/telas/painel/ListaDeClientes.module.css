@@ -1,7 +1,52 @@
+/* Coluna de altura definida, e não grade de altura natural: é o que dá
+   à tabela um teto contra o qual encolher. Sem teto ela cresce 13 mil
+   pixels e quem rola é a área de conteúdo do shell — aí o cabeçalho da
+   tabela sai de vista e a lista fica sem rótulo de coluna.
+   `flex` e não `grid` porque o que se quer é exatamente o encolhimento
+   de item de flex; o `gap` é o mesmo, e as margens negativas da
+   contagem e das faixas continuam valendo contra ele. */
 .pagina {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: var(--espaco-lg);
-  align-content: start;
+  height: 100%;
+}
+
+/* A tabela e o botão de carregar mais, juntos. O embrulho existe pelo
+   layout: é ele que recebe o encolhimento da página e o repassa só pra
+   moldura, deixando o botão com a altura dele. Sem o embrulho, o botão
+   seria o último filho da página e ficaria com o `min-height: 0` no
+   lugar da tabela — que voltaria a crescer sem teto, levando junto o
+   cabeçalho preso, que precisa de um scrollport pra grudar. */
+.lista {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-md);
+  min-height: 0;
+}
+
+/* Só `min-height: 0`, sem `flex-grow`: a moldura pode encolher abaixo
+   do próprio conteúdo (é o que liga a rolagem dela por dentro), mas não
+   é esticada quando é curta. Importa porque o primeiro filho nem sempre
+   é a tabela — com a lista vazia é o componente Vazio, e uma moldura de
+   "Nenhum cliente por aqui ainda" esticada até o rodapé seria pior do
+   que a de hoje. */
+.lista > :first-child {
+  min-height: 0;
+}
+
+/* O botão e, quando falha, o aviso ao lado dele — nunca no lugar da
+   lista: o que já veio continua valendo. */
+.maisClientes {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-md);
+  flex-wrap: wrap;
+}
+
+.erroDeMais {
+  color: var(--cor-ink-soft);
+  font-size: var(--texto-sm);
 }
 .topo { display: flex; align-items: center; justify-content: space-between; gap: var(--espaco-md); }
 

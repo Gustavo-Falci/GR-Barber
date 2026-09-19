@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildApp } from "../../src/app";
 import { auth, criarBarbeariaComToken } from "../helpers/barbearia";
+import type { App } from "../../src/tipos";
 
 const JOAO = { nome: "João da Silva", telefone: "11999998888" };
 
@@ -347,6 +348,260 @@ describe("GET /clientes", () => {
     const resposta = await app.inject({ method: "GET", url: "/clientes" });
 
     expect(resposta.statusCode).toBe(401);
+
+    await app.close();
+  });
+});
+
+describe("GET /clientes: ultimoAgendamento", () => {
+  // A lista do painel mostra numa coluna quando cada cliente esteve
+  // aqui pela última vez. Antes ela descobria isso baixando os
+  // agendamentos de 90 dias inteiros — com cliente e serviços aninhados
+  // em cada registro — pra jogar fora tudo menos a maior data por
+  // pessoa. Custava o MOVIMENTO da barbearia, não o número de clientes.
+  async function prepararComAgenda(app: App, sufixo = "um") {
+    const barbearia = await criarBarbeariaComToken(app, sufixo);
+
+    await app.inject({
+      method: "PUT",
+      url: "/barbearias/me/horarios",
+      headers: auth(barbearia.token),
+      payload: {
+        horarios: [1, 2, 3, 4, 5, 6].map((diaSemana) => ({
+          diaSemana,
+          horaAbertura: "09:00",
+          horaFechamento: "18:00",
+        })),
+      },
+    });
+
+    const servico = (
+      await app.inject({
+        method: "POST",
+        url: "/servicos",
+        headers: auth(barbearia.token),
+        payload: { nome: "Corte", duracaoMinutos: 45, preco: "45.00" },
+      })
+    ).json();
+
+    return { ...barbearia, servico };
+  }
+
+  async function cadastrar(
+    app: App,
+    token: string,
+    nome: string,
+    telefone: string
+  ) {
+    return (
+      await app.inject({
+        method: "POST",
+        url: "/clientes",
+        headers: auth(token),
+        payload: { nome, telefone },
+      })
+    ).json();
+  }
+
+  async function agendar(
+    app: App,
+    agenda: Awaited<ReturnType<typeof prepararComAgenda>>,
+    clienteId: string,
+    data: string,
+    horaInicio: string
+  ) {
+    return app.inject({
+      method: "POST",
+      url: "/agendamentos",
+      headers: auth(agenda.token),
+      payload: {
+        barbeiroId: agenda.barbeiroId,
+        clienteId,
+        servicoIds: [agenda.servico.id],
+        data,
+        horaInicio,
+      },
+    });
+  }
+
+  it("devolve a maior data de cada cliente, e null pra quem nunca veio", async () => {
+    const app = buildApp();
+    const agenda = await prepararComAgenda(app);
+
+    const joao = await cadastrar(app, agenda.token, "João", "11999990001");
+    const maria = await cadastrar(app, agenda.token, "Maria", "11999990002");
+    await cadastrar(app, agenda.token, "Zeca", "11999990003");
+
+    // Fora de ordem de propósito: o campo é um MAX, não "o último que
+    // entrou". Com a ordem trocada, um `findFirst` passaria igual.
+    await agendar(app, agenda, joao.id, "2026-09-10", "10:00");
+    await agendar(app, agenda, joao.id, "2026-09-02", "10:00");
+    await agendar(app, agenda, maria.id, "2026-09-04", "11:00");
+
+    const resposta = await app.inject({
+      method: "GET",
+      url: "/clientes",
+      headers: auth(agenda.token),
+    });
+
+    expect(resposta.statusCode).toBe(200);
+
+    const porNome = new Map(
+      resposta
+        .json()
+        .clientes.map((c: { nome: string; ultimoAgendamento: string | null }) => [
+          c.nome,
+          c.ultimoAgendamento,
+        ])
+    );
+
+    expect(porNome.get("João")).toBe("2026-09-10");
+    expect(porNome.get("Maria")).toBe("2026-09-04");
+    // `null`, e não a ausência do campo nem uma string vazia: quem lê
+    // precisa distinguir "nunca veio" de "não perguntei".
+    expect(porNome.get("Zeca")).toBeNull();
+
+    await app.close();
+  });
+
+  it("não enxerga o agendamento de outra barbearia", async () => {
+    const app = buildApp();
+    const uma = await prepararComAgenda(app, "uma");
+    const outra = await prepararComAgenda(app, "outra");
+
+    const daUma = await cadastrar(app, uma.token, "João", "11999990010");
+    const daOutra = await cadastrar(app, outra.token, "João", "11999990011");
+
+    await agendar(app, uma, daUma.id, "2026-09-10", "10:00");
+    await agendar(app, outra, daOutra.id, "2026-09-11", "10:00");
+
+    const resposta = await app.inject({
+      method: "GET",
+      url: "/clientes",
+      headers: auth(uma.token),
+    });
+
+    const [cliente] = resposta.json().clientes;
+    // A data da outra barbearia é mais recente. Se o filtro por
+    // barbearia vazasse na agregação, seria ela que apareceria aqui.
+    expect(cliente.ultimoAgendamento).toBe("2026-09-10");
+
+    await app.close();
+  });
+});
+
+describe("GET /clientes: páginas", () => {
+  async function cadastrarVarios(app: App, token: string, nomes: string[]) {
+    let sequencia = 0;
+    for (const nome of nomes) {
+      sequencia += 1;
+      await app.inject({
+        method: "POST",
+        url: "/clientes",
+        headers: auth(token),
+        payload: {
+          nome,
+          telefone: `1198888${String(sequencia).padStart(4, "0")}`,
+        },
+      });
+    }
+  }
+
+  async function pagina(app: App, token: string, query = "") {
+    const resposta = await app.inject({
+      method: "GET",
+      url: `/clientes${query}`,
+      headers: auth(token),
+    });
+    expect(resposta.statusCode).toBe(200);
+    return resposta.json();
+  }
+
+  it("devolve o total da barbearia, e não o tamanho da página", async () => {
+    const app = buildApp();
+    const um = await criarBarbeariaComToken(app, "um");
+    await cadastrarVarios(app, um.token, ["Ana", "Bruno", "Carla", "Davi"]);
+
+    const primeira = await pagina(app, um.token, "?limite=2");
+
+    expect(primeira.clientes).toHaveLength(2);
+    // O ponto inteiro do campo: a tela precisa saber que faltam dois.
+    // Com o teto mudo de antes, "2" era tudo que ela via.
+    expect(primeira.total).toBe(4);
+    expect(primeira.proximoCursor).not.toBeNull();
+
+    await app.close();
+  });
+
+  it("o cursor continua de onde parou, em ordem de nome e sem repetir", async () => {
+    const app = buildApp();
+    const um = await criarBarbeariaComToken(app, "um");
+    // Fora de ordem no cadastro: a ordenação é por nome, não por
+    // chegada. Com a inserção já ordenada, um `orderBy` errado passaria.
+    await cadastrarVarios(app, um.token, ["Davi", "Ana", "Carla", "Bruno"]);
+
+    const primeira = await pagina(app, um.token, "?limite=2");
+    const segunda = await pagina(
+      app,
+      um.token,
+      `?limite=2&cursor=${primeira.proximoCursor}`
+    );
+
+    const nomes = (p: { clientes: { nome: string }[] }) =>
+      p.clientes.map((c) => c.nome);
+
+    expect(nomes(primeira)).toEqual(["Ana", "Bruno"]);
+    expect(nomes(segunda)).toEqual(["Carla", "Davi"]);
+    // Acabou a lista: sem isto, a tela mostraria "carregar mais" pra
+    // buscar uma página vazia.
+    expect(segunda.proximoCursor).toBeNull();
+
+    await app.close();
+  });
+
+  it("não devolve cursor quando a carteira cabe exatamente na página", async () => {
+    const app = buildApp();
+    const um = await criarBarbeariaComToken(app, "um");
+    await cadastrarVarios(app, um.token, ["Ana", "Bruno"]);
+
+    // O caso que o `take: limite + 1` existe pra resolver: com um
+    // `take: limite` cru, dois de dois pareceriam "página cheia, deve
+    // ter mais".
+    const unica = await pagina(app, um.token, "?limite=2");
+
+    expect(unica.clientes).toHaveLength(2);
+    expect(unica.total).toBe(2);
+    expect(unica.proximoCursor).toBeNull();
+
+    await app.close();
+  });
+
+  it("o total acompanha a busca, não a carteira inteira", async () => {
+    const app = buildApp();
+    const um = await criarBarbeariaComToken(app, "um");
+    await cadastrarVarios(app, um.token, ["Ana Souza", "Bruno Lima", "Ana Dias"]);
+
+    const achados = await pagina(app, um.token, "?busca=Ana");
+
+    expect(achados.total).toBe(2);
+    // Senão "2 de 3" apareceria numa busca que achou exatamente duas.
+    expect(achados.clientes).toHaveLength(2);
+
+    await app.close();
+  });
+
+  it("recusa limite fora da faixa", async () => {
+    const app = buildApp();
+    const um = await criarBarbeariaComToken(app, "um");
+
+    const resposta = await app.inject({
+      method: "GET",
+      url: "/clientes?limite=500",
+      headers: auth(um.token),
+    });
+
+    // O teto é de resposta, não de carteira: quem quiser tudo pagina.
+    expect(resposta.statusCode).toBe(400);
 
     await app.close();
   });

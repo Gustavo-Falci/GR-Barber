@@ -9,8 +9,10 @@ import { navegacaoFalsa } from "../../ajudantes/navegacao";
 import { montarPainel } from "../../ajudantes/painel";
 import { montarPainelComSonda } from "../../ajudantes/sondaDeCorrida";
 
-// Instante fixo: a lista busca os agendamentos dos últimos 90 dias, e
-// sem passar o instante a janela mudaria a cada dia que o teste rodasse.
+// Instante fixo: a lista corta a coluna e as faixas em 30 e 90 dias
+// contados daqui, e sem passar o instante os cortes mudariam a cada dia
+// que o teste rodasse. Quem tem relógio é a tela — nem a API nem o
+// dublê têm janela, os dois devolvem a data real do último agendamento.
 const AGORA = new Date("2026-09-08T10:00:00-03:00");
 
 function semear() {
@@ -33,11 +35,11 @@ function semear() {
           { servicoId: "s1", nome: "Corte", precoNoMomento: "40.00", duracaoNoMomento: 30 },
         ],
       },
-      // Fora da janela de 90 dias a partir de AGORA (2026-09-08): o
-      // corte fica perto de 2026-06-10, e esta data é bem anterior a
-      // isso, sem risco de fuso horário empurrá-la pra dentro. Sem esta
-      // entrada, nada no arquivo distingue uma janela de 90 dias de uma
-      // busca sem limite nenhum.
+      // Fora dos 90 dias a partir de AGORA (2026-09-08): o corte fica
+      // perto de 2026-06-10, e esta data é bem anterior a isso, sem
+      // risco de fuso horário empurrá-la pra dentro. Sem esta entrada,
+      // nada no arquivo distingue uma tela que corta em 90 dias de uma
+      // que imprime qualquer data que a API mandar.
       {
         id: "a2",
         clienteId: "c2",
@@ -66,13 +68,16 @@ describe("clientes no painel", () => {
 
     expect(await screen.findByText("João Silva")).toBeInTheDocument();
     expect(screen.getByText("Marcos Reis")).toBeInTheDocument();
-    // O último agendamento de João (30/08) cai dentro da janela de 90
-    // dias a partir de AGORA; o de Marcos (05/01) fica de fora e mostra
-    // "—". Sem isso, apagar a janela e buscar tudo passaria igual.
+    // O último agendamento de João (30/08) cai dentro dos 90 dias a
+    // partir de AGORA; o de Marcos (05/01) fica fora. A API manda as
+    // DUAS datas — ela não tem janela — então quem esconde a de Marcos
+    // é esta tela. Sem esta asserção, tirar o corte da tela e imprimir
+    // "5 de janeiro" no alto de uma lista de setembro passaria igual.
     expect(await screen.findByText("30 de agosto")).toBeInTheDocument();
     // O traço de antes servia às duas respostas opostas — "nunca veio" e
     // "sumiu faz mais de três meses". Marcos é o segundo caso, e a
-    // célula agora diz só o que a janela de 90 dias sabe.
+    // célula diz só o que a coluna se propõe a responder: anda vindo ou
+    // não. A data exata dele está no detalhe do cliente.
     expect(screen.getByText("Sem registro nos últimos 90 dias")).toBeInTheDocument();
     expect(screen.queryByText("—")).not.toBeInTheDocument();
   });
@@ -514,21 +519,115 @@ describe("clientes no painel", () => {
     ).toBeInTheDocument();
   });
 
-  // Mutação testada manualmente: comentar o `if (recentes.erro)` faz
-  // este teste falhar mostrando "—" pra João em vez do aviso — a lista
-  // continua renderizando normalmente porque só `clientes.erro` travava
-  // a tela antes deste fix, e a chamada de intervalo falhando não
-  // impedia `clientes.dados` de chegar.
-  it("uma falha ao carregar os últimos agendamentos vira aviso, não um '—' confiante em toda linha", async () => {
+  // Esta garantia era de um `if (recentes.erro)` próprio, de volta
+  // quando a coluna vinha de uma segunda chamada: se ela falhasse, a
+  // lista renderizava mesmo assim e TODA linha dizia "sem registro" —
+  // que não é "não consegui saber", é a afirmação confiante de que
+  // ninguém aparece há três meses.
+  //
+  // A segunda chamada não existe mais (a data vem em cada cliente), e
+  // com ela foi embora o jeito de a lista aparecer com a coluna
+  // inventada. O teste fica, agora sobre a única chamada que restou: o
+  // que se protege não é o `if`, é a promessa de que falha nunca vira
+  // afirmação sobre a frequência de ninguém.
+  it("uma falha ao carregar não vira 'sem registro' confiante em toda linha", async () => {
     const falso = semear();
-    falso.barbeiro.agendamentosDoIntervalo = async () => {
+    falso.barbeiro.clientes = async () => {
       throw new ErroDaApi(500, "erro_interno", "");
     };
     montarPainel(<ListaDeClientes agora={AGORA} />, falso);
 
     expect(
-      await screen.findByText(/não foi possível carregar os últimos agendamentos agora/i)
+      await screen.findByText(/não foi possível carregar os clientes agora/i)
     ).toBeInTheDocument();
     expect(screen.queryByText("João Silva")).not.toBeInTheDocument();
+    expect(screen.queryByText(/sem registro/i)).not.toBeInTheDocument();
   });
+});
+
+// Uma página de um cliente sobre uma carteira de dois. O limite vem da
+// semente porque o padrão da API é 100, e provar a segunda página com o
+// padrão custaria 101 cadastros pra dizer a mesma coisa.
+function semearPaginado() {
+  return criarApiClientFalso({
+    limiteDaPagina: 1,
+    clientes: [
+      { id: "c1", nome: "João Silva", telefone: "(11) 99999-0001", email: null, temConta: false },
+      { id: "c2", nome: "Marcos Reis", telefone: "(11) 99999-0002", email: null, temConta: false },
+    ],
+    agendamentos: [],
+  });
+}
+
+describe("clientes no painel: páginas", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    navegacaoFalsa.redefinir({ pathname: "/painel/clientes" });
+  });
+
+  it("a contagem e a faixa Todos falam do total, não do que veio", async () => {
+    montarPainel(<ListaDeClientes agora={AGORA} />, semearPaginado());
+
+    expect(await screen.findByText("João Silva")).toBeInTheDocument();
+    expect(screen.queryByText("Marcos Reis")).not.toBeInTheDocument();
+    // A frase que o teto fixo de antes não sabia dizer: com 200 de 260
+    // na tela, ele anunciava "200 clientes" e o fim do alfabeto sumia
+    // sem que nada na tela indicasse que faltava alguém.
+    expect(screen.getByText("1 de 2 clientes")).toBeInTheDocument();
+  });
+
+  it("carregar mais anexa a próxima página, e o botão some no fim", async () => {
+    montarPainel(<ListaDeClientes agora={AGORA} />, semearPaginado());
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: /carregar mais clientes/i })
+    );
+
+    expect(await screen.findByText("Marcos Reis")).toBeInTheDocument();
+    // Anexa, não substitui: sem esta linha, uma segunda página que
+    // trocasse a lista inteira passaria igual.
+    expect(screen.getByText("João Silva")).toBeInTheDocument();
+    // Acabou: a frase volta a ser a simples, sem "de".
+    expect(screen.getByText("2 clientes")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /carregar mais clientes/i })
+    ).not.toBeInTheDocument();
+  });
+
+  it("falhar ao carregar mais não apaga o que já está na tela", async () => {
+    const falso = semearPaginado();
+    const paginar = falso.barbeiro.clientes;
+    falso.barbeiro.clientes = async (busca?: string, cursor?: string) => {
+      // Só a segunda página falha. A primeira já está na tela e não tem
+      // por que sumir junto.
+      if (cursor) throw new ErroDaApi(500, "erro_interno", "");
+      return paginar(busca);
+    };
+    montarPainel(<ListaDeClientes agora={AGORA} />, falso);
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: /carregar mais clientes/i })
+    );
+
+    expect(
+      await screen.findByText(/não foi possível carregar mais clientes agora/i)
+    ).toBeInTheDocument();
+    // O aviso fica ao lado do botão; a lista carregada continua válida.
+    expect(screen.getByText("João Silva")).toBeInTheDocument();
+  });
+
+  // SEM COBERTURA, e não por esquecimento: trocar a busca precisa
+  // descartar as páginas acumuladas E o cursor. As páginas porque um
+  // cliente trazido por "carregar mais" continuaria na tela debaixo de
+  // um filtro que não o traria; o cursor porque o `useRequisicao`
+  // segura a resposta anterior enquanto a próxima não chega — clicar em
+  // "carregar mais" nessa janela mandaria a busca NOVA com o cursor
+  // VELHO. O `useEffect` sobre `[busca]` na tela faz as duas coisas.
+  //
+  // Não dá pra exercitar aqui: o filtro entra pela URL, o `replace` do
+  // dublê de navegação é só um espião (ver o comentário lá em cima) e
+  // `montarPainel` não devolve o `rerender` do RTL, então nada nesta
+  // suíte consegue levar a tela de uma busca a outra. Cobrir isto pede
+  // mexer no ajudante — vale, mas é mudança de infraestrutura de teste,
+  // não deste arquivo.
 });

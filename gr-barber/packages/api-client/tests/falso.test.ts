@@ -101,7 +101,7 @@ describe("dublê — escopo do barbeiro", () => {
       ],
     });
 
-    expect(await falso.barbeiro.clientes()).toHaveLength(2);
+    expect((await falso.barbeiro.clientes()).clientes).toHaveLength(2);
   });
 
   it("filtra por nome sem se importar com caixa", async () => {
@@ -114,7 +114,10 @@ describe("dublê — escopo do barbeiro", () => {
 
     const achados = await falso.barbeiro.clientes("marcos");
 
-    expect(achados.map((c) => c.id)).toEqual(["c2"]);
+    expect(achados.clientes.map((c) => c.id)).toEqual(["c2"]);
+    // O total fala do filtro, não da carteira — é o que a tela usa pra
+    // escrever "1 de 2" sem mentir.
+    expect(achados.total).toBe(1);
   });
 
   it("filtra por telefone comparando dígito a dígito", async () => {
@@ -129,7 +132,7 @@ describe("dublê — escopo do barbeiro", () => {
 
     const achados = await falso.barbeiro.clientes("999990002");
 
-    expect(achados.map((c) => c.id)).toEqual(["c2"]);
+    expect(achados.clientes.map((c) => c.id)).toEqual(["c2"]);
   });
 
   it("cria cliente novo e o devolve na lista", async () => {
@@ -141,7 +144,7 @@ describe("dublê — escopo do barbeiro", () => {
     });
 
     expect(criado.nome).toBe("Ana Souza");
-    expect(await falso.barbeiro.clientes()).toHaveLength(1);
+    expect((await falso.barbeiro.clientes()).clientes).toHaveLength(1);
   });
 
   it("recusa telefone já cadastrado com conflito", async () => {

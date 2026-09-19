@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { apenasDigitos } from "@gr-barber/formato";
+import { ErroDaApi } from "@gr-barber/api-client";
+import type { ClienteDaLista } from "@gr-barber/types";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Aviso } from "../../componentes/Aviso";
 import { Botao } from "../../componentes/Botao";
@@ -118,91 +120,139 @@ export function ListaDeClientes({ agora = new Date() }: { agora?: Date }) {
 
   const clientes = useRequisicao(() => api.barbeiro.clientes(busca), [busca]);
 
-  // O último agendamento não vem na lista de clientes, então sai daqui:
-  // uma chamada de intervalo, não uma por linha. A janela é de 90 dias
-  // e não "desde sempre" de propósito — buscar o histórico inteiro da
-  // barbearia a cada abertura da lista fica mais caro a cada mês, e
-  // quem não aparece há três meses aparece como "—", que é a informação
-  // que a coluna existe pra dar.
-  const janela = 90;
-  const ate = hojeIso(agora);
-  const de = hojeIso(new Date(agora.getTime() - janela * 24 * 60 * 60 * 1000));
+  // As páginas seguintes moram fora do `useRequisicao`: ele é uma
+  // requisição por chave, e o que se quer aqui é acumular. A chave dele
+  // continua sendo a busca, então trocar o filtro descarta o acumulado
+  // sozinho — é o `useEffect` abaixo que garante isso, e não a sorte.
+  const [seguintes, setSeguintes] = useState<ClienteDaLista[]>([]);
+  const [cursor, setCursor] = useState<string | null>(null);
+  const [buscandoMais, setBuscandoMais] = useState(false);
+  const [erroDeMais, setErroDeMais] = useState<string | undefined>();
+
+  // Dois efeitos, e não um sobre `clientes.dados`, porque são dois
+  // momentos diferentes — e juntá-los tinha um buraco de verdade.
+  //
+  // Este descarta na hora em que a busca muda. O `useRequisicao` segura
+  // a resposta ANTERIOR enquanto a próxima não chega (é o que faz a
+  // lista não piscar), então entre a troca do filtro e a chegada da
+  // página nova a tela seguia montada com o cursor do filtro velho. Um
+  // clique em "carregar mais" nessa janela mandava a busca nova com o
+  // cursor antigo, e o Prisma se posicionaria num cliente que o novo
+  // `where` talvez nem contenha. Zerando aqui, o botão some durante a
+  // transição — que é o certo: não há próxima página até saber qual é a
+  // primeira.
+  useEffect(() => {
+    setSeguintes([]);
+    setCursor(null);
+    setErroDeMais(undefined);
+  }, [busca]);
+
+  // E este anota o cursor que veio com a página.
+  useEffect(() => {
+    setCursor(clientes.dados?.proximoCursor ?? null);
+  }, [clientes.dados]);
+
+  async function carregarMais() {
+    // Trava explícita e não só o `disabled` do botão: um `disabled` que
+    // só existe depois do re-render deixa a discriminação depender de
+    // quando o React agenda esse render, e dois cliques rápidos
+    // pediriam a MESMA página duas vezes — a lista mostraria cada nome
+    // dela em duplicata.
+    if (!cursor || buscandoMais) return;
+
+    setBuscandoMais(true);
+    setErroDeMais(undefined);
+    try {
+      const pagina = await api.barbeiro.clientes(busca, cursor);
+      setSeguintes((anteriores) => [...anteriores, ...pagina.clientes]);
+      setCursor(pagina.proximoCursor);
+    } catch (erro) {
+      // Aviso ao lado do botão, e não a tela inteira virando erro: o que
+      // já está carregado continua válido e útil. Falhar aqui não pode
+      // apagar as cem linhas que a pessoa está olhando.
+      // `.mensagem` e não `.message`: o construtor do ErroDaApi faz
+      // `super(mensagem || codigo)`, então `.message` nunca é vazio — um
+      // 500 sem texto chegaria aqui como "erro_interno" e era isso que o
+      // barbeiro leria. O campo `mensagem` preserva o vazio, que é o que
+      // deixa o fallback em português acontecer.
+      setErroDeMais(
+        (erro instanceof ErroDaApi && erro.mensagem) ||
+          "Não foi possível carregar mais clientes agora."
+      );
+    } finally {
+      setBuscandoMais(false);
+    }
+  }
+
+  // As duas fronteiras que a tela desenha sobre a data que a API manda.
+  // A API devolve o último agendamento de verdade, sem janela — quem
+  // sabe que dia é hoje é esta tela, e é ela que decide o que conta como
+  // "recente" e o que já é "sumido".
   const trintaDiasAtras = hojeIso(
     new Date(agora.getTime() - 30 * 24 * 60 * 60 * 1000)
   );
-  const recentes = useRequisicao(
-    () => api.barbeiro.agendamentosDoIntervalo(de, ate),
-    [de, ate]
+  const noventaDiasAtras = hojeIso(
+    new Date(agora.getTime() - 90 * 24 * 60 * 60 * 1000)
   );
-
-  // Uma passada pelos agendamentos, não uma por cliente: a versão antiga
-  // filtrava e ordenava a lista inteira dentro do map das linhas, o que
-  // com o teto de 200 clientes da API dava 200 varreduras de toda a
-  // agenda do trimestre a cada render.
-  const ultimaVisita = useMemo(() => {
-    const mapa = new Map<string, string>();
-    for (const agendamento of recentes.dados ?? []) {
-      const guardada = mapa.get(agendamento.cliente.id);
-      // ISO compara como texto, então `>` basta pra ficar com a maior.
-      if (!guardada || agendamento.data > guardada) {
-        mapa.set(agendamento.cliente.id, agendamento.data);
-      }
-    }
-    return mapa;
-  }, [recentes.dados]);
 
   // Só a primeira carga: `dados` guarda a resposta anterior enquanto a
   // próxima não chega, então trocar a busca não pisca — a lista antiga
   // fica à vista até a nova responder.
-  const carregando = !clientes.dados || !recentes.dados;
+  //
+  // Uma requisição só, e portanto um caminho de erro só. Antes eram
+  // duas, e a segunda precisava de um `if (erro)` próprio: sem ele, uma
+  // falha ao carregar os agendamentos deixava a coluna inteira dizendo
+  // "sem registro" — que não é "não consegui saber", é a afirmação
+  // confiante de que ninguém aparece há três meses. Com uma requisição
+  // só, o `clientes.erro` abaixo é essa garantia, e não sobra um
+  // segundo estado parcial pra alguém esquecer de tratar.
+  const carregando = !clientes.dados;
 
-  // Um cliente por balde, a partir do mapa que a coluna já usa.
-  const faixaDe = (clienteId: string): Faixa => {
-    const ultima = ultimaVisita.get(clienteId);
-    if (!ultima) return "sumidos";
+  // Um cliente por balde, a partir da data que veio na própria linha.
+  // "Sumido" inclui quem nunca veio: `null` e uma data velha respondem a
+  // mesma pergunta — esse cliente não aparece há pelo menos 90 dias.
+  const faixaDe = (ultima: string | null): Faixa => {
+    if (!ultima || ultima < noventaDiasAtras) return "sumidos";
     return ultima >= trintaDiasAtras ? "recentes" : "todos";
   };
 
-  const carregados = clientes.dados ?? [];
+  const carregados = [...(clientes.dados?.clientes ?? []), ...seguintes];
+  // Quantos existem de verdade no filtro atual — não quantos vieram.
+  const total = clientes.dados?.total ?? 0;
   const listados =
     faixa === "todos"
       ? carregados
-      : carregados.filter((cliente) => faixaDe(cliente.id) === faixa);
-
-  const quantosNaFaixa = (valor: Faixa) =>
-    valor === "todos"
-      ? carregados.length
-      : carregados.filter((cliente) => faixaDe(cliente.id) === valor).length;
+      : carregados.filter(
+          (cliente) => faixaDe(cliente.ultimoAgendamento) === faixa
+        );
 
   const quantos = listados.length;
+  // Três frases, e a do meio é a que faltava: enquanto houver página
+  // por carregar, a contagem diz "de quantos" — senão "100 clientes"
+  // numa carteira de 260 seria a mesma mentira silenciosa do teto fixo
+  // de antes. Quando tudo já veio, `quantos` e `total` coincidem e a
+  // frase volta a ser a simples.
   const contagem = busca
     ? `${quantos} ${quantos === 1 ? "encontrado" : "encontrados"} para “${busca}”`
-    : `${quantos} ${quantos === 1 ? "cliente" : "clientes"}`;
+    : quantos < total
+      ? `${quantos} de ${total} clientes`
+      : `${quantos} ${quantos === 1 ? "cliente" : "clientes"}`;
 
   if (clientes.erro) {
     return <Aviso>{clientes.erro.mensagem || "Não foi possível carregar os clientes agora."}</Aviso>;
   }
-  // `recentes.erro`, ao contrário do `daSemana.erro` da agenda (que fica
-  // de fora de propósito, ver o comentário lá), não pode ficar de fora
-  // aqui: quando essa chamada falha, `recentes.dados` fica `null` e
-  // `ultimoDe` devolve "—" pra TODO cliente — e "—" não é "sem dado
-  // ainda", é a alegação de que ninguém aparece há três meses. Uma
-  // falha de carregamento virando essa afirmação confiante e falsa é
-  // pior do que a tela inteira parar num aviso.
-  if (recentes.erro) {
-    return (
-      <Aviso>
-        {recentes.erro.mensagem || "Não foi possível carregar os últimos agendamentos agora."}
-      </Aviso>
-    );
-  }
-
-  function ultimoDe(clienteId: string): string {
-    const ultima = ultimaVisita.get(clienteId);
-    // O "—" de antes dizia duas coisas opostas com o mesmo traço: "nunca
-    // veio" e "sumiu faz mais de três meses". A frase não afirma nenhuma
-    // das duas — diz o que a janela de 90 dias de fato sabe.
-    return ultima ? formatarDataLonga(ultima) : SEM_REGISTRO;
+  // O "—" de antes dizia duas coisas opostas com o mesmo traço: "nunca
+  // veio" e "sumiu faz mais de três meses". A frase não afirma nenhuma
+  // das duas — diz o que a coluna de fato sabe.
+  //
+  // A API manda a data real, sem janela, mas a coluna continua cortando
+  // em 90 dias: "12 de março" no alto de uma lista em setembro é ruído
+  // que parece dado fresco, e a pergunta que a coluna existe pra
+  // responder é "esse cliente anda vindo?". A data exata de quem sumiu
+  // está no detalhe do cliente, a um clique da linha.
+  function ultimoDe(ultima: string | null): string {
+    if (!ultima || ultima < noventaDiasAtras) return SEM_REGISTRO;
+    return formatarDataLonga(ultima);
   }
 
   return (
@@ -249,9 +299,17 @@ export function ListaDeClientes({ agora = new Date() }: { agora?: Date }) {
                 onClick={() => setFaixa(opcao.valor)}
               >
                 {opcao.rotulo}
-                <span className={estilos.quantosNaFaixa}>
-                  {quantosNaFaixa(opcao.valor)}
-                </span>
+                {/* Número só em "Todos", e só porque agora ele é o
+                    `total` que a API contou. As outras duas faixas
+                    filtram o que ESTÁ carregado: com 100 de 260 na tela,
+                    um "67" ao lado de "Sem registro em 90 dias" seria
+                    uma afirmação sobre a carteira que ninguém mediu. A
+                    pílula sem número continua filtrando e não promete
+                    nada de falso — contar por faixa no servidor é o
+                    passo seguinte, não algo que a tela possa fingir. */}
+                {opcao.valor === "todos" ? (
+                  <span className={estilos.quantosNaFaixa}>{total}</span>
+                ) : null}
               </button>
             ))}
           </div>
@@ -260,6 +318,12 @@ export function ListaDeClientes({ agora = new Date() }: { agora?: Date }) {
             <p className={estilos.contagem}>{contagem}</p>
           ) : null}
 
+        {/* Tabela e botão no mesmo embrulho, e não soltos na página: é
+            o embrulho que leva o `min-height: 0` e, por dentro, o passa
+            só pra moldura. Com o botão solto, ele é que seria o último
+            filho — a tabela voltaria a crescer sem teto e o cabeçalho
+            preso perderia contra o que grudar. */}
+        <div className={estilos.lista}>
         <Tabela
           cabecalho={["Nome", "Telefone", "Último agendamento", ""]}
           // Sem largura declarada o excesso de uma tela larga cai todo na
@@ -305,7 +369,7 @@ export function ListaDeClientes({ agora = new Date() }: { agora?: Date }) {
             celulas: [
               cliente.nome,
               cliente.telefone,
-              ultimoDe(cliente.id),
+              ultimoDe(cliente.ultimoAgendamento),
               // Chamar no zap e marcar horário são as duas coisas que se
               // faz com um cliente na tela — e as duas custavam abrir o
               // detalhe e voltar. `stopPropagation` em ambas: a linha
@@ -339,6 +403,32 @@ export function ListaDeClientes({ agora = new Date() }: { agora?: Date }) {
             ],
           }))}
           />
+
+          {/* O botão só aparece quando há página por vir. Fica fora da
+              moldura de propósito: dentro, ele rolaria junto das linhas
+              e só seria encontrado por quem chegasse ao fim — que é
+              exatamente quem já não precisa procurar.
+
+              A faixa ativa não o esconde: ela filtra o carregado, e
+              carregar mais é justamente como aparecem mais candidatos
+              pra ela. */}
+          {cursor ? (
+            <div className={estilos.maisClientes}>
+              <Botao
+                variante="contorno"
+                onClick={carregarMais}
+                disabled={buscandoMais}
+              >
+                {buscandoMais ? "Carregando…" : "Carregar mais clientes"}
+              </Botao>
+              {erroDeMais ? (
+                <span className={estilos.erroDeMais} role="status">
+                  {erroDeMais}
+                </span>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
         </>
       )}
     </div>

@@ -5,6 +5,7 @@ import type {
   ClienteSerializado,
   HorarioSerializado,
   NovoAgendamentoBarbeiroInput,
+  PaginaDeClientes,
   PerfilBarbeiro,
   ServicoSerializado,
   SessaoBarbeiro,
@@ -152,7 +153,11 @@ export function criarApiBarbeiro(requisicao: Requisicao) {
       });
     },
 
-    async clientes(busca?: string): Promise<ClienteSerializado[]> {
+    // Devolve uma PÁGINA, não a lista: `{ clientes, total,
+    // proximoCursor }`. Cada linha traz a data do último agendamento —
+    // quem só quer o cadastro (a busca do Novo agendamento) lê
+    // `.clientes` e ignora o resto.
+    async clientes(busca?: string, cursor?: string): Promise<PaginaDeClientes> {
       // Busca vazia vira `undefined`, que é o único valor que o
       // `montarQuery` omite — `""` ele serializa, e `?busca=` bate no
       // `minLength: 1` do schema da API (400 "querystring/busca must
@@ -168,11 +173,10 @@ export function criarApiBarbeiro(requisicao: Requisicao) {
       // espaços em volta, então `"   "` seria uma ida ao servidor pra
       // receber a lista inteira de volta.
       const termo = busca?.trim() ? busca : undefined;
-      const resposta = await requisicao<{ clientes: ClienteSerializado[] }>(
-        "/clientes",
-        { query: { busca: termo }, comToken: true }
-      );
-      return resposta.clientes;
+      return requisicao<PaginaDeClientes>("/clientes", {
+        query: { busca: termo, cursor },
+        comToken: true,
+      });
     },
 
     criarCliente(novo: NovoCliente): Promise<ClienteSerializado> {

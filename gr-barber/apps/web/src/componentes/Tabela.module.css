@@ -17,6 +17,26 @@
   white-space: nowrap;
 }
 
+/* O cabeçalho fica preso no topo da moldura enquanto as linhas passam
+   por baixo. Uma lista de 200 clientes tem 16 telas de rolagem, e sem
+   isto a terceira coluna vira uma data solta sem ninguém pra dizer que
+   é o último agendamento.
+
+   Funciona porque a moldura é o scrollport: `overflow-x: auto` faz o
+   eixo Y computar `auto` junto, e o `min-height: 0` que a tela põe no
+   último filho deixa a moldura encolher abaixo do conteúdo — é aí que
+   ela passa a rolar por dentro e o `top: 0` tem contra o que grudar.
+   Numa lista curta nada disso acontece e o cabeçalho fica onde estava.
+
+   O fundo opaco de `.tabela th` não é decoração: sem ele as linhas
+   apareceriam por baixo do cabeçalho enquanto rolam. */
+.tabela thead th {
+  position: sticky;
+  top: 0;
+  /* Acima das células, que ganham fundo próprio no hover. */
+  z-index: 1;
+}
+
 .tabela th {
   text-align: left;
   padding: var(--espaco-md);

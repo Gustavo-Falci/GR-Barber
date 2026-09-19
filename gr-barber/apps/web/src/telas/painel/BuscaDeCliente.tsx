@@ -40,7 +40,10 @@ export function BuscaDeCliente({
   // não o traga de volta: recarregar a requisição não bastaria, porque
   // a busca poderia estar filtrando por outra coisa e o cadastro que
   // acabou de acontecer sumiria da tela igual.
-  const listaBase = clientes.dados ?? [];
+  // Só a primeira página: quem procura alguém aqui digita o nome, não
+  // rola uma lista de 260. O `total` e o `proximoCursor` da resposta não
+  // interessam a esta tela.
+  const listaBase = clientes.dados?.clientes ?? [];
   const lista =
     escolhido && !listaBase.some((cliente) => cliente.id === escolhido.id)
       ? [escolhido, ...listaBase]

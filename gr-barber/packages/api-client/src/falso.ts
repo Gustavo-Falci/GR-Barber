@@ -42,6 +42,11 @@ export interface EstadoFalso {
   // Os clientes que o barbeiro enxerga. Lista separada porque as duas
   // perguntas são diferentes: "quem sou eu" e "quem são os meus".
   clientes: ClienteSerializado[];
+  // Quantos clientes cabem numa página de GET /clientes. Existe na
+  // semente porque o padrão da API é 100, e um teste de "carregar mais"
+  // precisaria de 101 cadastros pra ver a segunda página — com dois
+  // clientes e um limite de 1, o mesmo caminho fica legível.
+  limiteDaPagina?: number;
 }
 
 const PERFIL_PADRAO: PerfilPublicoBarbearia = {
@@ -90,6 +95,8 @@ export function criarApiClientFalso(semente: Partial<EstadoFalso> = {}) {
     agendamentos: [...(semente.agendamentos ?? [])],
     cliente: semente.cliente ?? CLIENTE_PADRAO,
     clientes: [...(semente.clientes ?? [CLIENTE_PADRAO])],
+    // O mesmo padrão da API (LIMITE_PADRAO em routers/clientes.ts).
+    limiteDaPagina: semente.limiteDaPagina ?? 100,
   };
 
   function exigirSlug(slug: string): void {
@@ -97,6 +104,24 @@ export function criarApiClientFalso(semente: Partial<EstadoFalso> = {}) {
     if (slug !== estado.perfil.slug) {
       throw new ErroDaApi(404, "nao_encontrado", "barbearia não encontrada");
     }
+  }
+
+  // A mesma regra do `comUltimoAgendamento` da API: a MAIOR data entre
+  // todos os agendamentos do cliente, sem janela de tempo nenhuma.
+  //
+  // É a ausência de janela que mantém este dublê honesto. Com uma, ele
+  // precisaria saber que dia é hoje — e como a API responde a partir do
+  // relógio do servidor e o teste fixa o seu, os dois passariam a
+  // discordar sem ninguém notar. Sem relógio aqui, não há como divergir:
+  // quem compara com hoje é a tela, e o teste já lhe passa o instante.
+  function ultimoAgendamentoDe(clienteId: string): string | null {
+    let maior: string | null = null;
+    for (const agendamento of estado.agendamentos) {
+      if (agendamento.clienteId !== clienteId) continue;
+      // ISO compara como texto, então `>` basta pra ficar com a maior.
+      if (!maior || agendamento.data > maior) maior = agendamento.data;
+    }
+    return maior;
   }
 
   function duracaoDe(servicoIds: string[]): number {
@@ -339,8 +364,32 @@ export function criarApiClientFalso(semente: Partial<EstadoFalso> = {}) {
       async desativarServico(id: string) {
         return editarServico(id, { ativo: false });
       },
-      async clientes(busca?: string) {
-        return estado.clientes.filter((c) => combina(c, busca ?? ""));
+      // Pagina como a API: mesma ordem (nome, e o id pra desempatar),
+      // mesmo corte, mesmo `total` sobre o filtro — e não sobre a
+      // carteira toda. Um dublê que devolvesse tudo de uma vez deixaria
+      // a tela de "carregar mais" sem como ser testada, que é
+      // exatamente o tipo de folga que faz o dublê aceitar o que a API
+      // recusa.
+      async clientes(busca?: string, cursor?: string) {
+        const filtrados = estado.clientes
+          .filter((c) => combina(c, busca ?? ""))
+          .map((c) => ({ ...c, ultimoAgendamento: ultimoAgendamentoDe(c.id) }))
+          .sort((a, b) => a.nome.localeCompare(b.nome) || a.id.localeCompare(b.id));
+
+        const inicio = cursor
+          ? filtrados.findIndex((c) => c.id === cursor) + 1
+          : 0;
+        const pagina = filtrados.slice(
+          inicio,
+          inicio + (estado.limiteDaPagina ?? 100)
+        );
+        const fim = inicio + pagina.length;
+
+        return {
+          clientes: pagina,
+          total: filtrados.length,
+          proximoCursor: fim < filtrados.length ? pagina[pagina.length - 1].id : null,
+        };
       },
       async criarCliente(novo: NovoCliente) {
         const repetido = estado.clientes.some(

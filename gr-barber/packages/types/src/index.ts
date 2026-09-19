@@ -77,6 +77,37 @@ export interface ServicoSerializado {
 // mobile importam não têm como divergir em silêncio.
 export type ClienteSerializado = ClientePublico;
 
+// O que cada linha de GET /clientes devolve: o cliente mais a data do
+// último agendamento dele. Vem junto, e não de uma segunda chamada,
+// porque a lista do painel baixava a agenda inteira do trimestre — com
+// cliente e serviços aninhados em cada registro — só pra preencher uma
+// coluna. Aqui é uma agregação no banco.
+//
+// `null` quer dizer "nunca veio", não "não sei": a data é a maior de
+// TODAS as dele, sem janela nenhuma. Quem decide a partir de quando
+// isso vira "sumido" é a tela, que é quem sabe que dia é hoje. Manter a
+// janela fora do contrato é também o que mantém o dublê de teste
+// honesto — sem relógio próprio, ele não tem como divergir da API.
+export interface ClienteDaLista extends ClientePublico {
+  ultimoAgendamento: string | null; // "YYYY-MM-DD"
+}
+
+// Uma página de GET /clientes. O `total` existe porque sem ele a tela
+// não tinha como distinguir "são 200 clientes" de "são os 200 primeiros
+// de um número que eu não sei" — e, ordenando por nome, o que sumia era
+// sempre o fim do alfabeto, em silêncio.
+//
+// `proximoCursor` é o id do último cliente da página, e `null` quer
+// dizer que acabou. Cursor e não `offset`: a lista é ordenada por nome,
+// e um cadastro novo no meio do alfabeto desloca todas as páginas
+// seguintes de um offset — fazendo alguém aparecer duas vezes ou
+// nenhuma. O cursor não se move quando a vizinhança muda.
+export interface PaginaDeClientes {
+  clientes: ClienteDaLista[];
+  total: number;
+  proximoCursor: string | null;
+}
+
 export interface AgendamentoServicoSerializado {
   servicoId: string;
   nome: string;
