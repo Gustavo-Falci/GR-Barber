@@ -1,7 +1,18 @@
+/* Teto próprio, como toda outra tela do painel declara (560 nos
+   formulários, 680 nos detalhes, 1120 no Novo agendamento). Esta era a
+   única lista sem um, então herdava os 1180px do `.container` — e três
+   colunas curtas não têm o que fazer com eles: medido no harness, com
+   uma linha sobravam 977px entre o fim do nome e o começo do preço, os
+   dois dados que se lê junto. A 760 o vão cai pra 557 e a tabela lê
+   como um bloco, não como uma folha com um buraco no meio.
+
+   Clientes continua sem teto de propósito: lá são quatro colunas com
+   telefone, data por extenso e duas ações — 1180 é usado de verdade. */
 .pagina {
   display: grid;
   gap: var(--espaco-lg);
   align-content: start;
+  max-width: 760px;
 }
 
 /* A contagem acompanha a tabela, não o cabeçalho: ela fala do que está
@@ -22,4 +33,22 @@
   display: inline-flex;
   align-items: center;
   gap: var(--espaco-sm);
+}
+
+/* A seta de abrir, encostada no fim da linha. `--cor-muted` aqui é
+   legítimo — e não a exceção que a linha atenuada precisou evitar:
+   ícone decorativo é objeto gráfico, cujo piso é 3:1, e este token dá
+   3.76:1 no tema claro. Texto normal é que pede 4.5:1. */
+.abrir {
+  display: flex;
+  justify-content: flex-end;
+  color: var(--cor-muted);
+}
+
+/* No hover a seta acompanha o realce da linha, senão ela fica apagada
+   justamente no momento em que anuncia para onde o clique leva. O
+   `tr` não é embaralhado pelo CSS Module (só classe é), mas o `.abrir`
+   é — então isto não alcança linha nenhuma fora desta tela. */
+tr:hover .abrir {
+  color: var(--cor-ink);
 }

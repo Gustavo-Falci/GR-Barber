@@ -11,6 +11,41 @@ import { useRequisicao } from "../../api/useRequisicao";
 import { useApiDoPainel } from "../../painel/ProvedorDoPainel";
 import estilos from "./ListaDeServicos.module.css";
 
+// A partir de quantas linhas a contagem passa a informar. Com três ou
+// menos ela só repete o que a tabela já mostra inteira — "1 serviço"
+// acima de uma linha é ruído. Um inativo reabre a frase em qualquer
+// tamanho: ele pode estar abaixo da dobra, e a contagem é o único
+// lugar onde ele se anuncia sem rolar.
+const LINHAS_PARA_CONTAR = 3;
+
+// Desenhado aqui, e não em painel/icones.tsx, pelo mesmo motivo do
+// IconeZap de Clientes: aquele arquivo é a família da barra lateral, e
+// este é a marca de uma linha de uma tela só.
+//
+// Existe porque a linha inteira abre o serviço e nada dizia isso: o
+// realce só aparece no hover, que em toque não existe. A seta é a
+// convenção de "isto leva a algum lugar" e fica visível o tempo todo.
+// Decorativa — quem carrega o nome acessível é o botão da primeira
+// célula, então `aria-hidden`.
+function IconeAbrir() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="18"
+      height="18"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path d="m9 6 6 6-6 6" />
+    </svg>
+  );
+}
+
 export function ListaDeServicos() {
   const router = useRouter();
   const api = useApiDoPainel();
@@ -39,8 +74,12 @@ export function ListaDeServicos() {
         titulo="Serviços"
         apoio="O que a barbearia oferece, com duração e preço."
         acao={
+          // "+ Novo" não dizia novo o quê. Com a barra lateral
+          // recolhida — só ícones, sem rótulo — o título da página era
+          // a única pista, e ela fica do outro lado da tela. Mesmo
+          // conserto que ListaDeClientes já tinha.
           <Botao onClick={() => router.push("/painel/servicos/novo")}>
-            + Novo
+            + Novo serviço
           </Botao>
         }
       />
@@ -51,10 +90,7 @@ export function ListaDeServicos() {
         <p>Carregando…</p>
       ) : (
         <>
-          {/* Um inativo pode estar abaixo da dobra: a frase é o único
-              lugar onde ele se anuncia sem rolar. Só aparece quando há
-              o que contar. */}
-          {listados.length > 0 ? (
+          {listados.length > LINHAS_PARA_CONTAR || inativos > 0 ? (
             <p className={estilos.contagem}>
               {listados.length}{" "}
               {listados.length === 1 ? "serviço" : "serviços"}
@@ -65,15 +101,16 @@ export function ListaDeServicos() {
           ) : null}
 
           <Tabela
-            cabecalho={["Nome", "Duração", "Preço"]}
-            // Três colunas, e não quatro: a quarta existia só pro chip
-            // de "inativo", que agora anda junto do nome. Vazia em toda
-            // linha ativa, ela era 266px de nada no fim da tabela — e
-            // era pra lá que ia toda a sobra de uma tela larga.
-            larguras={["56%", "22%", "22%"]}
+            cabecalho={["Nome", "Duração", "Preço", ""]}
+            // A quarta coluna voltou, mas com outro conteúdo: antes era
+            // o chip de "inativo" — vazio em toda linha ativa —, agora
+            // é a seta de abrir, que está em TODAS as linhas. Coluna
+            // estreita e sempre preenchida, e não 266px de nada no fim
+            // da tabela.
+            larguras={["50%", "20%", "22%", "8%"]}
             // Duração e preço são número: à direita, para a vírgula de
             // "R$ 40,00" e a de "R$ 180,00" caírem na mesma coluna.
-            alinhamentos={["inicio", "fim", "fim"]}
+            alinhamentos={["inicio", "fim", "fim", "inicio"]}
             vazio="Nenhum serviço cadastrado ainda."
             dicaVazio="Sem serviço cadastrado ninguém consegue agendar — é ele que define quanto tempo o horário ocupa."
             acaoVazio={
@@ -100,6 +137,9 @@ export function ListaDeServicos() {
                 </span>,
                 `${servico.duracaoMinutos} min`,
                 formatarPreco(servico.preco),
+                <span className={estilos.abrir} key="abrir">
+                  <IconeAbrir />
+                </span>,
               ],
             }))}
           />

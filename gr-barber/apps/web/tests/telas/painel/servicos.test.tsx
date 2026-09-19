@@ -374,6 +374,58 @@ describe("serviços no painel", () => {
     expect(await screen.findByText("Corte")).toBeInTheDocument();
   });
 
+  // Espelha o teste irmão de ListaDeClientes, pelo mesmo motivo: com a
+  // barra lateral recolhida — só ícones, sem rótulo — "+ Novo" não
+  // dizia novo o quê, e o título fica do outro lado da tela.
+  it("o botão de criar diz do que é", async () => {
+    montarPainel(<ListaDeServicos />, semear());
+
+    expect(
+      await screen.findByRole("button", { name: /novo serviço/i })
+    ).toBeInTheDocument();
+  });
+
+  // A contagem informa quando há o que contar. Com poucas linhas todas
+  // à vista ela só repete a tabela; com um inativo ela volta em
+  // qualquer tamanho, porque o inativo pode estar abaixo da dobra.
+  it("não conta uma lista curta sem inativo, mas conta quando há inativo", async () => {
+    const soAtivos = criarApiClientFalso({
+      servicos: [
+        { id: "s1", nome: "Corte", duracaoMinutos: 30, preco: "40.00", ativo: true },
+      ],
+    });
+    montarPainel(<ListaDeServicos />, soAtivos);
+
+    expect(await screen.findByText("Corte")).toBeInTheDocument();
+    expect(screen.queryByText(/^1 serviço$/)).not.toBeInTheDocument();
+  });
+
+  // O limiar em si: com 4 ativos a contagem volta, sem nenhum inativo
+  // pra disparar a outra metade da condição. Sem este caso, `> 3`
+  // poderia virar `> 30` sem nenhum teste reclamar.
+  it("conta a partir de quatro linhas mesmo sem inativo", async () => {
+    const quatro = criarApiClientFalso({
+      servicos: [1, 2, 3, 4].map((n) => ({
+        id: `s${n}`,
+        nome: `Serviço ${n}`,
+        duracaoMinutos: 30,
+        preco: "40.00",
+        ativo: true,
+      })),
+    });
+
+    montarPainel(<ListaDeServicos />, quatro);
+
+    expect(await screen.findByText(/^4 serviços$/)).toBeInTheDocument();
+  });
+
+  it("conta quando a lista curta tem um inativo", async () => {
+    // `semear()` tem dois serviços, um deles inativo.
+    montarPainel(<ListaDeServicos />, semear());
+
+    expect(await screen.findByText(/2 serviços · 1 inativo/)).toBeInTheDocument();
+  });
+
   // Com a lista vazia de verdade o estado vazio continua aparecendo —
   // senão a guarda acima teria "consertado" o bug escondendo também o
   // caso que ela deve mostrar.
