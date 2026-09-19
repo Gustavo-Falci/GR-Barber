@@ -2,6 +2,7 @@ import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { criarApiClientFalso, ErroDaApi } from "@gr-barber/api-client";
+
 import { CadastroDeServico } from "../../../src/telas/painel/CadastroDeServico";
 import { ListaDeServicos } from "../../../src/telas/painel/ListaDeServicos";
 import { navegacaoFalsa } from "../../ajudantes/navegacao";
@@ -30,7 +31,14 @@ describe("serviços no painel", () => {
 
     expect(await screen.findByText("Corte")).toBeInTheDocument();
     expect(screen.getByText("Barba")).toBeInTheDocument();
-    expect(screen.getByText(/inativo/i)).toBeInTheDocument();
+    // Escopado na linha do inativo, e não um `getByText(/inativo/i)`
+    // solto: a contagem acima da tabela também diz "1 inativo", e a
+    // busca solta passaria a casar com as duas.
+    const linhaDoInativo = screen.getByText("Barba").closest("tr");
+    if (!linhaDoInativo) throw new Error("linha do serviço inativo não encontrada");
+    expect(
+      within(linhaDoInativo as HTMLElement).getByText(/inativo/i)
+    ).toBeInTheDocument();
   });
 
   it("mostra preço e duração", async () => {
@@ -308,10 +316,9 @@ describe("serviços no painel", () => {
     );
   });
 
-  // O preço vem preenchido válido de propósito: `paraDecimal` roda
-  // ANTES da guarda de duração no handler, e um preço inválido também
-  // retornaria cedo — o que faria este teste passar mesmo sem nenhuma
-  // guarda na duração, sem provar nada sobre ela.
+  // Nome e preço vêm preenchidos válidos de propósito: o handler
+  // valida os três campos e só então decide, então deixar outro campo
+  // inválido faria este teste passar sem provar nada sobre a duração.
   it("duração vazia ou não numérica não chama a API — mesma guarda do preço, no campo ao lado", async () => {
     navegacaoFalsa.redefinir({ pathname: "/painel/servicos/novo" });
     const falso = semear();
@@ -327,5 +334,148 @@ describe("serviços no painel", () => {
 
     expect(await screen.findByText(/use um número inteiro de minutos/i)).toBeInTheDocument();
     expect(criar).not.toHaveBeenCalled();
+  });
+
+  // A lista nasce com `dados: null`, e o `?? []` que a tela usava fazia
+  // a Tabela receber zero linhas e pintar o estado vazio no primeiro
+  // paint: o barbeiro com serviços cadastrados lia "Nenhum serviço
+  // cadastrado ainda" — e um botão oferecendo cadastrar o primeiro —
+  // toda vez que abria a tela.
+  //
+  // A leitura fica travada de propósito. Sem a trava, o dublê responde
+  // no microtask seguinte e a janela do bug some antes de qualquer
+  // asserção: o teste passaria com ou sem a guarda.
+  it("não anuncia lista vazia enquanto os serviços ainda estão carregando", async () => {
+    const falso = semear();
+    let liberar: () => void = () => {};
+    const pendente = new Promise<void>((resolve) => {
+      liberar = resolve;
+    });
+    const original = falso.barbeiro.servicos;
+    falso.barbeiro.servicos = async () => {
+      await pendente;
+      return original();
+    };
+
+    montarPainel(<ListaDeServicos />, falso);
+
+    expect(await screen.findByText(/carregando/i)).toBeInTheDocument();
+    expect(
+      screen.queryByText(/nenhum serviço cadastrado ainda/i)
+    ).not.toBeInTheDocument();
+    // O botão importa à parte da frase: é ele que leva a uma tela de
+    // cadastro que o barbeiro não pediu.
+    expect(
+      screen.queryByRole("button", { name: /cadastrar primeiro serviço/i })
+    ).not.toBeInTheDocument();
+
+    liberar();
+
+    expect(await screen.findByText("Corte")).toBeInTheDocument();
+  });
+
+  // Com a lista vazia de verdade o estado vazio continua aparecendo —
+  // senão a guarda acima teria "consertado" o bug escondendo também o
+  // caso que ela deve mostrar.
+  it("lista vazia de verdade ainda mostra o estado vazio", async () => {
+    montarPainel(<ListaDeServicos />, criarApiClientFalso({ servicos: [] }));
+
+    expect(
+      await screen.findByText(/nenhum serviço cadastrado ainda/i)
+    ).toBeInTheDocument();
+  });
+
+  // As três guardas abaixo espelham o schema de
+  // apps/api/src/routers/servicos.ts. O dublê NÃO valida — ele aceita
+  // tudo que a API recusaria —, então sem estes testes a divergência
+  // entre formulário e schema só apareceria contra o Postgres, como um
+  // 400 de ajv que o barbeiro não tem como agir.
+  it("duração fora da grade de 5 minutos não chama a API", async () => {
+    navegacaoFalsa.redefinir({ pathname: "/painel/servicos/novo" });
+    const falso = semear();
+    const criar = vi.fn(falso.barbeiro.criarServico);
+    falso.barbeiro.criarServico = criar;
+
+    montarPainel(<CadastroDeServico />, falso);
+
+    await userEvent.type(await screen.findByLabelText(/nome/i), "Sobrancelha");
+    await userEvent.type(screen.getByLabelText(/preço/i), "40,00");
+    // 32 passa num `/^\d+$/` e é recusado pelo `multipleOf: 5` da API.
+    await userEvent.type(screen.getByLabelText(/duração/i), "32");
+    await userEvent.click(screen.getByRole("button", { name: /^salvar$/i }));
+
+    expect(await screen.findByText(/múltiplos de 5/i)).toBeInTheDocument();
+    expect(criar).not.toHaveBeenCalled();
+  });
+
+  it("duração acima do teto da API não chama a API", async () => {
+    navegacaoFalsa.redefinir({ pathname: "/painel/servicos/novo" });
+    const falso = semear();
+    const criar = vi.fn(falso.barbeiro.criarServico);
+    falso.barbeiro.criarServico = criar;
+
+    montarPainel(<CadastroDeServico />, falso);
+
+    await userEvent.type(await screen.findByLabelText(/nome/i), "Dia inteiro");
+    await userEvent.type(screen.getByLabelText(/preço/i), "40,00");
+    // Múltiplo de 5, mas acima do `maximum: 480` — separa a guarda de
+    // faixa da guarda de passo.
+    await userEvent.type(screen.getByLabelText(/duração/i), "600");
+    await userEvent.click(screen.getByRole("button", { name: /^salvar$/i }));
+
+    expect(await screen.findByText(/entre 5 e 480 minutos/i)).toBeInTheDocument();
+    expect(criar).not.toHaveBeenCalled();
+  });
+
+  it("nome vazio não chama a API", async () => {
+    navegacaoFalsa.redefinir({ pathname: "/painel/servicos/novo" });
+    const falso = semear();
+    const criar = vi.fn(falso.barbeiro.criarServico);
+    falso.barbeiro.criarServico = criar;
+
+    montarPainel(<CadastroDeServico />, falso);
+
+    // Nome deixado em branco de propósito; os outros dois, válidos.
+    await userEvent.type(await screen.findByLabelText(/duração/i), "30");
+    await userEvent.type(screen.getByLabelText(/preço/i), "40,00");
+    await userEvent.click(screen.getByRole("button", { name: /^salvar$/i }));
+
+    expect(await screen.findByText(/escreva o nome do serviço/i)).toBeInTheDocument();
+    expect(criar).not.toHaveBeenCalled();
+  });
+
+  it("preço maior que o schema aceita não chama a API", async () => {
+    navegacaoFalsa.redefinir({ pathname: "/painel/servicos/novo" });
+    const falso = semear();
+    const criar = vi.fn(falso.barbeiro.criarServico);
+    falso.barbeiro.criarServico = criar;
+
+    montarPainel(<CadastroDeServico />, falso);
+
+    await userEvent.type(await screen.findByLabelText(/nome/i), "Absurdo");
+    await userEvent.type(screen.getByLabelText(/duração/i), "30");
+    // Nove dígitos: PADRAO_PRECO para em oito.
+    await userEvent.type(screen.getByLabelText(/preço/i), "123456789");
+    await userEvent.click(screen.getByRole("button", { name: /^salvar$/i }));
+
+    expect(await screen.findByText(/8 dígitos antes da vírgula/i)).toBeInTheDocument();
+    expect(criar).not.toHaveBeenCalled();
+  });
+
+  // O formulário valida os três campos por tentativa, e não até o
+  // primeiro que falha: parando no primeiro, quem errou nome e duração
+  // descobre a segunda falha só depois de consertar a primeira.
+  it("mostra os erros dos três campos de uma vez", async () => {
+    navegacaoFalsa.redefinir({ pathname: "/painel/servicos/novo" });
+    montarPainel(<CadastroDeServico />, semear());
+
+    await userEvent.type(await screen.findByLabelText(/nome/i), "C");
+    await userEvent.type(screen.getByLabelText(/duração/i), "7");
+    await userEvent.type(screen.getByLabelText(/preço/i), "abc");
+    await userEvent.click(screen.getByRole("button", { name: /^salvar$/i }));
+
+    expect(await screen.findByText(/escreva o nome do serviço/i)).toBeInTheDocument();
+    expect(screen.getByText(/múltiplos de 5/i)).toBeInTheDocument();
+    expect(screen.getByText(/use um valor como 40,00/i)).toBeInTheDocument();
   });
 });

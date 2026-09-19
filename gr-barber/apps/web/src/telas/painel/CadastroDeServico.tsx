@@ -10,23 +10,64 @@ import { useRequisicao } from "../../api/useRequisicao";
 import { useApiDoPainel } from "../../painel/ProvedorDoPainel";
 import estilos from "./CadastroDeServico.module.css";
 
+// Os limites abaixo ESPELHAM o schema de apps/api/src/routers/servicos.ts.
+// Divergir não é detalhe de formulário: o que a guarda deixa passar
+// volta como 400 de schema, com uma frase de ajv ("must be multiple of
+// 5") que o barbeiro não tem como agir — e era justamente pra evitar
+// isso que estas funções existem. Mexer no schema da API sem mexer aqui
+// reabre o buraco em silêncio, porque nada liga os dois arquivos.
+const NOME_MIN = 2;
+const NOME_MAX = 120;
+const DURACAO_MIN = 5;
+const DURACAO_MAX = 480;
+// O passo de 5 mantém o cadastro alinhado com a grade de horários
+// sugeridos; o teto existe porque um serviço de 2000 minutos faria o
+// `horaFim` do agendamento passar da meia-noite.
+const DURACAO_PASSO = 5;
+// PADRAO_PRECO aceita no máximo 8 dígitos na parte inteira.
+const PRECO_INTEIRO_MAX = 8;
+
+// Um resultado, e não `T | null`: com null a tela tinha uma mensagem só
+// por campo, e "30 não serve" e "7 não serve" precisam dizer coisas
+// diferentes — a segunda tem conserto óbvio, a primeira não.
+type Validado<T> = { valor: T } | { erro: string };
+
+function validarNome(digitado: string): Validado<string> {
+  const limpo = digitado.trim();
+  if (limpo.length < NOME_MIN) return { erro: "Escreva o nome do serviço." };
+  if (limpo.length > NOME_MAX)
+    return { erro: `No máximo ${NOME_MAX} caracteres.` };
+  return { valor: limpo };
+}
+
 // "20,00" e "20.00" viram a mesma string decimal. Number entra só na
-// validação, nunca no que é enviado: o preço é Decimal no banco.
-function paraDecimal(digitado: string): string | null {
+// normalização, nunca no que é enviado: o preço é Decimal no banco.
+function paraDecimal(digitado: string): Validado<string> {
   const limpo = digitado.trim().replace(",", ".");
-  if (!/^\d+(\.\d{1,2})?$/.test(limpo)) return null;
-  return Number(limpo).toFixed(2);
+  if (!/^\d+(\.\d{1,2})?$/.test(limpo))
+    return { erro: "Use um valor como 40,00" };
+  const [inteiro] = limpo.split(".");
+  // Contado antes do `Number`: a partir de 1e21 o toFixed sai em
+  // notação científica ("1e+21"), que não casa com PADRAO_PRECO e
+  // chegaria na API como um 400 sobre o formato, não sobre o tamanho.
+  if (inteiro.length > PRECO_INTEIRO_MAX)
+    return { erro: `No máximo ${PRECO_INTEIRO_MAX} dígitos antes da vírgula.` };
+  return { valor: Number(limpo).toFixed(2) };
 }
 
 // Mesma guarda do preço, pro campo ao lado: `duracaoMinutos` é inteiro
 // na API, e um `Number(duracao)` direto deixa "" virar 0 e "abc" virar
-// NaN — que o `JSON.stringify` do corpo transforma em `null`, e a API
-// rejeita com uma mensagem de schema que o barbeiro não tem como agir.
-function paraMinutos(digitado: string): number | null {
+// NaN — que o `JSON.stringify` do corpo transforma em `null`.
+function paraMinutos(digitado: string): Validado<number> {
   const limpo = digitado.trim();
-  if (!/^\d+$/.test(limpo)) return null;
+  if (!/^\d+$/.test(limpo))
+    return { erro: "Use um número inteiro de minutos, como 30" };
   const numero = Number(limpo);
-  return numero > 0 ? numero : null;
+  if (numero < DURACAO_MIN || numero > DURACAO_MAX)
+    return { erro: `Entre ${DURACAO_MIN} e ${DURACAO_MAX} minutos.` };
+  if (numero % DURACAO_PASSO !== 0)
+    return { erro: `Use múltiplos de ${DURACAO_PASSO} minutos — 30, 45, 60.` };
+  return { valor: numero };
 }
 
 export function CadastroDeServico() {
@@ -42,6 +83,7 @@ export function CadastroDeServico() {
   const [nome, setNome] = useState("");
   const [duracao, setDuracao] = useState("");
   const [preco, setPreco] = useState("");
+  const [erroNome, setErroNome] = useState<string | undefined>();
   const [erroDuracao, setErroDuracao] = useState<string | undefined>();
   const [erroPreco, setErroPreco] = useState<string | undefined>();
   const [aviso, setAviso] = useState<string | undefined>();
@@ -95,27 +137,29 @@ export function CadastroDeServico() {
 
   async function salvar() {
     setAviso(undefined);
-    setErroDuracao(undefined);
-    setErroPreco(undefined);
 
-    const decimal = paraDecimal(preco);
-    if (!decimal) {
-      setErroPreco("Use um valor como 40,00");
-      return;
-    }
+    // Os três campos são validados SEMPRE, e não até o primeiro que
+    // falha: parar no primeiro faz o formulário revelar um erro por
+    // tentativa, e quem digitou nome curto e duração fora da grade
+    // descobre a segunda só depois de consertar a primeira.
+    const comNome = validarNome(nome);
+    const comMinutos = paraMinutos(duracao);
+    const comDecimal = paraDecimal(preco);
 
-    const minutos = paraMinutos(duracao);
-    if (!minutos) {
-      setErroDuracao("Use um número inteiro de minutos, como 30");
+    setErroNome("erro" in comNome ? comNome.erro : undefined);
+    setErroDuracao("erro" in comMinutos ? comMinutos.erro : undefined);
+    setErroPreco("erro" in comDecimal ? comDecimal.erro : undefined);
+
+    if ("erro" in comNome || "erro" in comMinutos || "erro" in comDecimal) {
       return;
     }
 
     setSalvando(true);
     try {
       const corpo = {
-        nome: nome.trim(),
-        duracaoMinutos: minutos,
-        preco: decimal,
+        nome: comNome.valor,
+        duracaoMinutos: comMinutos.valor,
+        preco: comDecimal.valor,
       };
       if (id) await api.barbeiro.atualizarServico(id, corpo);
       else await api.barbeiro.criarServico(corpo);
@@ -145,9 +189,26 @@ export function CadastroDeServico() {
     <div className={estilos.pagina}>
       <h1>{id ? "Editar serviço" : "Novo serviço"}</h1>
 
-      <Campo rotulo="Nome" valor={nome} onChange={setNome} />
+      <Campo
+        rotulo="Nome"
+        placeholder="Corte"
+        valor={nome}
+        onChange={(proximo) => {
+          setNome(proximo);
+          setErroNome(undefined);
+        }}
+        erro={erroNome}
+      />
+      {/* `inputMode` e não `type="number"`: o teclado do celular abre
+          numérico do mesmo jeito, e o campo continua uma string — que é
+          o que o `paraMinutos`/`paraDecimal` validam. `type="number"`
+          traria as setinhas, a roda do mouse mudando o valor sem querer
+          e um `value` que o navegador esvazia sozinho quando a
+          digitação é inválida. */}
       <Campo
         rotulo="Duração em minutos"
+        inputMode="numeric"
+        placeholder="30"
         valor={duracao}
         onChange={(proximo) => {
           setDuracao(proximo);
@@ -157,6 +218,8 @@ export function CadastroDeServico() {
       />
       <Campo
         rotulo="Preço"
+        inputMode="decimal"
+        placeholder="40,00"
         valor={preco}
         onChange={(proximo) => {
           setPreco(proximo);

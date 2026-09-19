@@ -71,6 +71,37 @@
   cursor: pointer;
 }
 
+/* Coluna de número, alinhada à direita. `tabular-nums` é o que permite
+   ler a coluna na vertical: com a figura proporcional, "R$ 40,00" e
+   "R$ 180,00" desencontram a vírgula e a comparação que a coluna existe
+   pra dar tem que ser feita algarismo a algarismo. */
+.tabela .fim {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Linha atenuada: o registro está fora de serviço, não apagado. Troca
+   de COR, e não `opacity` — opacity dilui junto a borda de 2px de
+   qualquer chip na linha, e é o tipo de ajuste que se escolhe no olho
+   sem ninguém medir o que sobrou de contraste.
+
+   `--cor-ink-soft`, e não `--cor-muted`: medido com Chrome headless
+   sobre estes mesmos módulos, `--cor-muted` sobre `--cor-surface` dá
+   3.76:1 no tema claro — reprova nos 4.5:1 de texto normal. Ele serve
+   pra legenda pequena (a contagem acima da tabela), não pra uma linha
+   que o barbeiro precisa ler. `--cor-ink-soft` passa nos dois temas e
+   continua distinguível do `--cor-ink` das linhas ativas.
+
+   O `color` no `td` basta pro botão da primeira célula, que herda
+   (`color: inherit`, abaixo); o peso é o que ele não herda. */
+.tabela tbody tr.atenuada td {
+  color: var(--cor-ink-soft);
+}
+
+.tabela tbody tr.atenuada td:first-child button {
+  font-weight: 500;
+}
+
 /* A primeira célula é o alvo de abrir a linha: o botão ocupa a célula
    inteira pra que a área clicável case com o que se vê. */
 .tabela td:first-child {

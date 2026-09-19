@@ -5,7 +5,18 @@ import estilos from "./Tabela.module.css";
 export interface Linha {
   id: string;
   celulas: ReactNode[];
+  // A linha continua listada, mas o que ela representa está fora de
+  // serviço — o serviço desativado, que some do agendamento do cliente.
+  // Mora aqui e não numa célula porque é propriedade da LINHA: um chip
+  // na última coluna anuncia isso a meia tabela de distância do nome
+  // que qualifica.
+  atenuada?: boolean;
 }
+
+// Alinhamento por coluna, na ordem do cabeçalho. Vale pro `th` e pro
+// `td` juntos de propósito: cabeçalho à esquerda sobre número à direita
+// é o tipo de desalinhamento que parece defeito.
+export type Alinhamento = "inicio" | "fim";
 
 export function Tabela({
   cabecalho,
@@ -15,6 +26,7 @@ export function Tabela({
   dicaVazio,
   acaoVazio,
   larguras,
+  alinhamentos,
 }: {
   cabecalho: string[];
   linhas: Linha[];
@@ -29,7 +41,15 @@ export function Tabela({
   // o excesso: o texto fica encostado na esquerda dela e sobram
   // centenas de pixels vazios à direita da tabela.
   larguras?: string[];
+  // Mesma gramática de `larguras`: um valor por coluna, na ordem do
+  // cabeçalho. Ausente, tudo fica no padrão da casa (à esquerda).
+  alinhamentos?: Alinhamento[];
 }) {
+  // Uma classe só por coluna, calculada uma vez e usada no cabeçalho e
+  // em cada linha — `td` e `th` da mesma coluna não têm como divergir.
+  const classeDaColuna = (indice: number) =>
+    alinhamentos?.[indice] === "fim" ? estilos.fim : undefined;
+
   if (linhas.length === 0) {
     return <Vazio mensagem={vazio} dica={dicaVazio} acao={acaoVazio} />;
   }
@@ -46,8 +66,10 @@ export function Tabela({
         ) : null}
         <thead>
           <tr>
-            {cabecalho.map((titulo) => (
-              <th key={titulo}>{titulo}</th>
+            {cabecalho.map((titulo, indice) => (
+              <th key={titulo} className={classeDaColuna(indice)}>
+                {titulo}
+              </th>
             ))}
           </tr>
         </thead>
@@ -58,11 +80,18 @@ export function Tabela({
             // uma só é prometer um alvo que não existe.
             <tr
               key={linha.id}
-              className={aoAbrir ? estilos.clicavel : undefined}
+              className={
+                [
+                  aoAbrir ? estilos.clicavel : "",
+                  linha.atenuada ? estilos.atenuada : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ") || undefined
+              }
               onClick={aoAbrir ? () => aoAbrir(linha.id) : undefined}
             >
               {linha.celulas.map((celula, indice) => (
-                <td key={indice}>
+                <td key={indice} className={classeDaColuna(indice)}>
                   {/* O botão continua na primeira célula, e não some com
                     a linha clicável: <tr> com onClick não chega pelo
                     teclado, e é ele que dá foco, Enter e nome acessível.
